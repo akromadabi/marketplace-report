@@ -1,0 +1,9 @@
+node_modules
+.env
+.env.*
+build/
+*.sql
+*.sql.gz
+*.zip
+*.log
+.DS_Store

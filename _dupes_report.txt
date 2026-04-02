@@ -1,0 +1,40 @@
+Total payment rows: 54567
+
+Order IDs appearing in multiple uploads: 27000
+Estimated extra (duplicate) rows: 27032
+
+Examples:
+  OrderID: 3548216229499536955
+    db_id:8461 upload:36 settlement:-111000 hash:e9ec16c444227bb04793192daa060690
+    db_id:31176 upload:43 settlement:-111000 hash:a85ea5342aa67a346e29f474ba6d9030
+  OrderID: 7589149145648023304
+    db_id:8462 upload:36 settlement:88154 hash:b4a1a2a4b3b313733acff19037affc08
+    db_id:31177 upload:43 settlement:88154 hash:27d8c3bd5b94d7ac14ab45929b3ada73
+  OrderID: 7589144279576102674
+    db_id:8463 upload:36 settlement:42500 hash:1c9636ebf8b9844d8df2dd2312fe7e9c
+    db_id:31178 upload:43 settlement:42500 hash:8fbcd4ddee5dee8f50288d82a822e37e
+  OrderID: 581830260578682136
+    db_id:8464 upload:36 settlement:46966 hash:c68e8ab3fdd03cafb174c1bd084e6785
+    db_id:31179 upload:43 settlement:46966 hash:524d46839c2920aa9235aca95a1b0399
+  OrderID: 581829668744103898
+    db_id:8465 upload:36 settlement:48503 hash:af3aafa35d6bebeff959097ed0a2c874
+    db_id:31180 upload:43 settlement:48503 hash:60021c5b674f60496da947577e20e5ce
+
+All payment uploads (chronological):
+  [36] income_20251230203214(UTC+7)19 sep -29 des.xlsx | 2957 rows | 0 skipped | Thu Feb 19 2026 14:29:47 GMT+0700 (Indochina Time)
+  [37] income_20251230203101(UTC+7)11sep-29nov.xlsx | 4804 rows | 0 skipped | Thu Feb 19 2026 14:29:49 GMT+0700 (Indochina Time)
+  [38] income_20251230202823(UTC+7).xlsx | 5769 rows | 0 skipped | Thu Feb 19 2026 14:29:51 GMT+0700 (Indochina Time)
+  [39] income_20251230202657(UTC+7).xlsx | 4485 rows | 0 skipped | Thu Feb 19 2026 14:29:54 GMT+0700 (Indochina Time)
+  [41] income_20251230202035(UTC+7).xlsx | 4644 rows | 0 skipped | Thu Feb 19 2026 14:30:18 GMT+0700 (Indochina Time)
+  [43] income_20260220092942(UTC+7).xlsx | 3013 rows | 0 skipped | Fri Feb 20 2026 09:33:14 GMT+0700 (Indochina Time)
+  [44] income_20260220092514(UTC+7).xlsx | 4804 rows | 0 skipped | Fri Feb 20 2026 09:33:16 GMT+0700 (Indochina Time)
+  [45] income_20260220092118(UTC+7).xlsx | 5769 rows | 0 skipped | Fri Feb 20 2026 09:33:17 GMT+0700 (Indochina Time)
+  [46] income_20260220091729(UTC+7).xlsx | 4485 rows | 0 skipped | Fri Feb 20 2026 09:33:20 GMT+0700 (Indochina Time)
+  [47] income_20260220091554(UTC+7).xlsx | 4644 rows | 0 skipped | Fri Feb 20 2026 09:33:23 GMT+0700 (Indochina Time)
+  [51] income_20260220095434(UTC+7).xlsx | 4375 rows | 0 skipped | Fri Feb 20 2026 09:56:40 GMT+0700 (Indochina Time)
+  [52] income_20260227142732(UTC+7).xlsx | 4818 rows | 0 skipped | Fri Feb 27 2026 14:28:46 GMT+0700 (Indochina Time)
+
+Order IDs with different content_hash across rows: 27000
+(This is expected if rows have different data like adjustments)
+
+True duplicate orders (same OrderID + same settlement in different uploads): 27000

@@ -1,0 +1,50 @@
+{
+    "name": "my-react-app",
+    "version": "1.0.0",
+    "private": true,
+    "proxy": "http://localhost:8000",
+    "scripts": {
+        "start": "react-scripts start",
+        "build": "react-scripts build",
+        "test": "react-scripts test",
+        "eject": "react-scripts eject",
+        "server": "cd marketplace-api && php artisan serve --port=8000",
+        "dev": "concurrently \"npm run server\" \"npm start\""
+    },
+    "dependencies": {
+        "concurrently": "^9.1.2",
+        "framer-motion": "^12.34.1",
+        "html5-qrcode": "^2.3.8",
+        "jspdf": "^4.2.0",
+        "jspdf-autotable": "^5.0.7",
+        "lucide-react": "^0.574.0",
+        "react": "^18.0.0",
+        "react-dom": "^18.0.0",
+        "react-router-dom": "^7.5.0",
+        "react-scripts": "^5.0.1",
+        "recharts": "^3.7.0",
+        "tailwindcss": "^2.2.19",
+        "xlsx": "^0.17.0"
+    },
+    "devDependencies": {
+        "@babel/standalone": "^7.0.0"
+    },
+    "eslintConfig": {
+        "extends": [
+            "react-app",
+            "react-app/jest"
+        ]
+    },
+    "browserslist": {
+        "production": [
+            ">0.2%",
+            "not dead",
+            "not op_mini all"
+        ],
+        "development": [
+            "last 1 chrome version",
+            "last 1 firefox version",
+            "last 1 safari version"
+        ]
+    }
+}
