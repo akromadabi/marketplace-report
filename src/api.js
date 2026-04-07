@@ -206,3 +206,30 @@ export async function apiSaveModalSingle(key, value, storeId) {
         body: JSON.stringify({ key, value, store_id: storeId }),
     });
 }
+
+// ─── Promo TikTok ─────────────────────────────────────────────────────
+export async function apiGetPromoValues(storeId) {
+    const q = storeId ? `?store_id=${storeId}` : '';
+    return apiFetch(`/promo${q}`);
+}
+
+export async function apiUploadPromoProducts(products, storeId) {
+    return apiFetch('/promo/upload', {
+        method: 'POST',
+        body: JSON.stringify({ products, store_id: storeId }),
+    });
+}
+
+export async function apiSavePromoBatch(updates, storeId) {
+    return apiFetch('/promo/batch', {
+        method: 'PUT',
+        body: JSON.stringify({ updates, store_id: storeId }),
+    });
+}
+
+export async function apiDeletePromoItems(ids, storeId) {
+    return apiFetch('/promo', {
+        method: 'DELETE',
+        body: JSON.stringify({ ids, store_id: storeId }),
+    });
+}

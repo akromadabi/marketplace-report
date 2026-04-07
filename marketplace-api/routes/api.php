@@ -11,6 +11,7 @@ use App\Http\Controllers\TrackingController;
 use App\Http\Controllers\ScanController;
 use App\Http\Controllers\AsetController;
 use App\Http\Controllers\OperasionalController;
+use App\Http\Controllers\PromoController;
 use Illuminate\Support\Facades\DB;
 
 // Handle OPTIONS preflight requests
@@ -92,6 +93,14 @@ Route::prefix('aset')->group(function () {
     Route::post('/', [AsetController::class, 'store']);
     Route::put('/{id}', [AsetController::class, 'update']);
     Route::delete('/{id}', [AsetController::class, 'destroy']);
+});
+
+// ─── Promo TikTok ─────────────────────────────────────────────────────
+Route::prefix('promo')->group(function () {
+    Route::get('/', [PromoController::class, 'index']);
+    Route::post('/upload', [PromoController::class, 'upload']);
+    Route::put('/batch', [PromoController::class, 'batch']);
+    Route::delete('/', [PromoController::class, 'destroy']);
 });
 
 // ─── Operasional ─────────────────────────────────────────────────────
