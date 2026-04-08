@@ -97,11 +97,25 @@ Route::prefix('aset')->group(function () {
 
 // ─── Promo TikTok ─────────────────────────────────────────────────────
 Route::prefix('promo')->group(function () {
-    Route::get('/', [PromoController::class, 'index']);
-    Route::post('/upload', [PromoController::class, 'upload']);
-    Route::put('/batch', [PromoController::class, 'batch']);
-    Route::delete('/', [PromoController::class, 'destroy']);
+    Route::get('/', [\App\Http\Controllers\PromoController::class, 'index']);
+    Route::post('/upload', [\App\Http\Controllers\PromoController::class, 'upload']);
+    Route::put('/batch', [\App\Http\Controllers\PromoController::class, 'batch']);
+    Route::delete('/', [\App\Http\Controllers\PromoController::class, 'destroy']);
+
+    // Templates & Presets
+    Route::get('/templates', [\App\Http\Controllers\CampaignTemplateController::class, 'index']);
+    Route::post('/templates', [\App\Http\Controllers\CampaignTemplateController::class, 'store']);
+    Route::delete('/templates/{id}', [\App\Http\Controllers\CampaignTemplateController::class, 'destroy']);
 });
+
+// ─── Promo Shopee ─────────────────────────────────────────────────────
+Route::prefix('promo-shopee')->group(function () {
+    Route::get('/', [\App\Http\Controllers\PromoShopeeController::class, 'index']);
+    Route::post('/upload', [\App\Http\Controllers\PromoShopeeController::class, 'upload']);
+    Route::put('/batch', [\App\Http\Controllers\PromoShopeeController::class, 'batch']);
+    Route::delete('/', [\App\Http\Controllers\PromoShopeeController::class, 'destroy']);
+});
+
 
 // ─── Operasional ─────────────────────────────────────────────────────
 Route::prefix('operasional')->group(function () {

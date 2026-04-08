@@ -9,12 +9,16 @@ import { useStore } from '../contexts/StoreContext';
 import {
   apiGetPromoValues,
   apiUploadPromoProducts,
-  apiSavePromoValuesBatch,
+  apiSavePromoBatch,
   apiDeletePromoItems,
   apiGetKampanyeTemplates,
   apiSaveKampanyeTemplate,
   apiUpdateKampanyeTemplate,
-  apiDeleteKampanyeTemplate
+  apiDeleteKampanyeTemplate,
+  apiGetPromoShopeeValues,
+  apiUploadPromoShopeeProducts,
+  apiSavePromoShopeeBatch,
+  apiDeletePromoShopeeItems
 } from '../api';
 
 const SHOPEE_HEADER_ROW0 = ['Nama Produk','Kode Produk','Nama Variasi','Kode Variasi','Harga Diskon (Tidak Wajib)','Stok Promo (Tidak Wajib)','Harga Diskon (Wajib)','Periode Mulai','Periode Selesai','Nama Promo','Harga Diskon','Diskon (%)','Stok Saat Ini','Stok Promo','Batas Pembelian'];
@@ -50,7 +54,7 @@ function Kampanye() {
     try {
       setLoading(true);
       const [res, tpls] = await Promise.all([
-        apiGetPromoValues(activeStore.id, activePlatform),
+        activePlatform === 'shopee' ? apiGetPromoShopeeValues(activeStore.id) : apiGetPromoValues(activeStore.id),
         apiGetKampanyeTemplates(activeStore.id, activePlatform)
       ]);
       setData(res);
@@ -126,8 +130,12 @@ function Kampanye() {
     if (missingItems.length > 0) {
       setLoading(true);
       try {
-        await apiUploadPromoProducts(missingItems, activeStore.id, activePlatform);
-        const res = await apiGetPromoValues(activeStore.id, activePlatform);
+        if (activePlatform === 'shopee') {
+          await apiUploadPromoShopeeProducts(missingItems, activeStore.id);
+        } else {
+          await apiUploadPromoProducts(missingItems, activeStore.id);
+        }
+        const res = activePlatform === 'shopee' ? await apiGetPromoShopeeValues(activeStore.id) : await apiGetPromoValues(activeStore.id);
         setData(res);
         currentData = res;
       } catch (err) {
@@ -197,19 +205,47 @@ function Kampanye() {
           if (!row || row.length === 0) continue;
           const kode = String(row[kodeIdx] || '').trim();
           if (!kode || !/^\d+$/.test(kode)) continue;
-          parsedProducts.push({ product_id: kode, sku_id: String(row[kodeVarIdx] || '').trim(), product_name: String(row[namaIdx] || '').trim(), variation_value: String(row[namaVarIdx] || '').trim(), quantity: row[stokIdx] !== '' ? parseInt(row[stokIdx], 10) : null, rekomendasi_harga: (rekoIdx > -1 && row[rekoIdx] !== '') ? parseInt(row[rekoIdx], 10) : null });
+          const rawStok = stokIdx > -1 ? Number(String(row[stokIdx] ?? '').replace(/[^0-9]/g, '') || NaN) : NaN;
+          const rawReko = rekoIdx > -1 ? Number(String(row[rekoIdx] ?? '').replace(/[^0-9]/g, '') || NaN) : NaN;
+          parsedProducts.push({ product_id: kode, sku_id: String(row[kodeVarIdx] || '').trim(), product_name: String(row[namaIdx] || '').trim(), variation_value: String(row[namaVarIdx] || '').trim(), stok_saat_ini: isNaN(rawStok) ? null : rawStok, saran_harga: isNaN(rawReko) || rawReko === 0 ? null : rawReko });
         }
       } else {
-        const keys = rows[0];
+        const keys = (rows[0] || []).map(k => String(k).toLowerCase().trim());
+        const pidIdx = keys.findIndex(k => k === 'product id' || k === 'product_id');
+        const sidIdx = keys.findIndex(k => k === 'sku id' || k === 'sku_id');
+        const pnameIdx = keys.findIndex(k => k === 'product name' || k === 'title');
+        const sskuIdx = keys.findIndex(k => k === 'seller sku' || k === 'seller_sku');
+        const varIdx = keys.findIndex(k => k === 'variation name' || k === 'variation_value' || k === 'sku_name' || k === 'variation');
+        const stokIdx = keys.findIndex(k => k === 'available stock' || k === 'quantity' || k === 'stok' || k === 'kuantitas');
+
         for (let i = 1; i < rows.length; i++) {
           const row = rows[i];
           if (!row || row.length === 0) continue;
+          
           let p = {};
-          keys.forEach((k, idx) => { p[k] = row[idx]; });
-          if (p.product_id && /^\d+$/.test(String(p.product_id))) { p.product_id = String(p.product_id); if (p.sku_id) p.sku_id = String(p.sku_id); parsedProducts.push(p); }
+          if (pidIdx > -1) p.product_id = String(row[pidIdx] || '').trim();
+          if (sidIdx > -1) p.sku_id = String(row[sidIdx] || '').trim();
+          if (pnameIdx > -1) p.product_name = String(row[pnameIdx] || '').trim();
+          if (sskuIdx > -1) p.seller_sku = String(row[sskuIdx] || '').trim();
+          if (varIdx > -1) p.variation_value = String(row[varIdx] || '').trim();
+          if (stokIdx > -1) {
+            const raw = String(row[stokIdx] || '').replace(/[^0-9]/g, '');
+            p.stok_saat_ini = raw ? parseInt(raw, 10) : null;
+          }
+
+          if (p.product_id && /^\d+$/.test(p.product_id)) {
+            parsedProducts.push(p);
+          }
         }
       }
-      if (parsedProducts.length > 0) { await apiUploadPromoProducts(parsedProducts, activeStore.id, activePlatform); await loadData(); }
+      if (parsedProducts.length > 0) {
+        if (activePlatform === 'shopee') {
+          await apiUploadPromoShopeeProducts(parsedProducts, activeStore.id);
+        } else {
+          await apiUploadPromoProducts(parsedProducts, activeStore.id);
+        }
+        await loadData();
+      }
     } catch (err) { showAlert('Gagal upload: ' + err.message, 'error'); }
     finally { setLoading(false); e.target.value = null; }
   };
@@ -240,7 +276,14 @@ function Kampanye() {
     if (selectedIds.size === 0) return;
     showConfirm(`Hapus ${selectedIds.size} produk?`, async () => {
       setLoading(true);
-      try { await apiDeletePromoItems(Array.from(selectedIds)); await loadData(); }
+      try {
+        if (activePlatform === 'shopee') {
+          await apiDeletePromoShopeeItems(Array.from(selectedIds), activeStore.id);
+        } else {
+          await apiDeletePromoItems(Array.from(selectedIds), activeStore.id);
+        }
+        await loadData();
+      }
       catch (err) { showAlert('Gagal hapus: ' + err.message, 'error'); }
       finally { setLoading(false); }
     });
@@ -257,7 +300,14 @@ function Kampanye() {
         if (ed.batas_pembelian !== undefined) upd.batas_pembelian = ed.batas_pembelian;
         return upd;
       });
-      if (updates.length > 0) { await apiSavePromoValuesBatch(updates, activeStore.id); await loadData(); }
+      if (updates.length > 0) {
+        if (activePlatform === 'shopee') {
+          await apiSavePromoShopeeBatch(updates, activeStore.id);
+        } else {
+          await apiSavePromoBatch(updates, activeStore.id);
+        }
+        await loadData();
+      }
     } catch (err) { showAlert('Gagal simpan: ' + err.message, 'error'); }
     finally { setSaving(false); }
   };
@@ -574,7 +624,7 @@ function Kampanye() {
                         <button className="im-bulk-apply" onClick={() => applyBulkEdit(group.key, group.variations, bulk.harga||'', bulk.stok||'', bulk.batas||'')} style={{ padding: '0.25rem 0.6rem', display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.72rem', whiteSpace: 'nowrap' }}><Save size={11}/> Terapkan</button>
                         {activePlatform === 'shopee' && (
                           <button className="im-bulk-apply" title="Isi dari Rekomendasi Shopee"
-                            onClick={() => { setEditedValues(prev => { const next = {...prev}; group.variations.forEach(v => { if (v.rekomendasi_harga) next[v.id] = {...next[v.id], harga_promo: v.rekomendasi_harga}; }); return next; }); setIsDirty(true); }}
+                            onClick={() => { setEditedValues(prev => { const next = {...prev}; group.variations.forEach(v => { if (v.saran_harga) next[v.id] = {...next[v.id], harga_promo: v.saran_harga}; }); return next; }); setIsDirty(true); }}
                             style={{ background: 'linear-gradient(135deg, #16a34a, #22c55e)', padding: '0.25rem 0.6rem', display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.72rem', whiteSpace: 'nowrap' }}>Reko</button>
                         )}
                       </div>
@@ -594,8 +644,8 @@ function Kampanye() {
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-primary)' }}>{item.variation_value || '-'}</div>
                               <div style={{ fontSize: '0.68rem', color: 'var(--text-tertiary)' }}>
-                                {item.sku_id} {item.stok_saat_ini != null ? `· ${item.stok_saat_ini} stk` : ''}
-                                {item.rekomendasi_harga && activePlatform === 'shopee' && <span style={{ marginLeft: '4px', color: '#16a34a' }} title={`Rekomendasi: ${fmtRp(item.rekomendasi_harga)}`}>★ {fmtRp(item.rekomendasi_harga)}</span>}
+                                {item.sku_id} {(item.stok_saat_ini != null || item.quantity != null) ? `· ${item.stok_saat_ini ?? item.quantity} stk` : ''}
+                                {item.saran_harga && activePlatform === 'shopee' && <span style={{ marginLeft: '4px', color: '#16a34a' }} title={`Rekomendasi: ${fmtRp(item.saran_harga)}`}>★ {fmtRp(item.saran_harga)}</span>}
                               </div>
                               {reason && <div style={{ fontSize: '0.68rem', color: 'var(--accent-danger)', background: 'rgba(239,68,68,0.08)', padding: '2px 6px', borderRadius: '4px', marginTop: '2px', display: 'inline-block' }} title={reason}>✗ {reason.length > 40 ? reason.slice(0,40)+'…' : reason}</div>}
                             </div>

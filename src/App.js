@@ -23,7 +23,7 @@ const StoreManagement = lazy(() => import('./components/StoreManagement'));
 const AsetTable = lazy(() => import('./components/AsetTable'));
 const OperasionalTable = lazy(() => import('./components/OperasionalTable'));
 const UserProfile = lazy(() => import('./components/UserProfile'));
-const PromoTiktok = lazy(() => import('./components/PromoTiktok'));
+const KampanyeMain = lazy(() => import('./components/KampanyeMain'));
 // Admin pages
 const AdminDashboard = lazy(() => import('./components/admin/AdminDashboard'));
 const AdminUserManagement = lazy(() => import('./components/admin/AdminUserManagement'));
@@ -118,7 +118,7 @@ function UserLayout() {
                                         <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
                                         <Route path="/upload" element={<ProtectedRoute><UploadFile /></ProtectedRoute>} />
                                         <Route path="/input-modal" element={<ProtectedRoute requiredPermission="/input-modal"><InputModal /></ProtectedRoute>} />
-                                        <Route path="/kampanye" element={<ProtectedRoute><PromoTiktok /></ProtectedRoute>} />
+                                        <Route path="/kampanye" element={<ProtectedRoute><KampanyeMain /></ProtectedRoute>} />
                                         <Route path="/return" element={<ProtectedRoute requiredPermission="/return"><ReturnTable /></ProtectedRoute>} />
                                         <Route path="/pengembalian" element={<ProtectedRoute requiredPermission="/pengembalian"><PengembalianTable /></ProtectedRoute>} />
                                         <Route path="/analisis" element={<ProtectedRoute requiredPermission="/analisis"><ProductAnalysis /></ProtectedRoute>} />

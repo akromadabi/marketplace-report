@@ -7,10 +7,10 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import {
-  apiGetPromoValues,
-  apiUploadPromoProducts,
-  apiSavePromoBatch,
-  apiDeletePromoItems,
+  apiGetPromoShopeeValues as apiGetPromoValues,
+  apiUploadPromoShopeeProducts as apiUploadPromoProducts,
+  apiSavePromoShopeeBatch as apiSavePromoBatch,
+  apiDeletePromoShopeeItems as apiDeletePromoItems,
   apiGetCampaignTemplates,
   apiSaveCampaignTemplate,
   apiDeleteCampaignTemplate
@@ -75,55 +75,55 @@ function extractRekoPrice(reason) {
   return null;
 }
 
-// ─── Excel: parse Sales Information ───────────────────────────────
-function parseSalesInfoSheet(wb) {
-  // Try 'Template' sheet first, fallback to first sheet
-  const sheetName = wb.SheetNames.includes('Template') ? 'Template' : wb.SheetNames[0];
-  const ws = wb.Sheets[sheetName];
 
-  // ⚠️ TikTok templates often have stale cached range (e.g. A1:AL5).
-  // Force-expand so XLSX reads ALL rows including product data beyond row 5.
+// ─── Excel: parse Sales Information Shopee ──────────────────────────────
+function parseSalesInfoSheet(wb) {
+  const ws = wb.Sheets[wb.SheetNames[0]];
   if (ws['!ref']) {
     const range = XLSX.utils.decode_range(ws['!ref']);
     range.e.r = Math.max(range.e.r, 5000);
     ws['!ref'] = XLSX.utils.encode_range(range);
   }
-
   const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false, blankrows: false });
-
-  // Find the header row — the row containing 'product_id'
-  let headerIdx = -1;
-  for (let i = 0; i < Math.min(rows.length, 15); i++) {
-    if (Array.isArray(rows[i]) && rows[i].some(cell => String(cell).toLowerCase() === 'product_id')) {
-      headerIdx = i;
-      break;
+  const headers = rows[0] || [];
+  const namaIdx = headers.indexOf('Nama Produk');
+  const kodeIdx = headers.indexOf('Kode Produk');
+  const namaVarIdx = headers.indexOf('Nama Variasi');
+  const kodeVarIdx = headers.indexOf('Kode Variasi');
+  const stokIdx = headers.indexOf('Stok');
+  // Kadang ada Rekomendasi di Shopee:
+  const rekoIdx = headers.findIndex(h => String(h).includes('Rekomendasi'));
+  
+  const parsed = [];
+  // Shopee data starts exactly at row 4 (index 3)
+  for (let i = 3; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || row.length === 0) continue;
+    const kode = String(row[kodeIdx] || '').trim();
+    if (!kode || !/^\d+$/.test(kode)) continue;
+    
+    let saran = null;
+    if (rekoIdx > -1 && row[rekoIdx]) {
+      const num = Number(String(row[rekoIdx]).replace(/[^0-9]/g, ''));
+      if (num > 0) saran = num;
     }
+    
+    parsed.push({
+      product_id: kode,
+      sku_id: String(row[kodeVarIdx] || '').trim(),
+      product_name: String(row[namaIdx] || '').trim(),
+      seller_sku: '', // not commonly used in shopee template line
+      variation_value: String(row[namaVarIdx] || '').trim(),
+      stok_saat_ini: row[stokIdx] ? Number(String(row[stokIdx]).replace(/[^0-9]/g, '')) : null,
+      saran_harga: saran
+    });
   }
-  if (headerIdx === -1) return [];
-
-  const headerRow = rows[headerIdx].map(h => String(h).trim().toLowerCase());
-  const productIdCol = headerRow.indexOf('product_id');
-  const skuIdCol = headerRow.indexOf('sku_id');
-
-  // Skip description rows — find first row where product_id or sku_id is numeric
-  let dataStart = headerIdx + 1;
-  while (dataStart < rows.length) {
-    const r = rows[dataStart];
-    const pid = String(r[productIdCol] || '').trim();
-    const sid = String(r[skuIdCol] || '').trim();
-    if ((pid && /^\d+$/.test(pid)) || (sid && /^\d+$/.test(sid))) break;
-    dataStart++;
-  }
-
-  return rows.slice(dataStart)
-    .map(r => {
-      const obj = {};
-      headerRow.forEach((k, i) => { obj[k] = r[i] ?? ''; });
-      return obj;
-    })
-    .filter(r => String(r['product_id'] || '').trim() || String(r['sku_id'] || '').trim());
+  return parsed;
 }
 
+// ─── Replace Fail map ───
+// Shopee doesn't have an error upload
+// We get Saran Harga directly from the db (p.saran_harga).
 
 // ─── Excel: parse Fail Report ──────────────────────────────────────
 function parseFailReport(wb) {
@@ -154,14 +154,27 @@ function parseFailReport(wb) {
   return map;
 }
 
-// ─── Export ──────────────────────────────────────────────────────
+
+const SHOPEE_HEADER_ROW0 = ['Nama Produk','Kode Produk','Nama Variasi','Kode Variasi','Harga Diskon (Tidak Wajib)','Stok Promo (Tidak Wajib)','Harga Diskon (Wajib)','Periode Mulai','Periode Selesai','Nama Promo','Harga Diskon','Diskon (%)','Stok Saat Ini','Stok Promo','Batas Pembelian'];
+const SHOPEE_HEADER_ROW1 = ['Tidak Wajib','Tidak Wajib','Tidak Wajib','Tidak Wajib','Tidak Wajib','Tidak Wajib','Tidak Wajib','Tidak Wajib','Tidak Wajib','Tidak Wajib','Wajib','Tidak Wajib','Referensi','Wajib','Wajib'];
+const SHOPEE_HEADER_ROW2 = ['','','','','','','','','','','Masukkan harga diskon produk','','','Aktifkan promo dengan mengisi stok promo','Batas pembelian per pembeli per hari, min 1'];
+
 function exportCampaign(rows, withStock, filename) {
-  const tips = 'Kiat: Periksa persyaratan kampanye sebelum mengunggah file\n\n    1,Performa toko: Memenuhi kriteria pendaftaran kampanye TikTok Shop.\n    2,Toko terpilih: Hanya toko terpilih yang bisa mendaftar ke kampanye ini.\n    3,Kualitas produk: Memenuhi kriteria pendaftaran produk kampanye TikTok.\n    4,Harga kampanye: Harga kampanye harus lebih rendah dari harga eceran.\nBidang wajib diisi: ID produk , ID SKU, harga kampanye.';
-  const header = withStock ? ['Product ID', 'SKU ID', 'Campaign price', 'Campaign stock'] : ['Product ID', 'SKU ID', 'Campaign price'];
-  const aoa = [[tips], header, ...rows.map(r =>
-    withStock ? [r.product_id, r.sku_id, r.harga_promo, r.stok_promo != null ? r.stok_promo : '']
-              : [r.product_id, r.sku_id, r.harga_promo]
-  )];
+  const aoa = [SHOPEE_HEADER_ROW0, SHOPEE_HEADER_ROW1, SHOPEE_HEADER_ROW2];
+  rows.forEach(r => {
+    aoa.push([
+      r.product_name || '',
+      r.product_id,
+      r.variation_value || '',
+      r.sku_id,
+      '','','','','','',
+      r.harga_promo,
+      '',
+      r.stok_saat_ini || '',
+      withStock && r.stok_promo != null ? r.stok_promo : '',
+      r.batas_pembelian != null ? r.batas_pembelian : ''
+    ]);
+  });
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   const wb2 = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb2, ws, 'Sheet1');
@@ -169,7 +182,7 @@ function exportCampaign(rows, withStock, filename) {
 }
 
 // ─── Main Component ────────────────────────────────────────────────
-function PromoTiktok() {
+function PromoShopee() {
   const { activeStore } = useStore();
   const storeId = activeStore?.id || null;
   const fileInputRef = useRef(null);
@@ -209,7 +222,7 @@ function PromoTiktok() {
   const uploadRef = useRef(null);
   const filterRef = useRef(null);
   const [showFilterMenu, setShowFilterMenu] = useState(false);
-  // Per-card bulk state: { [sellerSku]: { selections: [], harga: '', stok: '' } }
+  // Per-card bulk state: { [sellerSku]: { selections: [], harga: '', stok: '', batas: '' } }
   const [cardBulk, setCardBulk] = useState({});
   const [flashSku, setFlashSku] = useState(null);
   const [ignoreZeroStock, setIgnoreZeroStock] = useState(false);
@@ -280,6 +293,10 @@ function PromoTiktok() {
     setLocalField(id, 'stok_promo', e.target.value.replace(/[^0-9]/g, ''));
   }
 
+  function onBatasChange(id, e) {
+    setLocalField(id, 'batas_pembelian', e.target.value.replace(/[^0-9]/g, ''));
+  }
+
   // ─── Fill status ─────────────────────────────────────────────
   const getFillStatus = useCallback((rows) => {
     const anyFilled = rows.some(r => toRawNum(getLocal(r.id, 'harga_promo')) > 0);
@@ -340,7 +357,7 @@ function PromoTiktok() {
   const loadTemplates = useCallback(async () => {
     if (!activeStore?.id) return;
     try {
-      const res = await apiGetCampaignTemplates(activeStore.id, 'tiktok');
+      const res = await apiGetCampaignTemplates(activeStore.id, 'shopee');
       setTemplates(res || []);
     } catch (e) {
       console.error("Gagal meload template:", e);
@@ -380,11 +397,12 @@ function PromoTiktok() {
 
       harga_promo: localValues[p.id]?.harga_promo !== undefined ? localValues[p.id].harga_promo : (p.harga_promo || null),
       stok_promo: localValues[p.id]?.stok_promo !== undefined ? localValues[p.id].stok_promo : (p.stok_promo || null),
+      batas_pembelian: localValues[p.id]?.batas_pembelian !== undefined ? localValues[p.id].batas_pembelian : (p.batas_pembelian || null),
       checked: selectedIds.has(p.id)
     }));
 
     try {
-      await apiSaveCampaignTemplate(activeStore.id, 'tiktok', finalName.trim(), payload);
+      await apiSaveCampaignTemplate(activeStore.id, 'shopee', finalName.trim(), payload);
       setSaveTemplateModal(false);
       setTemplateName('');
       loadTemplates();
@@ -415,10 +433,11 @@ function PromoTiktok() {
       payload.forEach(item => {
         const matchedProduct = skuMap.get(String(item.sku_id));
         if (matchedProduct) {
-          if (item.harga_promo != null || item.stok_promo != null) {
+          if (item.harga_promo != null || item.stok_promo != null || item.batas_pembelian != null) {
             newLocalValues[matchedProduct.id] = {
               harga_promo: item.harga_promo,
-              stok_promo: item.stok_promo
+              stok_promo: item.stok_promo,
+              batas_pembelian: item.batas_pembelian
             };
           }
           if (item.checked) {
@@ -459,10 +478,11 @@ function PromoTiktok() {
       payload.forEach(item => {
         const matchedProduct = skuMap.get(String(item.sku_id));
         if (matchedProduct) {
-          if (item.harga_promo != null || item.stok_promo != null) {
+          if (item.harga_promo != null || item.stok_promo != null || item.batas_pembelian != null) {
             newLocalValues[matchedProduct.id] = {
               harga_promo: item.harga_promo,
-              stok_promo: item.stok_promo
+              stok_promo: item.stok_promo,
+              batas_pembelian: item.batas_pembelian
             };
           }
           if (item.checked) {
@@ -513,8 +533,8 @@ function PromoTiktok() {
 
   // ─── Per-Card Bulk apply ─────────────────────────────────────
   function applyCardBulk(sellerSku, rows) {
-    const bulk = cardBulk[sellerSku] || { selections: [], harga: '', stok: '' };
-    if (!bulk.harga && bulk.stok === '') return;
+    const bulk = cardBulk[sellerSku] || { selections: [], harga: '', stok: '', batas: '' };
+    if (!bulk.harga && bulk.stok === '' && bulk.batas === '') return;
     const varTypes = getVariationTypes(rows);
     const selections = bulk.selections || [];
 
@@ -538,6 +558,7 @@ function PromoTiktok() {
         const next = { ...cur };
         if (bulk.harga) next.harga_promo = bulk.harga;
         if (bulk.stok !== '') next.stok_promo = bulk.stok;
+        if (bulk.batas !== '') next.batas_pembelian = bulk.batas;
         return { ...prev, [p.id]: next };
       });
     });
@@ -549,26 +570,18 @@ function PromoTiktok() {
 
   function setCardBulkField(sellerSku, field, value) {
     setCardBulk(prev => {
-      const cur = prev[sellerSku] || { selections: [], harga: '', stok: '' };
+      const cur = prev[sellerSku] || { selections: [], harga: '', stok: '', batas: '' };
       return { ...prev, [sellerSku]: { ...cur, [field]: value } };
     });
   }
 
   function setCardBulkSelection(sellerSku, idx, value) {
     setCardBulk(prev => {
-      const cur = prev[sellerSku] || { selections: [], harga: '', stok: '' };
+      const cur = prev[sellerSku] || { selections: [], harga: '', stok: '', batas: '' };
       const selections = [...(cur.selections || [])];
       selections[idx] = value;
       return { ...prev, [sellerSku]: { ...cur, selections } };
     });
-  }
-
-  function setLocalField(id, field, value) {
-    setLocalValues(prev => {
-      const cur = prev[id] || {};
-      return { ...prev, [id]: { ...cur, [field]: value } };
-    });
-    setIsDirty(true);
   }
 
   // ─── Stok Masal (Global bulk) ─────────────────────────────────
@@ -605,11 +618,19 @@ function PromoTiktok() {
     setShowStokMasalModal(false);
   };
 
+  // Direct-set a single localValues field (used by saran harga)
+  function setLocalField(id, field, value) {
+    setLocalValues(prev => {
+      const cur = prev[id] || {};
+      return { ...prev, [id]: { ...cur, [field]: value } };
+    });
+    setIsDirty(true);
+  }
+
   // Apply saran harga from failMap to a list of rows
   function applySaranHarga(rows) {
     rows.forEach(r => {
-      const rekoPrice = extractRekoPrice(failMap.get(String(r.sku_id)));
-      if (rekoPrice) setLocalField(r.id, 'harga_promo', fmtRp(rekoPrice));
+      if (r.saran_harga) setLocalField(r.id, 'harga_promo', fmtRp(r.saran_harga));
     });
   }
 
@@ -639,24 +660,9 @@ function PromoTiktok() {
         sku_id: String(r['sku_id'] || '').trim(),
         product_name: String(r['product_name'] || r['title'] || '').trim(),
         seller_sku: String(r['seller_sku'] || r['seller sku'] || '').trim(),
-        variation_value: (() => {
-          let vars = [];
-          for (let i = 1; i <= 5; i++) {
-            const v = r[`variation${i}_value`] || r[`variation ${i} value`] || r[`nilai variasi ${i}`] || r[`variation${i} value`];
-            if (v) vars.push(String(v).trim());
-          }
-          if (vars.length > 0) return vars.join(' / ');
-          return String(r['variation_value'] || r['variation name'] || r['sku_name'] || r['nilai variasi'] || '').trim();
-        })(),
-        stok_saat_ini: (() => {
-          const raw = String(
-            r['available_stock'] || r['Available Stock'] || r['available stock'] ||
-            r['kuantitas'] || r['Kuantitas'] ||
-            r['quantity'] || r['Quantity'] ||
-            r['stock'] || r['Stock'] || r['stok'] || ''
-          ).replace(/[^0-9]/g, '');
-          return raw === '' ? null : (Number(raw) || 0);
-        })(),
+        variation_value: String(r['variation_value'] || r['variation name'] || r['sku_name'] || '').trim(),
+        stok_saat_ini: r.stok_saat_ini !== undefined ? r.stok_saat_ini : null,
+        saran_harga: r.saran_harga || null,
       })).filter(r => r.product_id || r.sku_id);
 
       if (mapped.length === 0) {
@@ -693,15 +699,21 @@ function PromoTiktok() {
         id: Number(id),
         ...('harga_promo' in vals ? { harga_promo: toRawNum(vals.harga_promo) } : {}),
         ...('stok_promo' in vals ? { stok_promo: vals.stok_promo !== '' ? toRawNum(vals.stok_promo) : null } : {}),
+        ...('batas_pembelian' in vals ? { batas_pembelian: vals.batas_pembelian !== '' ? toRawNum(vals.batas_pembelian) : null } : {}),
       }));
       if (updates.length > 0) await apiSavePromoBatch(updates, storeId);
-      setLocalValues({});
-      setIsDirty(false);
-      setSaveSuccess(true);
-      await loadProducts();
-      setTimeout(() => setSaveSuccess(false), 2000);
-    } catch (err) { alert('Gagal menyimpan: ' + err.message); }
+    } catch (err) {
+      alert('Gagal menyimpan: ' + err.message);
+      setIsSaving(false);
+      return;
+    }
+    // Save berhasil — baru clear local edits dan reload
+    setLocalValues({});
+    setIsDirty(false);
+    setSaveSuccess(true);
+    try { await loadProducts(); } catch { /* reload gagal tapi data sudah tersimpan */ }
     setIsSaving(false);
+    setTimeout(() => setSaveSuccess(false), 2000);
   }
 
   // ─── Delete ──────────────────────────────────────────────────
@@ -762,7 +774,7 @@ function PromoTiktok() {
     const d = new Date();
     const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
     const dateStr = `${d.getDate()} ${monthNames[d.getMonth()]} ${d.getFullYear()}`;
-    const filename = `Kampanye Tiktok ${dateStr}.xlsx`;
+    const filename = `Kampanye Shopee ${dateStr}.xlsx`;
 
     if (skipped > 0) {
       setDownloadConfirm({ rows, skipped, withStock, filename });
@@ -839,7 +851,7 @@ function PromoTiktok() {
                   onMouseOut={e => e.currentTarget.style.background = 'transparent'}
                 >
                   <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-primary)' }}>Produk</span>
-                  <span style={{ fontSize: '0.6875rem', color: 'var(--text-tertiary)' }}>Sales Information TikTok</span>
+                  <span style={{ fontSize: '0.6875rem', color: 'var(--text-tertiary)' }}>Promo Shopee</span>
                 </button>
                 <div style={{ height: '1px', background: 'var(--border-subtle)', margin: '0 0.875rem' }} />
                 <button
@@ -1051,6 +1063,7 @@ function PromoTiktok() {
               borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-lg)',
               minWidth: '185px', zIndex: 60, padding: '0.5rem 0'
             }}>
+              {/* Section 1: Tampilkan */}
               <div style={{ padding: '0.2rem 0.75rem 0.35rem', fontSize: '0.625rem', fontWeight: 700, color: 'var(--text-tertiary)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Tampilkan</div>
               {[
                 { key: 'all',      label: 'Semua',       count: stats.total },
@@ -1062,7 +1075,7 @@ function PromoTiktok() {
                   onMouseOut={e => e.currentTarget.style.background = 'transparent'}
                 >
                   <input
-                    type="radio" name="filterModeTiktok"
+                    type="radio" name="filterMode"
                     checked={filterMode === opt.key}
                     onChange={() => setFilterMode(opt.key)}
                     style={{ accentColor: '#6c5ce7', flexShrink: 0 }}
@@ -1071,7 +1084,11 @@ function PromoTiktok() {
                   <span style={{ fontSize: '0.6875rem', color: 'var(--text-tertiary)' }}>{opt.count}</span>
                 </label>
               ))}
+
+              {/* Divider */}
               <div style={{ height: '1px', background: 'var(--border-medium)', margin: '0.35rem 0' }} />
+
+              {/* Section 2: Opsi */}
               <div style={{ padding: '0.2rem 0.75rem 0.35rem', fontSize: '0.625rem', fontWeight: 700, color: 'var(--text-tertiary)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Opsi</div>
               <label
                 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.375rem 0.875rem', cursor: 'pointer', transition: 'background 0.1s' }}
@@ -1232,7 +1249,6 @@ function PromoTiktok() {
       )}
 
 
-
       {/* ══ DOWNLOAD CONFIRM ══ */}
       {downloadConfirm && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1304,7 +1320,7 @@ function PromoTiktok() {
           const allGroupSelected = groupIds.every(id => selectedIds.has(id));
           const someGroupSelected = groupIds.some(id => selectedIds.has(id));
           const varTypes = getVariationTypes(rows);
-          const bulk = cardBulk[sellerSku] || { selections: [], harga: '', stok: '' };
+          const bulk = cardBulk[sellerSku] || { selections: [], harga: '', stok: '', batas: '' };
           const isFlash = flashSku === sellerSku;
           // Total stok saat ini untuk grup
           const totalStock = rows.reduce((sum, r) => sum + (Number(r.stok_saat_ini || 0) || 0), 0);
@@ -1355,7 +1371,7 @@ function PromoTiktok() {
 
                 {/* Input direct (single var) */}
                 {rows.length === 1 && (() => {
-                  const singleReko = extractRekoPrice(failMap.get(String(rows[0].sku_id)));
+                  const singleReko = rows[0].saran_harga;
                   return (
                     <div style={{ display: 'flex', gap: '0.375rem', flexShrink: 0, alignItems: 'center' }}>
                       <input type="text" inputMode="numeric" placeholder="Harga Promo" className="im-input" style={{ width: '7.5rem' }}
@@ -1365,6 +1381,10 @@ function PromoTiktok() {
                       <input type="text" inputMode="numeric" placeholder="Stok (∞)" className="im-input" style={{ width: '5.25rem' }}
                         value={localValues[rows[0].id]?.stok_promo !== undefined ? localValues[rows[0].id].stok_promo : (rows[0].stok_promo != null ? rows[0].stok_promo : '')}
                         onInput={e => onStokChange(rows[0].id, e)}
+                      />
+                      <input type="text" inputMode="numeric" placeholder="Batas" className="im-input" style={{ width: '4.5rem' }}
+                        value={localValues[rows[0].id]?.batas_pembelian !== undefined ? localValues[rows[0].id].batas_pembelian : (rows[0].batas_pembelian != null ? rows[0].batas_pembelian : '')}
+                        onInput={e => onBatasChange(rows[0].id, e)}
                       />
                       {singleReko && (
                         <button
@@ -1428,6 +1448,15 @@ function PromoTiktok() {
                       onChange={e => setCardBulkField(sellerSku, 'stok', e.target.value.replace(/[^0-9]/g, ''))}
                       onKeyDown={e => { if (e.key === 'Enter') applyCardBulk(sellerSku, rows); }}
                     />
+                    <input
+                      type="text" inputMode="numeric"
+                      placeholder="Batas"
+                      className="im-bulk-input"
+                      style={{ width: '5rem' }}
+                      value={bulk.batas}
+                      onChange={e => setCardBulkField(sellerSku, 'batas', e.target.value.replace(/[^0-9]/g, ''))}
+                      onKeyDown={e => { if (e.key === 'Enter') applyCardBulk(sellerSku, rows); }}
+                    />
 
                     <button
                       className="im-bulk-apply"
@@ -1439,7 +1468,7 @@ function PromoTiktok() {
 
                     {/* Saran harga — di samping Terapkan, langsung ke semua variasi yg punya saran */}
                     {(() => {
-                      const withReko = rows.filter(r => extractRekoPrice(failMap.get(String(r.sku_id))));
+                      const withReko = rows.filter(r => r.saran_harga);
                       if (withReko.length === 0) return null;
                       return (
                         <button
@@ -1460,6 +1489,7 @@ function PromoTiktok() {
                       .map(p => {
                       const hargaVal = localValues[p.id]?.harga_promo !== undefined ? localValues[p.id].harga_promo : fmtRp(p.harga_promo || '');
                       const stokVal = localValues[p.id]?.stok_promo !== undefined ? localValues[p.id].stok_promo : (p.stok_promo != null ? p.stok_promo : '');
+                      const batasVal = localValues[p.id]?.batas_pembelian !== undefined ? localValues[p.id].batas_pembelian : (p.batas_pembelian != null ? p.batas_pembelian : '');
                       const varFail = failMap.get(String(p.sku_id));
 
                       return (
@@ -1470,7 +1500,18 @@ function PromoTiktok() {
                             {selectedIds.has(p.id) ? <CheckSquare size={13} /> : <Square size={13} />}
                           </button>
                           <div className="im-var-detail" style={{ flex: 1, minWidth: 0 }}>
-                            <span className="im-var-name">{p.variation_value || 'Default'}</span>
+                            <span className="im-var-name">
+                              {p.variation_value || 'Default'}
+                              {p.saran_harga && (
+                                <button
+                                  onClick={() => setLocalField(p.id, 'harga_promo', fmtRp(p.saran_harga))}
+                                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.1rem', padding: '0.15rem 0.3rem', background: 'rgba(108,92,231,0.1)', border: '1px solid rgba(108,92,231,0.3)', borderRadius: '0.15rem', cursor: 'pointer', fontSize: '0.55rem', fontWeight: 700, color: '#6c5ce7', whiteSpace: 'nowrap', marginLeft: '0.375rem' }}
+                                  title={`Gunakan saran harga: ${fmtRp(p.saran_harga)}`}
+                                >
+                                  💡 {fmtRp(p.saran_harga)}
+                                </button>
+                              )}
+                            </span>
                             {p.sku_id && (
                               <span className="im-var-skuid">
                                 {p.sku_id}
@@ -1491,6 +1532,9 @@ function PromoTiktok() {
                             />
                             <input type="text" inputMode="numeric" placeholder="Stok (∞)" className="im-input im-input-sm" style={{ width: '4.75rem' }}
                               value={stokVal} onInput={e => onStokChange(p.id, e)}
+                            />
+                            <input type="text" inputMode="numeric" placeholder="Batas" className="im-input im-input-sm" style={{ width: '4rem' }}
+                              value={batasVal} onInput={e => onBatasChange(p.id, e)}
                             />
                           </div>
                         </div>
@@ -1536,4 +1580,4 @@ function PromoTiktok() {
   );
 }
 
-export default PromoTiktok;
+export default PromoShopee;

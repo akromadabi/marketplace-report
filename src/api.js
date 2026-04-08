@@ -233,3 +233,47 @@ export async function apiDeletePromoItems(ids, storeId) {
         body: JSON.stringify({ ids, store_id: storeId }),
     });
 }
+
+// ─── Promo Shopee ─────────────────────────────────────────────────────
+export async function apiGetPromoShopeeValues(storeId) {
+    const q = storeId ? `?store_id=${storeId}` : '';
+    return apiFetch(`/promo-shopee${q}`);
+}
+
+export async function apiUploadPromoShopeeProducts(products, storeId) {
+    return apiFetch('/promo-shopee/upload', {
+        method: 'POST',
+        body: JSON.stringify({ products, store_id: storeId }),
+    });
+}
+
+export async function apiSavePromoShopeeBatch(updates, storeId) {
+    return apiFetch('/promo-shopee/batch', {
+        method: 'PUT',
+        body: JSON.stringify({ updates, store_id: storeId }),
+    });
+}
+
+export async function apiDeletePromoShopeeItems(ids, storeId) {
+    return apiFetch('/promo-shopee', {
+        method: 'DELETE',
+        body: JSON.stringify({ ids, store_id: storeId }),
+    });
+}
+
+// ─── Promo Templates / Presets ────────────────────────────────────────
+export async function apiGetCampaignTemplates(storeId, platform = 'tiktok') {
+    const q = storeId ? `?store_id=${storeId}&platform=${platform}` : `?platform=${platform}`;
+    return apiFetch(`/promo/templates${q}`);
+}
+
+export async function apiSaveCampaignTemplate(storeId, platform, name, payload) {
+    return apiFetch('/promo/templates', {
+        method: 'POST',
+        body: JSON.stringify({ store_id: storeId, platform, name, payload }),
+    });
+}
+
+export async function apiDeleteCampaignTemplate(id) {
+    return apiFetch(`/promo/templates/${id}`, { method: 'DELETE' });
+}

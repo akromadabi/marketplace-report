@@ -1661,69 +1661,116 @@ h6 {
 @media (max-width: 640px) {
   .im-header {
     flex-direction: column;
-    align-items: flex-start;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .im-header-left {
+    justify-content: center;
+  }
+
+  .im-header-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    justify-content: center;
+  }
+
+  .im-header-stats button {
+    padding: 0.35rem 0.5rem !important;
+    font-size: 0.6875rem !important;
+    flex-grow: 1;
+    justify-content: center;
   }
 
   .im-toolbar {
     flex-direction: column;
+    gap: 0.5rem;
   }
 
   .im-search-box {
     width: 100%;
   }
+  
+  .im-search-input {
+    padding: 0.5rem 2rem 0.5rem 2rem;
+    font-size: 0.8125rem;
+  }
 
   .im-filter-tabs {
     width: 100%;
+    overflow-x: auto;
   }
 
   .im-filter-tab {
     flex: 1;
     justify-content: center;
+    padding: 0.4rem 0.2rem;
+    font-size: 0.75rem;
   }
 
   .im-card-header {
-    flex-direction: column;
-    align-items: flex-start;
+    padding: 0.6rem 0.75rem;
+    gap: 0.5rem;
+    align-items: center;
+    /* Tetap gunakan flex-direction: row bawaan untuk menampilkan Checkbox agar sejajar dengan Judul SKU */
+  }
+
+  .im-card-left {
+    flex-wrap: wrap; /* Memberi ruang untuk wrap elemen yang di dalamnya */
+  }
+
+  .im-sku-info {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
     gap: 0.5rem;
   }
 
-  .im-card-right {
-    width: 100%;
+  .im-multi-label {
+    display: none; /* Sembunyikan label multi-variasi pada mobile agar hemat space */
   }
 
-  .im-bulk-bar {
-    flex-direction: row;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    align-items: center;
-    gap: 0.35rem;
-    padding: 0.4rem 0.75rem;
-  }
-
-  /* Responsive bulk wrap: 2 baris di mobile */
   .im-bulk-wrap {
     flex-direction: column;
     align-items: stretch;
   }
 
+  .im-bulk-row {
+    padding: 0.25rem 0.5rem;
+    gap: 0.25rem;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
   .im-bulk-row-2 {
     border-left: none;
-    border-top: 1px solid var(--border-subtle);
+    border-bottom: none;
   }
 
   .im-bulk-input {
-    width: 65px;
+    width: 60px;
     font-size: 0.7rem;
-    padding: 0.2rem 0.35rem;
+    padding: 0.25rem 0.35rem;
+  }
+  
+  .im-bulk-apply {
+    padding: 0.25rem 0.5rem;
   }
 
   .im-var-item {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.375rem;
+    padding: 0.4rem 0.6rem;
+    gap: 0.4rem;
+    flex-wrap: wrap;
   }
 
   .im-var-item .im-input {
     width: 100%;
+    margin-top: 0.25rem;
+    padding: 0.4rem 0.6rem;
   }
-}
+  
+  .im-var-name {
+    font-size: 0.75rem;
+    white-space: normal;
+  }
+}
