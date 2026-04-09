@@ -214,6 +214,17 @@ export async function apiGetPromoValues(storeId) {
 }
 
 export async function apiUploadPromoProducts(products, storeId) {
+    const CHUNK_SIZE = 500;
+    if (products.length > CHUNK_SIZE) {
+        for (let i = 0; i < products.length; i += CHUNK_SIZE) {
+            const chunk = products.slice(i, i + CHUNK_SIZE);
+            await apiFetch('/promo/upload', {
+                method: 'POST',
+                body: JSON.stringify({ products: chunk, store_id: storeId }),
+            });
+        }
+        return { success: true };
+    }
     return apiFetch('/promo/upload', {
         method: 'POST',
         body: JSON.stringify({ products, store_id: storeId }),
@@ -221,6 +232,17 @@ export async function apiUploadPromoProducts(products, storeId) {
 }
 
 export async function apiSavePromoBatch(updates, storeId) {
+    const CHUNK_SIZE = 500;
+    if (updates.length > CHUNK_SIZE) {
+        for (let i = 0; i < updates.length; i += CHUNK_SIZE) {
+            const chunk = updates.slice(i, i + CHUNK_SIZE);
+            await apiFetch('/promo/batch', {
+                method: 'PUT',
+                body: JSON.stringify({ updates: chunk, store_id: storeId }),
+            });
+        }
+        return { success: true };
+    }
     return apiFetch('/promo/batch', {
         method: 'PUT',
         body: JSON.stringify({ updates, store_id: storeId }),
@@ -241,6 +263,17 @@ export async function apiGetPromoShopeeValues(storeId) {
 }
 
 export async function apiUploadPromoShopeeProducts(products, storeId) {
+    const CHUNK_SIZE = 500;
+    if (products.length > CHUNK_SIZE) {
+        for (let i = 0; i < products.length; i += CHUNK_SIZE) {
+            const chunk = products.slice(i, i + CHUNK_SIZE);
+            await apiFetch('/promo-shopee/upload', {
+                method: 'POST',
+                body: JSON.stringify({ products: chunk, store_id: storeId }),
+            });
+        }
+        return { success: true };
+    }
     return apiFetch('/promo-shopee/upload', {
         method: 'POST',
         body: JSON.stringify({ products, store_id: storeId }),
@@ -248,6 +281,17 @@ export async function apiUploadPromoShopeeProducts(products, storeId) {
 }
 
 export async function apiSavePromoShopeeBatch(updates, storeId) {
+    const CHUNK_SIZE = 500;
+    if (updates.length > CHUNK_SIZE) {
+        for (let i = 0; i < updates.length; i += CHUNK_SIZE) {
+            const chunk = updates.slice(i, i + CHUNK_SIZE);
+            await apiFetch('/promo-shopee/batch', {
+                method: 'PUT',
+                body: JSON.stringify({ updates: chunk, store_id: storeId }),
+            });
+        }
+        return { success: true };
+    }
     return apiFetch('/promo-shopee/batch', {
         method: 'PUT',
         body: JSON.stringify({ updates, store_id: storeId }),
