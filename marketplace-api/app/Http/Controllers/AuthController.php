@@ -98,11 +98,12 @@ class AuthController extends Controller
 
         $enriched = $users->map(function ($u) use ($storesByUser, $orderCounts, $allLimits) {
             $stores = $storesByUser[$u->id] ?? [];
-            $lim = $allLimits[$u->class] ?? null;
+            $lim = isset($allLimits[$u->class]) ? $allLimits[$u->class] : null;
+            $orderCount = isset($orderCounts[$u->id]) ? $orderCounts[$u->id]->count : 0;
             return array_merge((array) $u, [
                 'stores'      => $stores,
                 'store_count' => count($stores),
-                'order_count' => $orderCounts[$u->id]->count ?? 0,
+                'order_count' => $orderCount,
                 'limits'      => $lim
                     ? ['max_stores' => $lim->max_stores, 'max_orders' => $lim->max_orders]
                     : ['max_stores' => -1, 'max_orders' => -1],
