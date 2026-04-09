@@ -7,3 +7,6 @@ node_modules
 *.zip
 *.log
 .DS_Store
+
+# Server-specific files (managed by cPanel/hosting)
+public/.htaccess
