@@ -1355,7 +1355,18 @@ function PromoShopee() {
                 </button>
 
                 {/* Name */}
-                <div className="im-card-left" style={{ flex: 1, minWidth: 0 }}>
+                <div className="im-card-left" 
+                  style={{ flex: 1, minWidth: 0, cursor: rows.length > 1 ? 'pointer' : 'default' }}
+                  onClick={() => {
+                    if (rows.length > 1) {
+                      setExpandedSkus(prev => {
+                        const next = new Set(prev);
+                        next.has(sellerSku) ? next.delete(sellerSku) : next.add(sellerSku);
+                        return next;
+                      });
+                    }
+                  }}
+                >
                   <div className="im-sku-info">
                     <div className="im-sku-name">
                       {noSku && <span style={{ background: 'linear-gradient(135deg,#f59e0b,#d97706)', color: '#fff', fontSize: '0.5625rem', fontWeight: 700, padding: '0.1rem 0.3rem', borderRadius: '0.2rem' }}>SKU-</span>}
