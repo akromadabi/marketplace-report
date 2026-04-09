@@ -67,6 +67,14 @@ Route::prefix('data')->group(function () {
     Route::delete('/clear', [DataController::class, 'clear']);
 });
 
+// ─── Fee Profiles ───────────────────────────────────────────────────
+Route::prefix('fee-profiles')->group(function () {
+    Route::get('/', [\App\Http\Controllers\FeeProfileController::class, 'index']);
+    Route::post('/', [\App\Http\Controllers\FeeProfileController::class, 'store']);
+    Route::put('/{id}', [\App\Http\Controllers\FeeProfileController::class, 'update']);
+    Route::delete('/{id}', [\App\Http\Controllers\FeeProfileController::class, 'destroy']);
+});
+
 // ─── Modal (HPP) ────────────────────────────────────────────────────
 Route::prefix('modal')->group(function () {
     Route::get('/', [ModalController::class, 'index']);
@@ -117,10 +125,14 @@ Route::prefix('promo-shopee')->group(function () {
 });
 
 
-// ─── Operasional ─────────────────────────────────────────────────────
+// ─── Operasional ───────────────────────────────────────────────────────────
 Route::prefix('operasional')->group(function () {
     Route::get('/', [OperasionalController::class, 'index']);
     Route::post('/', [OperasionalController::class, 'store']);
     Route::put('/{id}', [OperasionalController::class, 'update']);
     Route::delete('/{id}', [OperasionalController::class, 'destroy']);
 });
+
+// ─── Pricing Simulations ───────────────────────────────────────────────────────────
+Route::get('/pricing-simulations', [App\Http\Controllers\PricingSimulationController::class, 'index']);
+Route::post('/pricing-simulations/sync', [App\Http\Controllers\PricingSimulationController::class, 'sync']);

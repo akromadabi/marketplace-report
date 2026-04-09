@@ -277,3 +277,26 @@ export async function apiSaveCampaignTemplate(storeId, platform, name, payload) 
 export async function apiDeleteCampaignTemplate(id) {
     return apiFetch(`/promo/templates/${id}`, { method: 'DELETE' });
 }
+
+// ─── Fee Profiles ───────────────────────────────────────────────────
+export async function apiGetFeeProfiles(storeId) {
+    const q = storeId ? `?store_id=${storeId}` : '';
+    return apiFetch(`/fee-profiles${q}`);
+}
+
+export async function apiSaveFeeProfile(data) {
+    if (data.id) {
+        return apiFetch(`/fee-profiles/${data.id}`, {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        });
+    }
+    return apiFetch('/fee-profiles', {
+        method: 'POST',
+        body: JSON.stringify(data),
+    });
+}
+
+export async function apiDeleteFeeProfile(id) {
+    return apiFetch(`/fee-profiles/${id}`, { method: 'DELETE' });
+}

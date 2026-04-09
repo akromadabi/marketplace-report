@@ -3,9 +3,10 @@ import {
   Tag, ChevronDown, ChevronRight, Save, Search,
   CheckCircle2, Circle, Layers, Zap, Filter, X,
   Loader2, Upload, Trash2, Download, AlertTriangle,
-  FileX, CheckSquare, Square, RefreshCw, Bookmark, Plus, Edit2
+  FileX, CheckSquare, Square, RefreshCw, Bookmark, Plus, Edit2, Calculator
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { useModalValues } from '../hooks/useApiData';
 import {
   apiGetPromoValues,
   apiUploadPromoProducts,
@@ -13,7 +14,8 @@ import {
   apiDeletePromoItems,
   apiGetCampaignTemplates,
   apiSaveCampaignTemplate,
-  apiDeleteCampaignTemplate
+  apiDeleteCampaignTemplate,
+  apiGetFeeProfiles
 } from '../api';
 import { useStore } from '../contexts/StoreContext';
 
@@ -220,6 +222,10 @@ function PromoTiktok() {
   const [stokMasalMode, setStokMasalMode] = useState('samakan'); // samakan, kurangi, tambah
   const [stokMasalValue, setStokMasalValue] = useState('');
 
+  // ─── Kalkulator Harga State ──────
+  const { modalValues } = useModalValues(storeId);
+  const [feeProfiles, setFeeProfiles] = useState([]);
+
   useEffect(() => {
     function handleClick(e) {
       if (uploadRef.current && !uploadRef.current.contains(e.target)) setShowUploadMenu(false);
@@ -231,6 +237,14 @@ function PromoTiktok() {
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
+
+  const getHppValue = useCallback((row) => {
+    if (!row) return '';
+    const varKey = `${row.seller_sku}||${row.sku_id}||${row.variation_value}`;
+    if (modalValues[varKey]) return modalValues[varKey];
+    if (modalValues[row.seller_sku]) return modalValues[row.seller_sku];
+    return '';
+  }, [modalValues]);
 
   // Unique fail reasons for checklist filter
   const uniqueFailReasons = useMemo(() => {
@@ -245,6 +259,10 @@ function PromoTiktok() {
       const data = await apiGetPromoValues(storeId);
       setProducts(Array.isArray(data) ? data : []);
     } catch { setProducts([]); }
+    try {
+      const profiles = await apiGetFeeProfiles(storeId);
+      setFeeProfiles(Array.isArray(profiles) ? profiles : []);
+    } catch { setFeeProfiles([]); }
     setLoading(false);
   }, [storeId]);
 
@@ -1531,6 +1549,8 @@ function PromoTiktok() {
           </button>
         </div>
       )}
+
+
 
     </div>
   );

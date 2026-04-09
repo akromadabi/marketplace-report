@@ -66,6 +66,7 @@ export const ALL_USER_FEATURES = [
     { path: '/', label: 'Dashboard' },
     { path: '/upload', label: 'Upload File' },
     { path: '/input-modal', label: 'Input HPP' },
+    { path: '/kalkulator', label: 'Kalkulator Harga' },
     { path: '/kampanye', label: 'Kampanye TikTok' },
     { path: '/return', label: 'Retur' },
     { path: '/pengembalian', label: 'Pengembalian' },
@@ -123,7 +124,7 @@ export function AuthProvider({ children }) {
         // User: check class-based permissions
         if (!currentUser.permissions) return false;
         // /upload and / are always available for users
-        if (page === '/upload' || page === '/' || page === '/kampanye') return true;
+        if (page === '/upload' || page === '/') return true;
         return currentUser.permissions.includes(page);
     }, [currentUser]);
 

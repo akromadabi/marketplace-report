@@ -20,6 +20,7 @@ import {
     Receipt,
     ChevronDown,
     Tag,
+    Calculator,
 } from 'lucide-react';
 
 const menuGroups = [
@@ -41,6 +42,7 @@ const menuGroups = [
         label: 'Analisis',
         items: [
             { path: '/input-modal', label: 'Input HPP', icon: PenLine },
+            { path: '/kalkulator', label: 'Kalkulator Harga', icon: Calculator },
             { path: '/kampanye', label: 'Kampanye', icon: Tag },
             { path: '/analisis', label: 'Produk Analisis', icon: BarChart3 },
             { path: '/rangkuman', label: 'Rekap Transaksi', icon: FileSpreadsheet },

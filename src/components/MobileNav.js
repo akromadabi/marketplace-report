@@ -19,6 +19,7 @@ import {
     User,
     LogOut,
     Tag,
+    Calculator,
 } from 'lucide-react';
 
 // ─── Bottom bar tabs ──────────────────────────────────────────────
@@ -33,6 +34,7 @@ const bottomTabs = [
 // ─── Menu items shown in the dropup ──────────────────────────────
 const dropupMenuItems = [
     { path: '/input-modal', label: 'Input HPP', icon: PenLine },
+    { path: '/kalkulator', label: 'Kalkulator', icon: Calculator },
     { path: '/kampanye', label: 'Kampanye', icon: Tag },
     { path: '/olahan', label: 'Analisis Pesanan', icon: Calendar },
     { path: '/return', label: 'Retur', icon: RotateCcw },
