@@ -7,8 +7,13 @@ async function apiFetch(path, options = {}) {
         ...options,
     });
     if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: 'Network error' }));
-        throw new Error(err.error || `HTTP ${res.status}`);
+        const text = await res.text().catch(() => '');
+        let errObj = {};
+        try { errObj = JSON.parse(text); } catch (e) {
+            // Not JSON (e.g. 500 HTML page or 403 ModSecurity page or 413 Payload Too Large)
+            throw new Error(`HTTP ${res.status} - ${text.substring(0, 60).replace(/<[^>]+>/g, '') || 'Server Error'}`);
+        }
+        throw new Error(errObj.error || `Server Error ${res.status}`);
     }
     return res.json();
 }
@@ -214,7 +219,7 @@ export async function apiGetPromoValues(storeId) {
 }
 
 export async function apiUploadPromoProducts(products, storeId) {
-    const CHUNK_SIZE = 500;
+    const CHUNK_SIZE = 100;
     if (products.length > CHUNK_SIZE) {
         for (let i = 0; i < products.length; i += CHUNK_SIZE) {
             const chunk = products.slice(i, i + CHUNK_SIZE);
@@ -232,7 +237,7 @@ export async function apiUploadPromoProducts(products, storeId) {
 }
 
 export async function apiSavePromoBatch(updates, storeId) {
-    const CHUNK_SIZE = 500;
+    const CHUNK_SIZE = 100;
     if (updates.length > CHUNK_SIZE) {
         for (let i = 0; i < updates.length; i += CHUNK_SIZE) {
             const chunk = updates.slice(i, i + CHUNK_SIZE);
@@ -263,7 +268,7 @@ export async function apiGetPromoShopeeValues(storeId) {
 }
 
 export async function apiUploadPromoShopeeProducts(products, storeId) {
-    const CHUNK_SIZE = 500;
+    const CHUNK_SIZE = 100;
     if (products.length > CHUNK_SIZE) {
         for (let i = 0; i < products.length; i += CHUNK_SIZE) {
             const chunk = products.slice(i, i + CHUNK_SIZE);
@@ -281,7 +286,7 @@ export async function apiUploadPromoShopeeProducts(products, storeId) {
 }
 
 export async function apiSavePromoShopeeBatch(updates, storeId) {
-    const CHUNK_SIZE = 500;
+    const CHUNK_SIZE = 100;
     if (updates.length > CHUNK_SIZE) {
         for (let i = 0; i < updates.length; i += CHUNK_SIZE) {
             const chunk = updates.slice(i, i + CHUNK_SIZE);
