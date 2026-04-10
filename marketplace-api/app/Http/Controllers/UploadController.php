@@ -425,16 +425,17 @@ class UploadController extends Controller
     // POST /api/upload-parsed (Bypass PhpSpreadsheet)
     public function uploadParsed(Request $request)
     {
-        ini_set('memory_limit', '-1');
-        set_time_limit(0);
-        $userId  = $request->input('user_id');
-        $storeId = $request->input('store_id');
-        $filesData = $request->input('files_data'); // array of {filename, platform, category, jsonData}
+        try {
+            ini_set('memory_limit', '-1');
+            set_time_limit(0);
+            $userId  = $request->input('user_id');
+            $storeId = $request->input('store_id');
+            $filesData = $request->input('files_data'); // array of {filename, platform, category, jsonData}
 
-        $results = ['orders' => 0, 'payments' => 0, 'returns' => 0, 'pengembalian' => 0];
-        $skipped = ['orders' => 0, 'payments' => 0, 'returns' => 0, 'pengembalian' => 0];
+            $results = ['orders' => 0, 'payments' => 0, 'returns' => 0, 'pengembalian' => 0];
+            $skipped = ['orders' => 0, 'payments' => 0, 'returns' => 0, 'pengembalian' => 0];
 
-        if (!is_array($filesData)) return response()->json(['error' => 'Invalid data payload'], 400);
+            if (!is_array($filesData)) return response()->json(['error' => 'Invalid data payload'], 400);
 
         // Phase 1: Limits check
         $totalNewOrders = array_sum(array_map(fn($f) => $f['category'] === 'orders' ? count($f['jsonData']) : 0, $filesData));
@@ -675,5 +676,10 @@ class UploadController extends Controller
 
         $totalSkipped = array_sum($skipped);
         return response()->json(['success' => true, 'results' => $results, 'skipped' => $skipped, 'totalSkipped' => $totalSkipped]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'error' => 'API Backend Error: ' . $e->getMessage() . ' at line ' . $e->getLine()
+            ], 400);
+        }
     }
 }
