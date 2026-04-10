@@ -465,18 +465,26 @@ class UploadController extends Controller
         $existingHashes = ['payments' => [], 'returns_data' => [], 'pengembalian' => []];
         $existingPaymentOrderIds = [];
         if ($storeId) {
-            foreach (['payments', 'returns_data', 'pengembalian'] as $table) {
-                $rows = DB::select("SELECT t.content_hash FROM {$table} t JOIN uploads u ON t.upload_id = u.id WHERE u.store_id = ? AND t.content_hash IS NOT NULL", [$storeId]);
-                $existingHashes[$table] = array_flip(array_column($rows, 'content_hash'));
+            $catSet = array_flip(array_column($filesData, 'category'));
+            foreach (['payments' => 'payments', 'returns' => 'returns_data', 'pengembalian' => 'pengembalian'] as $cat => $table) {
+                if (isset($catSet[$cat]) || isset($catSet[$table]) || isset($catSet['return'])) {
+                    $rows = DB::select("SELECT t.content_hash FROM {$table} t JOIN uploads u ON t.upload_id = u.id WHERE u.store_id = ? AND t.content_hash IS NOT NULL", [$storeId]);
+                    $existingHashes[$table] = array_flip(array_column($rows, 'content_hash'));
+                }
             }
-            $payRows = DB::select('SELECT t.data FROM payments t JOIN uploads u ON t.upload_id = u.id WHERE u.store_id = ?', [$storeId]);
-            foreach ($payRows as $pr) {
-                $d = is_string($pr->data) ? json_decode($pr->data, true) : (array)$pr->data;
-                foreach (array_keys($d) as $k) {
-                    if (str_contains(strtolower($k), 'order/adjustment') || str_contains(strtolower($k), 'no. pesanan')) {
-                        $oid = trim((string)($d[$k] ?? ''));
-                        if ($oid && $oid !== '/') $existingPaymentOrderIds[$oid] = true;
-                        break;
+
+            if (isset($catSet['payments'])) {
+                $payRows = DB::select("
+                    SELECT 
+                        JSON_UNQUOTE(JSON_EXTRACT(t.data, '$.\"Order/Adjustment No.\"')) as oid1,
+                        JSON_UNQUOTE(JSON_EXTRACT(t.data, '$.\"No. Pesanan\"')) as oid2
+                    FROM payments t JOIN uploads u ON t.upload_id = u.id 
+                    WHERE u.store_id = ?
+                ", [$storeId]);
+                foreach ($payRows as $pr) {
+                    $oid = trim((string)($pr->oid1 ?: $pr->oid2));
+                    if ($oid && $oid !== '/' && $oid !== 'null') {
+                        $existingPaymentOrderIds[$oid] = true;
                     }
                 }
             }

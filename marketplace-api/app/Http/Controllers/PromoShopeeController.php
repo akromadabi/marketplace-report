@@ -29,34 +29,36 @@ class PromoShopeeController extends Controller
             return response()->json(['error' => 'Invalid data'], 400);
         }
 
-        foreach ($products as $p) {
-            $matchArgs = [
-                'store_id'   => $storeId,
-                'product_id' => $p['product_id'] ?? null,
-                'sku_id'     => $p['sku_id'] ?? null,
-            ];
+        DB::transaction(function () use ($products, $storeId) {
+            foreach ($products as $p) {
+                $matchArgs = [
+                    'store_id'   => $storeId,
+                    'product_id' => $p['product_id'] ?? null,
+                    'sku_id'     => $p['sku_id'] ?? null,
+                ];
 
-            $existing = DB::table('promo_shopee_values')->where($matchArgs)->first();
+                $existing = DB::table('promo_shopee_values')->where($matchArgs)->first();
 
-            DB::table('promo_shopee_values')->updateOrInsert(
-                $matchArgs,
-                [
-                    'product_name'    => $p['product_name'] ?? null,
-                    'seller_sku'      => $p['seller_sku'] ?? null,
-                    'variation_value' => $p['variation_value'] ?? null,
-                    'stok_saat_ini'   => $p['stok_saat_ini'] ?? null,
-                    // Di Shopee, rekomendasi harga kadang langsung datang dari Excel waktu di-upload
-                    'saran_harga'     => $p['saran_harga'] ?? null,
-                    // Batas pembelian bisa datang dari Excel:
-                    'batas_pembelian' => $p['batas_pembelian'] ?? ($existing ? $existing->batas_pembelian : null),
-                    
-                    'harga_promo'     => $existing ? $existing->harga_promo : null,
-                    'stok_promo'      => $existing ? $existing->stok_promo : null,
-                    'updated_at'      => now(),
-                    'created_at'      => $existing ? $existing->created_at : now(),
-                ]
-            );
-        }
+                DB::table('promo_shopee_values')->updateOrInsert(
+                    $matchArgs,
+                    [
+                        'product_name'    => $p['product_name'] ?? null,
+                        'seller_sku'      => $p['seller_sku'] ?? null,
+                        'variation_value' => $p['variation_value'] ?? null,
+                        'stok_saat_ini'   => $p['stok_saat_ini'] ?? null,
+                        // Di Shopee, rekomendasi harga kadang langsung datang dari Excel waktu di-upload
+                        'saran_harga'     => $p['saran_harga'] ?? null,
+                        // Batas pembelian bisa datang dari Excel:
+                        'batas_pembelian' => $p['batas_pembelian'] ?? ($existing ? $existing->batas_pembelian : null),
+                        
+                        'harga_promo'     => $existing ? $existing->harga_promo : null,
+                        'stok_promo'      => $existing ? $existing->stok_promo : null,
+                        'updated_at'      => now(),
+                        'created_at'      => $existing ? $existing->created_at : now(),
+                    ]
+                );
+            }
+        });
 
         return response()->json(['success' => true]);
     }
@@ -71,16 +73,18 @@ class PromoShopeeController extends Controller
             return response()->json(['error' => 'Invalid data'], 400);
         }
 
-        foreach ($updates as $u) {
-            if (!isset($u['id'])) continue;
+        DB::transaction(function () use ($updates, $storeId) {
+            foreach ($updates as $u) {
+                if (!isset($u['id'])) continue;
 
-            $payload = ['updated_at' => now()];
-            if (array_key_exists('harga_promo', $u)) $payload['harga_promo'] = $u['harga_promo'];
-            if (array_key_exists('stok_promo', $u))  $payload['stok_promo']  = $u['stok_promo'];
-            if (array_key_exists('batas_pembelian', $u)) $payload['batas_pembelian'] = $u['batas_pembelian'];
+                $payload = ['updated_at' => now()];
+                if (array_key_exists('harga_promo', $u)) $payload['harga_promo'] = $u['harga_promo'];
+                if (array_key_exists('stok_promo', $u))  $payload['stok_promo']  = $u['stok_promo'];
+                if (array_key_exists('batas_pembelian', $u)) $payload['batas_pembelian'] = $u['batas_pembelian'];
 
-            DB::table('promo_shopee_values')->where('id', $u['id'])->update($payload);
-        }
+                DB::table('promo_shopee_values')->where('id', $u['id'])->update($payload);
+            }
+        });
 
         return response()->json(['success' => true]);
     }

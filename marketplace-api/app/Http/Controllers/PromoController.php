@@ -26,30 +26,32 @@ class PromoController extends Controller
             return response()->json(['error' => 'Invalid data'], 400);
         }
 
-        foreach ($products as $p) {
-            $matchArgs = [
-                'store_id'   => $storeId,
-                'product_id' => $p['product_id'] ?? null,
-                'sku_id'     => $p['sku_id'] ?? null,
-            ];
+        DB::transaction(function () use ($products, $storeId) {
+            foreach ($products as $p) {
+                $matchArgs = [
+                    'store_id'   => $storeId,
+                    'product_id' => $p['product_id'] ?? null,
+                    'sku_id'     => $p['sku_id'] ?? null,
+                ];
 
-            // Keep existing harga_promo / stok_promo intact
-            $existing = DB::table('promo_values')->where($matchArgs)->first();
+                // Keep existing harga_promo / stok_promo intact
+                $existing = DB::table('promo_values')->where($matchArgs)->first();
 
-            DB::table('promo_values')->updateOrInsert(
-                $matchArgs,
-                [
-                    'product_name'    => $p['product_name'] ?? null,
-                    'seller_sku'      => $p['seller_sku'] ?? null,
-                    'variation_value' => $p['variation_value'] ?? null,
-                    'stok_saat_ini'   => $p['stok_saat_ini'] ?? null,
-                    'harga_promo'     => $existing ? $existing->harga_promo : null,
-                    'stok_promo'      => $existing ? $existing->stok_promo : null,
-                    'updated_at'      => now(),
-                    'created_at'      => $existing ? $existing->created_at : now(),
-                ]
-            );
-        }
+                DB::table('promo_values')->updateOrInsert(
+                    $matchArgs,
+                    [
+                        'product_name'    => $p['product_name'] ?? null,
+                        'seller_sku'      => $p['seller_sku'] ?? null,
+                        'variation_value' => $p['variation_value'] ?? null,
+                        'stok_saat_ini'   => $p['stok_saat_ini'] ?? null,
+                        'harga_promo'     => $existing ? $existing->harga_promo : null,
+                        'stok_promo'      => $existing ? $existing->stok_promo : null,
+                        'updated_at'      => now(),
+                        'created_at'      => $existing ? $existing->created_at : now(),
+                    ]
+                );
+            }
+        });
 
         return response()->json(['success' => true]);
     }
@@ -64,15 +66,17 @@ class PromoController extends Controller
             return response()->json(['error' => 'Invalid data'], 400);
         }
 
-        foreach ($updates as $u) {
-            if (!isset($u['id'])) continue;
+        DB::transaction(function () use ($updates, $storeId) {
+            foreach ($updates as $u) {
+                if (!isset($u['id'])) continue;
 
-            $payload = ['updated_at' => now()];
-            if (array_key_exists('harga_promo', $u)) $payload['harga_promo'] = $u['harga_promo'];
-            if (array_key_exists('stok_promo', $u))  $payload['stok_promo']  = $u['stok_promo'];
+                $payload = ['updated_at' => now()];
+                if (array_key_exists('harga_promo', $u)) $payload['harga_promo'] = $u['harga_promo'];
+                if (array_key_exists('stok_promo', $u))  $payload['stok_promo']  = $u['stok_promo'];
 
-            DB::table('promo_values')->where('id', $u['id'])->update($payload);
-        }
+                DB::table('promo_values')->where('id', $u['id'])->update($payload);
+            }
+        });
 
         return response()->json(['success' => true]);
     }
