@@ -457,34 +457,108 @@ class UploadController extends Controller
 
         // Phase 2: Deduplication setup
         $existingOrderIds = [];
-        if ($storeId && !empty(array_filter($filesData, fn($f) => $f['category'] === 'orders'))) {
-            $rows = DB::select('SELECT DISTINCT o.order_id FROM orders o JOIN uploads u ON o.upload_id = u.id WHERE u.store_id = ?', [$storeId]);
-            $existingOrderIds = array_flip(array_column($rows, 'order_id'));
-        }
-
         $existingHashes = ['payments' => [], 'returns_data' => [], 'pengembalian' => []];
         $existingPaymentOrderIds = [];
+
         if ($storeId) {
-            $catSet = array_flip(array_column($filesData, 'category'));
-            foreach (['payments' => 'payments', 'returns' => 'returns_data', 'pengembalian' => 'pengembalian'] as $cat => $table) {
-                if (isset($catSet[$cat]) || isset($catSet[$table]) || isset($catSet['return'])) {
-                    $rows = DB::select("SELECT t.content_hash FROM {$table} t JOIN uploads u ON t.upload_id = u.id WHERE u.store_id = ? AND t.content_hash IS NOT NULL", [$storeId]);
-                    $existingHashes[$table] = array_flip(array_column($rows, 'content_hash'));
+            $incomingOrderIds = [];
+            $incomingHashes = ['payments' => [], 'returns_data' => [], 'pengembalian' => []];
+            $incomingPaymentOids = [];
+
+            foreach ($filesData as $fdata) {
+                $cat = $fdata['category'] ?? 'unknown';
+                $jsonData = $fdata['jsonData'] ?? [];
+                if (empty($jsonData)) continue;
+
+                if ($cat === 'orders') {
+                    foreach ($jsonData as $row) {
+                        $oid = (string)($row['Order ID'] ?? '');
+                        if ($oid) $incomingOrderIds[] = $oid;
+                    }
+                } else {
+                    $table = match($cat) {
+                        'payments' => 'payments',
+                        'return' => 'returns_data',
+                        'pengembalian' => 'pengembalian',
+                        default => null
+                    };
+                    if ($table) {
+                        $rows = $cat === 'pengembalian' 
+                            ? array_map(fn($r) => array_merge((array)$r, ['Channel Marketplace' => 'Pengembalian']), $jsonData)
+                            : $jsonData;
+                        
+                        foreach ($rows as $row) {
+                            $hash = md5(json_encode($row));
+                            $incomingHashes[$table][] = $hash;
+
+                            if ($cat === 'payments') {
+                                foreach (array_keys((array)$row) as $k) {
+                                    if (str_contains(strtolower($k), 'order/adjustment') || str_contains(strtolower($k), 'no. pesanan')) {
+                                        $payOid = trim((string)($row[$k] ?? ''));
+                                        if ($payOid && $payOid !== '/') $incomingPaymentOids[] = $payOid;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
-            if (isset($catSet['payments'])) {
-                $payRows = DB::select("
-                    SELECT 
-                        JSON_UNQUOTE(JSON_EXTRACT(t.data, '$.\"Order/Adjustment No.\"')) as oid1,
-                        JSON_UNQUOTE(JSON_EXTRACT(t.data, '$.\"No. Pesanan\"')) as oid2
-                    FROM payments t JOIN uploads u ON t.upload_id = u.id 
-                    WHERE u.store_id = ?
-                ", [$storeId]);
-                foreach ($payRows as $pr) {
-                    $oid = trim((string)($pr->oid1 ?: $pr->oid2));
-                    if ($oid && $oid !== '/' && $oid !== 'null') {
-                        $existingPaymentOrderIds[$oid] = true;
+            if (!empty($incomingOrderIds)) {
+                $oids = array_unique($incomingOrderIds);
+                foreach (array_chunk($oids, 1000) as $chunk) {
+                    $rows = DB::table('orders as o')
+                        ->join('uploads as u', 'o.upload_id', '=', 'u.id')
+                        ->where('u.store_id', $storeId)
+                        ->whereIn('o.order_id', $chunk)
+                        ->select('o.order_id')
+                        ->distinct()
+                        ->get();
+                    foreach ($rows as $r) $existingOrderIds[$r->order_id] = true;
+                }
+            }
+
+            foreach (['payments' => 'payments', 'returns_data' => 'returns_data', 'pengembalian' => 'pengembalian'] as $table => $tableVal) {
+                if (!empty($incomingHashes[$table])) {
+                    $hashes = array_unique($incomingHashes[$table]);
+                    foreach (array_chunk($hashes, 1000) as $chunk) {
+                        $rows = DB::table($table . ' as t')
+                            ->join('uploads as u', 't.upload_id', '=', 'u.id')
+                            ->where('u.store_id', $storeId)
+                            ->whereNotNull('t.content_hash')
+                            ->whereIn('t.content_hash', $chunk)
+                            ->select('t.content_hash')
+                            ->get();
+                        foreach ($rows as $r) $existingHashes[$table][$r->content_hash] = true;
+                    }
+                }
+            }
+
+            if (!empty($incomingPaymentOids)) {
+                $oids = array_unique($incomingPaymentOids);
+                foreach (array_chunk($oids, 1000) as $chunk) {
+                    $payRows = DB::table('payments as t')
+                        ->join('uploads as u', 't.upload_id', '=', 'u.id')
+                        ->where('u.store_id', $storeId)
+                        ->where(function($q) use ($chunk) {
+                            $q->whereIn(DB::raw("JSON_UNQUOTE(JSON_EXTRACT(t.data, '$.\"Order/Adjustment No.\"'))"), $chunk)
+                              ->orWhereIn(DB::raw("JSON_UNQUOTE(JSON_EXTRACT(t.data, '$.\"No. Pesanan\"'))"), $chunk);
+                        })
+                        ->select('t.data')
+                        ->get();
+                    
+                    foreach ($payRows as $pr) {
+                        $d = is_string($pr->data) ? json_decode($pr->data, true) : (array)$pr->data;
+                        foreach (array_keys($d) as $k) {
+                            if (str_contains(strtolower($k), 'order/adjustment') || str_contains(strtolower($k), 'no. pesanan')) {
+                                $oid = trim((string)($d[$k] ?? ''));
+                                if ($oid && $oid !== '/' && $oid !== 'null') {
+                                    $existingPaymentOrderIds[$oid] = true;
+                                }
+                                break;
+                            }
+                        }
                     }
                 }
             }

@@ -136,7 +136,7 @@ export async function apiUploadFiles(files, userId, storeId) {
 }
 
 export async function apiUploadParsedFiles(filesData, userId, storeId) {
-    const CHUNK_SIZE = 2000;
+    const CHUNK_SIZE = 500;
     const aggregatedResults = { orders: 0, payments: 0, returns: 0, pengembalian: 0 };
     const aggregatedSkipped = { orders: 0, payments: 0, returns: 0, pengembalian: 0 };
     let totalSkipped = 0;
