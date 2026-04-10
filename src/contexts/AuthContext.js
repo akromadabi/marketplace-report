@@ -142,6 +142,24 @@ export function AuthProvider({ children }) {
         } catch (e) { /* ignore */ }
     }, [currentUser]);
 
+    // Auto-refresh permissions on mount to prevent stale storage menus
+    useEffect(() => {
+        let mounted = true;
+        const initPerms = async () => {
+            const session = getStoredSession();
+            if (!session || session.role !== 'user' || !session.class) return;
+            try {
+                const { apiGetPermissions } = await import('../api');
+                const permissions = await apiGetPermissions(session.class);
+                if (mounted && Array.isArray(permissions)) {
+                    setCurrentUser(prev => prev ? { ...prev, permissions } : prev);
+                }
+            } catch (e) { /* ignore */ }
+        };
+        initPerms();
+        return () => { mounted = false; };
+    }, []);
+
     // User management via API
     const getUsers = useCallback(async () => {
         return apiGetUsers();
