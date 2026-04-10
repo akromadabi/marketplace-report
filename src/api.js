@@ -136,16 +136,66 @@ export async function apiUploadFiles(files, userId, storeId) {
 }
 
 export async function apiUploadParsedFiles(filesData, userId, storeId) {
-    const res = await fetch(`${API_BASE}/upload/parsed`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ files_data: filesData, user_id: userId, store_id: storeId }),
-    });
-    if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: 'Upload gagal' }));
-        throw new Error(err.error || `HTTP ${res.status}`);
+    const CHUNK_SIZE = 2000;
+    const aggregatedResults = { orders: 0, payments: 0, returns: 0, pengembalian: 0 };
+    const aggregatedSkipped = { orders: 0, payments: 0, returns: 0, pengembalian: 0 };
+    let totalSkipped = 0;
+
+    for (const fileData of filesData) {
+        let chunkIndex = 1;
+        const totalChunks = Math.ceil((fileData.jsonData?.length || 0) / CHUNK_SIZE) || 1;
+        
+        for (let i = 0; i < (fileData.jsonData?.length || 0); i += CHUNK_SIZE) {
+            const chunk = fileData.jsonData.slice(i, i + CHUNK_SIZE);
+            const chunkFileName = totalChunks > 1 
+                ? `${fileData.filename} (Part ${chunkIndex}/${totalChunks})` 
+                : fileData.filename;
+
+            const singleFilePayload = [{
+                ...fileData,
+                filename: chunkFileName,
+                jsonData: chunk
+            }];
+
+            const res = await fetch(`${API_BASE}/upload/parsed`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ files_data: singleFilePayload, user_id: userId, store_id: storeId }),
+            });
+
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({ error: 'Upload gagal' }));
+                throw new Error(err.error || `HTTP ${res.status}`);
+            }
+
+            const jsonResponse = await res.json();
+            
+            // Aggregate
+            if (jsonResponse.results) {
+                aggregatedResults.orders += (jsonResponse.results.orders || 0);
+                aggregatedResults.payments += (jsonResponse.results.payments || 0);
+                aggregatedResults.returns += (jsonResponse.results.returns || 0);
+                aggregatedResults.pengembalian += (jsonResponse.results.pengembalian || 0);
+            }
+            if (jsonResponse.skipped) {
+                aggregatedSkipped.orders += (jsonResponse.skipped.orders || 0);
+                aggregatedSkipped.payments += (jsonResponse.skipped.payments || 0);
+                aggregatedSkipped.returns += (jsonResponse.skipped.returns || 0);
+                aggregatedSkipped.pengembalian += (jsonResponse.skipped.pengembalian || 0);
+            }
+            totalSkipped += (jsonResponse.totalSkipped || 0);
+
+            chunkIndex++;
+            if (totalChunks > 1) await new Promise(r => setTimeout(r, 200));
+        }
     }
-    return res.json();
+
+    return {
+        success: true,
+        results: aggregatedResults,
+        skipped: aggregatedSkipped,
+        totalSkipped: totalSkipped
+    };
 }
 
 export async function apiGetUploadHistory(userId, storeId) {
@@ -219,7 +269,7 @@ export async function apiGetPromoValues(storeId) {
 }
 
 export async function apiUploadPromoProducts(products, storeId) {
-    const CHUNK_SIZE = 100;
+    const CHUNK_SIZE = 1000;
     if (products.length > CHUNK_SIZE) {
         for (let i = 0; i < products.length; i += CHUNK_SIZE) {
             const chunk = products.slice(i, i + CHUNK_SIZE);
@@ -227,6 +277,7 @@ export async function apiUploadPromoProducts(products, storeId) {
                 method: 'POST',
                 body: JSON.stringify({ products: chunk, store_id: storeId }),
             });
+            await new Promise(r => setTimeout(r, 100)); // Prevent rate limit block
         }
         return { success: true };
     }
@@ -237,7 +288,7 @@ export async function apiUploadPromoProducts(products, storeId) {
 }
 
 export async function apiSavePromoBatch(updates, storeId) {
-    const CHUNK_SIZE = 100;
+    const CHUNK_SIZE = 1000;
     if (updates.length > CHUNK_SIZE) {
         for (let i = 0; i < updates.length; i += CHUNK_SIZE) {
             const chunk = updates.slice(i, i + CHUNK_SIZE);
@@ -245,6 +296,7 @@ export async function apiSavePromoBatch(updates, storeId) {
                 method: 'PUT',
                 body: JSON.stringify({ updates: chunk, store_id: storeId }),
             });
+            await new Promise(r => setTimeout(r, 100)); // Prevent rate limit block
         }
         return { success: true };
     }
@@ -268,7 +320,7 @@ export async function apiGetPromoShopeeValues(storeId) {
 }
 
 export async function apiUploadPromoShopeeProducts(products, storeId) {
-    const CHUNK_SIZE = 100;
+    const CHUNK_SIZE = 1000;
     if (products.length > CHUNK_SIZE) {
         for (let i = 0; i < products.length; i += CHUNK_SIZE) {
             const chunk = products.slice(i, i + CHUNK_SIZE);
@@ -276,6 +328,7 @@ export async function apiUploadPromoShopeeProducts(products, storeId) {
                 method: 'POST',
                 body: JSON.stringify({ products: chunk, store_id: storeId }),
             });
+            await new Promise(r => setTimeout(r, 100)); // Prevent rate limit block
         }
         return { success: true };
     }
@@ -286,7 +339,7 @@ export async function apiUploadPromoShopeeProducts(products, storeId) {
 }
 
 export async function apiSavePromoShopeeBatch(updates, storeId) {
-    const CHUNK_SIZE = 100;
+    const CHUNK_SIZE = 1000;
     if (updates.length > CHUNK_SIZE) {
         for (let i = 0; i < updates.length; i += CHUNK_SIZE) {
             const chunk = updates.slice(i, i + CHUNK_SIZE);
@@ -294,6 +347,7 @@ export async function apiSavePromoShopeeBatch(updates, storeId) {
                 method: 'PUT',
                 body: JSON.stringify({ updates: chunk, store_id: storeId }),
             });
+            await new Promise(r => setTimeout(r, 100)); // Prevent rate limit block
         }
         return { success: true };
     }
