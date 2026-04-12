@@ -65,7 +65,7 @@ const menuGroups = [
 ];
 
 function Sidebar({ currentPath, isOpen, onToggle }) {
-    const { user, logout, hasPermission } = useAuth();
+    const { user, logout, hasPermission, permissionsLoading } = useAuth();
     const { stores, activeStore, setActiveStore } = useStore();
     const navigate = useNavigate();
     const sidebarRef = useRef(null);
@@ -221,101 +221,118 @@ function Sidebar({ currentPath, isOpen, onToggle }) {
                     overflowX: 'hidden',
                     padding: '0.75rem 0.5rem',
                 }}>
-                    {filteredMenuGroups.map((group, gi) => (
-                        <div key={gi} style={{ marginBottom: '0.5rem' }}>
-                            {group.label && isOpen && (
-                                <div style={{
-                                    padding: '0.5rem 0.75rem 0.25rem',
-                                    fontSize: '0.625rem',
-                                    fontWeight: 700,
-                                    textTransform: 'uppercase',
-                                    letterSpacing: '0.1em',
-                                    color: 'var(--text-tertiary)',
-                                }}>
-                                    {group.label}
-                                </div>
-                            )}
-                            {!isOpen && gi > 0 && (
-                                <div style={{
-                                    height: '1px',
-                                    background: 'var(--border-subtle)',
-                                    margin: '0.5rem 0.75rem',
+                    {permissionsLoading ? (
+                        // Skeleton placeholders while permissions load from server
+                        <div style={{ padding: '0 0rem' }}>
+                            {[...Array(7)].map((_, i) => (
+                                <div key={i} style={{
+                                    height: '2.25rem',
+                                    background: 'var(--bg-glass)',
+                                    borderRadius: 'var(--radius-md)',
+                                    marginBottom: '0.125rem',
+                                    animation: 'sidebarPulse 1.4s ease-in-out infinite',
+                                    animationDelay: `${i * 0.07}s`,
                                 }} />
-                            )}
-                            {group.items.map(({ path, label, icon: Icon }) => {
-                                const isActive = currentPath === path;
-                                const isDisabled = false;
-                                return (
-                                    <a
-                                        key={path}
-                                        href={path}
-                                        onClick={(e) => { e.preventDefault(); navigate(path); if (window.innerWidth < 768) onToggle(false); }}
-                                        onMouseEnter={(e) => showTooltip(e, label)}
-                                        onMouseLeave={hideTooltip}
-                                        style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '0.75rem',
-                                            width: '100%',
-                                            padding: isOpen ? '0.625rem 0.75rem' : '0.625rem',
-                                            justifyContent: isOpen ? 'flex-start' : 'center',
-                                            background: isActive
-                                                ? 'rgba(108, 92, 231, 0.08)'
-                                                : 'transparent',
-                                            border: 'none',
-                                            borderRadius: 'var(--radius-md)',
-                                            cursor: 'pointer',
-                                            color: isActive
-                                                    ? '#6c5ce7'
-                                                    : 'var(--text-secondary)',
-                                            transition: 'all var(--transition-fast)',
-                                            marginBottom: '0.125rem',
-                                            position: 'relative',
-                                            textDecoration: 'none',
-                                            fontSize: '0.8125rem',
-                                            fontWeight: isActive ? 600 : 500,
-                                        }}
-                                        onMouseOver={(e) => {
-                                            if (!isActive) {
-                                                e.currentTarget.style.background = 'var(--bg-glass-hover)';
-                                                e.currentTarget.style.color = 'var(--text-primary)';
-                                            }
-                                        }}
-                                        onMouseOut={(e) => {
-                                            if (!isActive) {
-                                                e.currentTarget.style.background = 'transparent';
-                                                e.currentTarget.style.color = 'var(--text-secondary)';
-                                            }
-                                        }}
-                                    >
-                                        {isActive && (
-                                            <div style={{
-                                                position: 'absolute',
-                                                left: 0,
-                                                top: '50%',
-                                                transform: 'translateY(-50%)',
-                                                width: '3px',
-                                                height: '1.25rem',
-                                                borderRadius: '0 4px 4px 0',
-                                                background: 'var(--gradient-primary)',
-                                            }} />
-                                        )}
-                                        <Icon size={18} strokeWidth={isActive ? 2.5 : 2} />
-                                        {isOpen && (
-                                            <span style={{
-                                                whiteSpace: 'nowrap',
-                                                overflow: 'hidden',
-                                                textOverflow: 'ellipsis',
-                                            }}>
-                                                {label}
-                                            </span>
-                                        )}
-                                    </a>
-                                );
-                            })}
+                            ))}
                         </div>
-                    ))}
+                    ) : (
+                        filteredMenuGroups.map((group, gi) => (
+                            <div key={gi} style={{ marginBottom: '0.5rem' }}>
+                                {group.label && isOpen && (
+                                    <div style={{
+                                        padding: '0.5rem 0.75rem 0.25rem',
+                                        fontSize: '0.625rem',
+                                        fontWeight: 700,
+                                        textTransform: 'uppercase',
+                                        letterSpacing: '0.1em',
+                                        color: 'var(--text-tertiary)',
+                                    }}>
+                                        {group.label}
+                                    </div>
+                                )}
+                                {!isOpen && gi > 0 && (
+                                    <div style={{
+                                        height: '1px',
+                                        background: 'var(--border-subtle)',
+                                        margin: '0.5rem 0.75rem',
+                                    }} />
+                                )}
+                                {group.items.map(({ path, label, icon: Icon }) => {
+                                    const isActive = currentPath === path;
+                                    const isDisabled = false;
+                                    return (
+                                        <a
+                                            key={path}
+                                            href={path}
+                                            onClick={(e) => { e.preventDefault(); navigate(path); if (window.innerWidth < 768) onToggle(false); }}
+                                            onMouseEnter={(e) => showTooltip(e, label)}
+                                            onMouseLeave={hideTooltip}
+                                            style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '0.75rem',
+                                                width: '100%',
+                                                padding: isOpen ? '0.625rem 0.75rem' : '0.625rem',
+                                                justifyContent: isOpen ? 'flex-start' : 'center',
+                                                background: isActive
+                                                    ? 'rgba(108, 92, 231, 0.08)'
+                                                    : 'transparent',
+                                                border: 'none',
+                                                borderRadius: 'var(--radius-md)',
+                                                cursor: 'pointer',
+                                                color: isActive
+                                                        ? '#6c5ce7'
+                                                        : 'var(--text-secondary)',
+                                                transition: 'all var(--transition-fast)',
+                                                marginBottom: '0.125rem',
+                                                position: 'relative',
+                                                textDecoration: 'none',
+                                                fontSize: '0.8125rem',
+                                                fontWeight: isActive ? 600 : 500,
+                                            }}
+                                            onMouseOver={(e) => {
+                                                if (!isActive) {
+                                                    e.currentTarget.style.background = 'var(--bg-glass-hover)';
+                                                    e.currentTarget.style.color = 'var(--text-primary)';
+                                                }
+                                            }}
+                                            onMouseOut={(e) => {
+                                                if (!isActive) {
+                                                    e.currentTarget.style.background = 'transparent';
+                                                    e.currentTarget.style.color = 'var(--text-secondary)';
+                                                }
+                                            }}
+                                        >
+                                            {isActive && (
+                                                <div style={{
+                                                    position: 'absolute',
+                                                    left: 0,
+                                                    top: '50%',
+                                                    transform: 'translateY(-50%)',
+                                                    width: '3px',
+                                                    height: '1.25rem',
+                                                    borderRadius: '0 4px 4px 0',
+                                                    background: 'var(--gradient-primary)',
+                                                }} />
+                                            )}
+                                            <Icon size={18} strokeWidth={isActive ? 2.5 : 2} />
+                                            {isOpen && (
+                                                <span style={{
+                                                    whiteSpace: 'nowrap',
+                                                    overflow: 'hidden',
+                                                    textOverflow: 'ellipsis',
+                                                }}>
+                                                    {label}
+                                                </span>
+                                            )}
+                                        </a>
+                                    );
+                                })}
+                            </div>
+                        ))
+                    )}
                 </nav>
+
 
                 {/* Active Store Selector */}
                 {isOpen && stores.length > 0 && (
@@ -537,6 +554,14 @@ function Sidebar({ currentPath, isOpen, onToggle }) {
             >
                 {tooltip.text}
             </div>
+
+            {/* Skeleton pulse animation */}
+            <style>{`
+                @keyframes sidebarPulse {
+                    0%, 100% { opacity: 0.45; }
+                    50% { opacity: 0.2; }
+                }
+            `}</style>
         </>
     );
 }

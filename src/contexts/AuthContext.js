@@ -80,6 +80,10 @@ export const ALL_USER_FEATURES = [
 
 export function AuthProvider({ children }) {
     const [currentUser, setCurrentUser] = useState(getStoredSession);
+    const [permissionsLoading, setPermissionsLoading] = useState(() => {
+        const s = getStoredSession();
+        return !!(s && s.role === 'user' && s.class);
+    });
 
     // Sync session to localStorage
     useEffect(() => {
@@ -147,14 +151,19 @@ export function AuthProvider({ children }) {
         let mounted = true;
         const initPerms = async () => {
             const session = getStoredSession();
-            if (!session || session.role !== 'user' || !session.class) return;
+            if (!session || session.role !== 'user' || !session.class) {
+                if (mounted) setPermissionsLoading(false);
+                return;
+            }
             try {
                 const { apiGetPermissions } = await import('../api');
                 const permissions = await apiGetPermissions(session.class);
                 if (mounted && Array.isArray(permissions)) {
                     setCurrentUser(prev => prev ? { ...prev, permissions } : prev);
                 }
-            } catch (e) { /* ignore */ }
+            } catch (e) { /* ignore */ } finally {
+                if (mounted) setPermissionsLoading(false);
+            }
         };
         initPerms();
         return () => { mounted = false; };
@@ -200,6 +209,7 @@ export function AuthProvider({ children }) {
         hasPermission,
         hasAdminAccess,
         refreshPermissions,
+        permissionsLoading,
         getUsers,
         addUser,
         updateUser,

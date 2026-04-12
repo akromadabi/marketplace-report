@@ -24,26 +24,28 @@ class PromoController extends Controller
             return response()->json(['error' => 'Invalid data'], 400);
         }
 
-        foreach ($products as $p) {
-            // We use updateOrInsert based on store_id and sku_id. If a product has no sku_id, fallback to product_id + variation_value
-            $matchArgs = ['store_id' => $storeId, 'product_id' => $p['product_id'], 'sku_id' => $p['sku_id'] ?? null];
-            
-            // To ensure we don't accidentally overwrite harga_promo / stok_promo with nulls
-            $existing = DB::table('promo_values')->where($matchArgs)->first();
-            
-            DB::table('promo_values')->updateOrInsert(
-                $matchArgs,
-                [
-                    'product_name' => $p['product_name'] ?? null,
-                    'seller_sku' => $p['seller_sku'] ?? null,
-                    'variation_value' => $p['variation_value'] ?? null,
-                    'harga_promo' => $existing ? $existing->harga_promo : null,
-                    'stok_promo' => $existing ? $existing->stok_promo : null,
-                    'updated_at' => now(),
-                    'created_at' => $existing ? $existing->created_at : now(),
-                ]
-            );
-        }
+        DB::transaction(function () use ($products, $storeId) {
+            foreach ($products as $p) {
+                $matchArgs = ['store_id' => $storeId, 'product_id' => $p['product_id'], 'sku_id' => $p['sku_id'] ?? null];
+
+                $existing = DB::table('promo_values')->where($matchArgs)->first();
+
+                DB::table('promo_values')->updateOrInsert(
+                    $matchArgs,
+                    [
+                        'product_name'    => $p['product_name'] ?? null,
+                        'seller_sku'      => $p['seller_sku'] ?? null,
+                        'variation_value' => $p['variation_value'] ?? null,
+                        'stok_saat_ini'   => $p['stok_saat_ini'] ?? null,
+                        'harga_promo'     => $existing ? $existing->harga_promo : null,
+                        'stok_promo'      => $existing ? $existing->stok_promo : null,
+                        'updated_at'      => now(),
+                        'created_at'      => $existing ? $existing->created_at : now(),
+                    ]
+                );
+            }
+        });
+
         return response()->json(['success' => true]);
     }
 

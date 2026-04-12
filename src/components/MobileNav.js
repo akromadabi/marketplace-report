@@ -44,7 +44,7 @@ const dropupMenuItems = [
 ];
 
 function MobileNav({ currentPath }) {
-    const { user, hasPermission, logout } = useAuth();
+    const { user, hasPermission, logout, permissionsLoading } = useAuth();
     const { stores, activeStore, setActiveStore } = useStore();
     const navigate = useNavigate();
     const [menuOpen, setMenuOpen] = useState(false);
@@ -55,8 +55,8 @@ function MobileNav({ currentPath }) {
 
     const classCfg = user ? (CLASS_CONFIG[user.class] || CLASS_CONFIG.silver) : CLASS_CONFIG.silver;
 
-    // Filter dropup items by permission
-    const filteredDropup = dropupMenuItems.filter(item => hasPermission(item.path));
+    // Filter dropup items by permission (after permissions have loaded)
+    const filteredDropup = permissionsLoading ? [] : dropupMenuItems.filter(item => hasPermission(item.path));
 
     // Close store dropdown when clicking outside
     useEffect(() => {
@@ -327,35 +327,49 @@ function MobileNav({ currentPath }) {
                     gridTemplateColumns: 'repeat(3, 1fr)',
                     gap: '0.375rem',
                 }}>
-                    {filteredDropup.map(({ path, label, icon: Icon }) => {
-                        const isActive = currentPath === path;
-                        return (
-                            <button
-                                key={path}
-                                onClick={() => handleNav(path)}
-                                style={{
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    alignItems: 'center',
-                                    gap: '0.375rem',
-                                    padding: '0.75rem 0.5rem',
-                                    background: isActive ? 'rgba(108, 92, 231, 0.08)' : 'var(--bg-glass)',
-                                    border: isActive ? '1px solid rgba(108, 92, 231, 0.2)' : '1px solid transparent',
-                                    borderRadius: 'var(--radius-md)',
-                                    cursor: 'pointer',
-                                    color: isActive ? '#6c5ce7' : 'var(--text-secondary)',
-                                    fontSize: '0.6875rem',
-                                    fontWeight: isActive ? 600 : 500,
-                                    transition: 'all 0.15s',
-                                }}
-                                type="button"
-                            >
-                                <Icon size={20} strokeWidth={isActive ? 2.5 : 1.8} />
-                                <span>{label}</span>
-                            </button>
-                        );
-                    })}
+                    {permissionsLoading ? (
+                        // Skeleton grid while permissions load
+                        [...Array(6)].map((_, i) => (
+                            <div key={i} style={{
+                                height: '4.5rem',
+                                background: 'var(--bg-glass)',
+                                borderRadius: 'var(--radius-md)',
+                                animation: 'sidebarPulse 1.4s ease-in-out infinite',
+                                animationDelay: `${i * 0.07}s`,
+                            }} />
+                        ))
+                    ) : (
+                        filteredDropup.map(({ path, label, icon: Icon }) => {
+                            const isActive = currentPath === path;
+                            return (
+                                <button
+                                    key={path}
+                                    onClick={() => handleNav(path)}
+                                    style={{
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        alignItems: 'center',
+                                        gap: '0.375rem',
+                                        padding: '0.75rem 0.5rem',
+                                        background: isActive ? 'rgba(108, 92, 231, 0.08)' : 'var(--bg-glass)',
+                                        border: isActive ? '1px solid rgba(108, 92, 231, 0.2)' : '1px solid transparent',
+                                        borderRadius: 'var(--radius-md)',
+                                        cursor: 'pointer',
+                                        color: isActive ? '#6c5ce7' : 'var(--text-secondary)',
+                                        fontSize: '0.6875rem',
+                                        fontWeight: isActive ? 600 : 500,
+                                        transition: 'all 0.15s',
+                                    }}
+                                    type="button"
+                                >
+                                    <Icon size={20} strokeWidth={isActive ? 2.5 : 1.8} />
+                                    <span>{label}</span>
+                                </button>
+                            );
+                        })
+                    )}
                 </div>
+
             </div>
 
             {/* ═══════════ BOTTOM TAB BAR ═══════════ */}
@@ -453,6 +467,10 @@ function MobileNav({ currentPath }) {
                 @keyframes mobileOverlayIn {
                     from { opacity: 0; }
                     to { opacity: 1; }
+                }
+                @keyframes sidebarPulse {
+                    0%, 100% { opacity: 0.45; }
+                    50% { opacity: 0.2; }
                 }
             `}</style>
         </>
