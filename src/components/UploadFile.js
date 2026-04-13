@@ -691,8 +691,8 @@ function UploadFile() {
               };
               const cat = categoryColors[item.category] || { bg: 'rgba(99,110,114,0.08)', border: 'rgba(99,110,114,0.15)', text: '#636e72', label: item.category };
               const platformLabel = item.platform ? item.platform.charAt(0).toUpperCase() + item.platform.slice(1) : '-';
-              const dateStr = item.created_at ? new Date(item.created_at).toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
-
+              // Append 'Z' to treat MySQL UTC string as UTC properly in Javascript
+              const dateStr = item.created_at ? new Date(item.created_at.replace(' ', 'T') + 'Z').toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
               return (
                 <div
                   key={item.id}
