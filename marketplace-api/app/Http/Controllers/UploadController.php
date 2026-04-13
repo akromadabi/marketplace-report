@@ -398,27 +398,64 @@ class UploadController extends Controller
         return response()->json(['success' => true, 'results' => $results, 'skipped' => $skipped, 'totalSkipped' => $totalSkipped]);
     }
 
-    // GET /api/upload/history
     public function history(Request $request)
     {
         $query = DB::table('uploads as u')
             ->leftJoin('users as us', 'u.user_id', '=', 'us.id')
             ->select('u.*', 'us.name as uploaded_by')
             ->orderBy('u.created_at', 'desc')
-            ->limit(100);
+            ->limit(500);
+            
         if ($request->filled('user_id'))  $query->where('u.user_id', $request->query('user_id'));
         if ($request->filled('store_id')) $query->where('u.store_id', $request->query('store_id'));
-        return response()->json($query->get());
+        
+        $results = $query->get();
+
+        $grouped = [];
+        foreach($results as $item) {
+            $baseName = preg_replace('/ \(Part \d+\/\d+\)$/', '', $item->filename);
+            
+            $date = substr($item->created_at, 0, 10);
+            $key = $baseName . '|' . $item->category . '|' . $item->store_id . '|' . $date;
+
+            if (!isset($grouped[$key])) {
+                $grouped[$key] = (object)[
+                    'id' => (string) $item->id,
+                    'filename' => $baseName,
+                    'category' => $item->category,
+                    'platform' => $item->platform,
+                    'row_count' => 0,
+                    'skipped_rows' => 0,
+                    'created_at' => $item->created_at,
+                    'uploaded_by' => $item->uploaded_by,
+                    'user_id' => $item->user_id,
+                    'store_id' => $item->store_id,
+                ];
+            } else {
+                $grouped[$key]->id .= ',' . $item->id;
+                if ($item->created_at > $grouped[$key]->created_at) {
+                    $grouped[$key]->created_at = $item->created_at;
+                }
+            }
+            $grouped[$key]->row_count += ($item->row_count ?? 0);
+            $grouped[$key]->skipped_rows += ($item->skipped_rows ?? 0);
+        }
+
+        $groupedList = array_values($grouped);
+        usort($groupedList, fn($a, $b) => strcmp($b->created_at, $a->created_at));
+
+        return response()->json(array_slice($groupedList, 0, 100));
     }
 
     // DELETE /api/upload/:id
     public function destroy($id)
     {
-        DB::table('orders')->where('upload_id', $id)->delete();
-        DB::table('payments')->where('upload_id', $id)->delete();
-        DB::table('returns_data')->where('upload_id', $id)->delete();
-        DB::table('pengembalian')->where('upload_id', $id)->delete();
-        DB::table('uploads')->where('id', $id)->delete();
+        $ids = array_filter(explode(',', $id));
+        DB::table('orders')->whereIn('upload_id', $ids)->delete();
+        DB::table('payments')->whereIn('upload_id', $ids)->delete();
+        DB::table('returns_data')->whereIn('upload_id', $ids)->delete();
+        DB::table('pengembalian')->whereIn('upload_id', $ids)->delete();
+        DB::table('uploads')->whereIn('id', $ids)->delete();
         return response()->json(['success' => true]);
     }
 

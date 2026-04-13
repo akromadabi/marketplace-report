@@ -147,13 +147,9 @@ export async function apiUploadParsedFiles(filesData, userId, storeId) {
         
         for (let i = 0; i < (fileData.jsonData?.length || 0); i += CHUNK_SIZE) {
             const chunk = fileData.jsonData.slice(i, i + CHUNK_SIZE);
-            const chunkFileName = totalChunks > 1 
-                ? `${fileData.filename} (Part ${chunkIndex}/${totalChunks})` 
-                : fileData.filename;
-
             const singleFilePayload = [{
                 ...fileData,
-                filename: chunkFileName,
+                filename: fileData.filename,
                 jsonData: chunk
             }];
 
