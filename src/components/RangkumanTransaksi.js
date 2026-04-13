@@ -1509,10 +1509,22 @@ function RangkumanTransaksi() {
                                     {detailColumns.map(col => {
                                         let val = selectedRow[col];
                                         if (typeof val === 'object' && val !== null && 'text' in val) val = val.text;
+                                        const isResi = col && typeof col === 'string' && col.trim().toLowerCase() === 'resi';
+                                        
                                         return (
                                             <div key={col} style={{ display: 'flex', flexDirection: 'column', gap: '0.125rem', padding: '0.5rem 0.75rem', background: 'var(--bg-glass)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }}>
                                                 <span style={{ fontSize: '0.6875rem', color: 'var(--text-tertiary)', fontWeight: 600, textTransform: 'uppercase' }}>{col}</span>
-                                                <span style={{ fontSize: '0.8125rem', color: 'var(--text-primary)', fontWeight: 600, wordBreak: 'break-word' }}>{val || '-'}</span>
+                                                {isResi && val && val.toString().trim() !== '-' && val.toString().trim() !== '' ? (
+                                                    <span onClick={(e) => { e.stopPropagation(); setQrPopupResi(val.toString().trim()); }}
+                                                          title="Tampilkan QR Code"
+                                                          style={{ cursor: 'pointer', color: '#818cf8', fontWeight: 600, textDecoration: 'underline', textDecorationColor: 'rgba(129,140,248,0.3)', wordBreak: 'break-word', fontSize: '0.8125rem' }}
+                                                          onMouseEnter={e => e.currentTarget.style.color = '#c4b5fd'}
+                                                          onMouseLeave={e => e.currentTarget.style.color = '#818cf8'}>
+                                                        {val}
+                                                    </span>
+                                                ) : (
+                                                    <span style={{ fontSize: '0.8125rem', color: 'var(--text-primary)', fontWeight: 600, wordBreak: 'break-word' }}>{val || '-'}</span>
+                                                )}
                                             </div>
                                         );
                                     })}
