@@ -104,7 +104,7 @@ export function useProcessedOrders(overrideStoreId) {
         const map = new Map();
         normalizedPayments.forEach(p => {
             const key = Object.keys(p).find(k => k.toLowerCase() === 'order/adjustment id');
-            const id = key ? p[key] : '';
+            const id = key && p[key] != null ? p[key].toString().trim() : '';
             if (!id) return;
             if (!map.has(id)) map.set(id, []);
             map.get(id).push(p);
@@ -115,7 +115,7 @@ export function useProcessedOrders(overrideStoreId) {
     const ordersGroupedById = useMemo(() => {
         const map = new Map();
         ordersData.forEach(order => {
-            const id = order['Order ID'] || '';
+            const id = order['Order ID'] != null ? order['Order ID'].toString().trim() : '';
             if (!id) return;
             if (!map.has(id)) map.set(id, []);
             map.get(id).push(order);
@@ -126,7 +126,7 @@ export function useProcessedOrders(overrideStoreId) {
     const returnStatusByOrderId = useMemo(() => {
         const map = new Map();
         returnData.forEach(r => {
-            const orderId = r['Order ID'] || '';
+            const orderId = r['Order ID'] != null ? r['Order ID'].toString().trim() : '';
             const returnStatus = (r['Return Status'] || '').toString().toLowerCase();
             if (!orderId) return;
             if (!map.has(orderId)) map.set(orderId, []);
@@ -178,10 +178,15 @@ export function useProcessedOrders(overrideStoreId) {
 
             const paymentsForOrder = paymentsByOrderId.get(orderId) || [];
             let totalSettlementAmount = 0, totalAffiliateCommission = 0, totalCustomerPayment = 0;
+            const parseAmount = (val) => {
+                if (typeof val === 'number') return val;
+                if (!val) return NaN;
+                return parseFloat(val.toString().replace(/,/g, ''));
+            };
             paymentsForOrder.forEach(p => {
-                const tsa = parseFloat(p['Total settlement amount']); if (!isNaN(tsa)) totalSettlementAmount += tsa;
-                const aff = parseFloat(p['Affiliate commission']); if (!isNaN(aff)) totalAffiliateCommission += aff;
-                const custPay = parseFloat(p['Customer payment']); if (!isNaN(custPay)) totalCustomerPayment += custPay;
+                const tsa = parseAmount(p['Total settlement amount']); if (!isNaN(tsa)) totalSettlementAmount += tsa;
+                const aff = parseAmount(p['Affiliate commission']); if (!isNaN(aff)) totalAffiliateCommission += aff;
+                const custPay = parseAmount(p['Customer payment']); if (!isNaN(custPay)) totalCustomerPayment += custPay;
             });
 
             rows.push({
