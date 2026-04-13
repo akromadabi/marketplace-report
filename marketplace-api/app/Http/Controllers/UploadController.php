@@ -404,7 +404,7 @@ class UploadController extends Controller
             ->leftJoin('users as us', 'u.user_id', '=', 'us.id')
             ->select('u.*', 'us.name as uploaded_by')
             ->orderBy('u.created_at', 'desc')
-            ->limit(500);
+            ->limit(10000);
             
         if ($request->filled('user_id'))  $query->where('u.user_id', $request->query('user_id'));
         if ($request->filled('store_id')) $query->where('u.store_id', $request->query('store_id'));
