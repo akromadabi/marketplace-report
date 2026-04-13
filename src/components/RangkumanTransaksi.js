@@ -520,8 +520,10 @@ function RangkumanTransaksi() {
     const [searchQuery, setSearchQuery] = useState('');
     const [copiedField, setCopiedField] = useState(null);
     const [showPdfMenu, setShowPdfMenu] = useState(false);
+    const [showFilterMenu, setShowFilterMenu] = useState(false);
     const [pdfChecked, setPdfChecked] = useState({ retur: false, gagal_kirim: false, cancel: false });
     const pdfMenuRef = useRef(null);
+    const filterMenuRef = useRef(null);
 
     useEffect(() => {
         function handleClickOutside(event) {
@@ -536,10 +538,11 @@ function RangkumanTransaksi() {
     useEffect(() => {
         function handleClickOutside(event) {
             if (pdfMenuRef.current && !pdfMenuRef.current.contains(event.target)) setShowPdfMenu(false);
+            if (filterMenuRef.current && !filterMenuRef.current.contains(event.target)) setShowFilterMenu(false);
         }
-        if (showPdfMenu) document.addEventListener('mousedown', handleClickOutside);
+        if (showPdfMenu || showFilterMenu) document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [showPdfMenu]);
+    }, [showPdfMenu, showFilterMenu]);
 
     // ── PDF Download Handler ──
     const handleDownloadVerifikasiPdf = (mode) => {
@@ -1058,61 +1061,89 @@ function RangkumanTransaksi() {
                         </div>
                     )}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: 'var(--bg-glass)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '0 0.75rem', height: '36px' }}>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-tertiary)', marginRight: '0.25rem' }}>FILTER:</span>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', cursor: 'pointer', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                        <input type="checkbox" checked={pdfChecked.retur} onChange={e => setPdfChecked({...pdfChecked, retur: e.target.checked})} style={{ accentColor: '#3b82f6', width: '0.875rem', height: '0.875rem' }} />
-                        <span>🔄 Retur</span>
-                    </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', cursor: 'pointer', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                        <input type="checkbox" checked={pdfChecked.gagal_kirim} onChange={e => setPdfChecked({...pdfChecked, gagal_kirim: e.target.checked})} style={{ accentColor: '#f97316', width: '0.875rem', height: '0.875rem' }} />
-                        <span>🚚 Gagal Kirim</span>
-                    </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', cursor: 'pointer', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                        <input type="checkbox" checked={pdfChecked.cancel} onChange={e => setPdfChecked({...pdfChecked, cancel: e.target.checked})} style={{ accentColor: '#ef4444', width: '0.875rem', height: '0.875rem' }} />
-                        <span>❌ Cancel</span>
-                    </label>
+                {/* Checkbox Filters Dropdown */}
+                <div style={{ position: 'relative' }} ref={filterMenuRef}>
+                    <button onClick={() => setShowFilterMenu(!showFilterMenu)} type="button"
+                        style={{
+                            display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem',
+                            borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)',
+                            background: showFilterMenu ? 'var(--bg-active)' : 'var(--bg-glass)',
+                            color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.8125rem', fontWeight: 600,
+                            transition: 'background 0.2s', height: '36px'
+                        }}>
+                        <Filter size={14} /> 
+                        Status Filter {(pdfChecked.retur || pdfChecked.gagal_kirim || pdfChecked.cancel) ? ' (Aktif)' : ''} ▾
+                    </button>
+                    {showFilterMenu && (
+                        <div style={{
+                            position: 'absolute', top: '100%', left: 0, marginTop: '0.5rem', zIndex: 50,
+                            background: 'var(--bg-card)', border: '1px solid var(--border-medium)', borderRadius: 'var(--radius-md)',
+                            boxShadow: 'var(--shadow-lg)', overflow: 'hidden', minWidth: '180px', padding: '0.5rem 0.75rem',
+                            display: 'flex', flexDirection: 'column', gap: '0.625rem'
+                        }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
+                                <input type="checkbox" checked={pdfChecked.retur} onChange={e => setPdfChecked({...pdfChecked, retur: e.target.checked})} style={{ accentColor: '#3b82f6', width: '1rem', height: '1rem' }} />
+                                <span>🔄 Retur</span>
+                            </label>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
+                                <input type="checkbox" checked={pdfChecked.gagal_kirim} onChange={e => setPdfChecked({...pdfChecked, gagal_kirim: e.target.checked})} style={{ accentColor: '#f97316', width: '1rem', height: '1rem' }} />
+                                <span>🚚 Gagal Kirim</span>
+                            </label>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
+                                <input type="checkbox" checked={pdfChecked.cancel} onChange={e => setPdfChecked({...pdfChecked, cancel: e.target.checked})} style={{ accentColor: '#ef4444', width: '1rem', height: '1rem' }} />
+                                <span>❌ Cancel</span>
+                            </label>
+                        </div>
+                    )}
                 </div>
-                <button
-                    onClick={() => {
-                        const rowsToExport = filteredTableData.filter(row => ['Gagal Kirim Paket', 'Paket Ditolak'].includes(row['Alasan Cancel']));
-                        const exportColumns = ['ORDER ID', 'QTT', 'WAKTU PESANAN DIBUAT', 'ALAMAT', 'Alasan Cancel', 'Waktu Pengembalian', 'Resi', 'Verifikasi Paket'];
-                        const worksheetData = rowsToExport.map(row => {
-                            const obj = {};
-                            exportColumns.forEach(col => {
-                                if (col === 'Verifikasi Paket') {
-                                    if (typeof row[col] === 'string') obj[col] = row[col];
-                                    else if (typeof row[col] === 'object' && row[col] !== null && 'text' in row[col]) obj[col] = row[col].text;
-                                    else obj[col] = '';
-                                } else obj[col] = row[col] || '';
-                            });
-                            return obj;
-                        });
-                        const worksheet = XLSX.utils.json_to_sheet(worksheetData, { header: exportColumns });
-                        const workbook = XLSX.utils.book_new();
-                        XLSX.utils.book_append_sheet(workbook, worksheet, 'Laporan Pengembalian');
-                        XLSX.writeFile(workbook, 'Laporan_Pengembalian.xlsx');
-                    }}
-                    className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', padding: '0.5rem 1rem', fontSize: '0.8125rem' }}
-                    type="button"
-                >
-                    <Download size={14} /> Download Laporan Pengembalian
-                </button>
+
+                {/* Export Dropdown */}
                 <div style={{ position: 'relative' }} ref={pdfMenuRef}>
                     <button onClick={() => setShowPdfMenu(!showPdfMenu)} type="button"
                         style={{
                             display: 'flex', alignItems: 'center', gap: '0.375rem', padding: '0.5rem 1rem', fontSize: '0.8125rem',
-                            fontWeight: 700, borderRadius: 'var(--radius-md)', border: '1px solid #ef4444',
-                            background: showPdfMenu ? 'rgba(239, 68, 68, 0.2)' : 'rgba(239, 68, 68, 0.1)', color: '#f87171', cursor: 'pointer',
+                            fontWeight: 700, borderRadius: 'var(--radius-md)', border: '1px solid #7c3aed',
+                            background: showPdfMenu ? 'rgba(124, 58, 237, 0.2)' : 'var(--accent-primary)', color: '#fff', cursor: 'pointer',
+                            height: '36px'
                         }}>
-                        <FileText size={14} /> Download PDF ▾
+                        <Download size={14} /> Export Laporan ▾
                     </button>
                     {showPdfMenu && (
                         <div style={{
-                            position: 'absolute', top: '100%', left: 0, marginTop: '0.375rem', zIndex: 50,
+                            position: 'absolute', top: '100%', right: 0, marginTop: '0.375rem', zIndex: 50,
                             background: 'var(--bg-card)', border: '1px solid var(--border-medium)', borderRadius: 'var(--radius-md)',
-                            boxShadow: 'var(--shadow-lg)', overflow: 'hidden', minWidth: '200px',
+                            boxShadow: 'var(--shadow-lg)', overflow: 'hidden', minWidth: '220px',
                         }}>
+                            <button type="button" onClick={() => {
+                                setShowPdfMenu(false);
+                                const rowsToExport = filteredTableData.filter(row => ['Gagal Kirim Paket', 'Paket Ditolak'].includes(row['Alasan Cancel']));
+                                const exportColumns = ['ORDER ID', 'QTT', 'WAKTU PESANAN DIBUAT', 'ALAMAT', 'Alasan Cancel', 'Waktu Pengembalian', 'Resi', 'Verifikasi Paket'];
+                                const worksheetData = rowsToExport.map(row => {
+                                    const obj = {};
+                                    exportColumns.forEach(col => {
+                                        if (col === 'Verifikasi Paket') {
+                                            if (typeof row[col] === 'string') obj[col] = row[col];
+                                            else if (typeof row[col] === 'object' && row[col] !== null && 'text' in row[col]) obj[col] = row[col].text;
+                                            else obj[col] = '';
+                                        } else obj[col] = row[col] || '';
+                                    });
+                                    return obj;
+                                });
+                                const worksheet = XLSX.utils.json_to_sheet(worksheetData, { header: exportColumns });
+                                const workbook = XLSX.utils.book_new();
+                                XLSX.utils.book_append_sheet(workbook, worksheet, 'Laporan Pengembalian');
+                                XLSX.writeFile(workbook, 'Laporan_Pengembalian.xlsx');
+                            }}
+                                style={{
+                                    display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%', padding: '0.625rem 1rem',
+                                    background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.8125rem', fontWeight: 600,
+                                    color: '#10b981', textAlign: 'left',
+                                }}
+                                onMouseEnter={e => e.target.style.background = 'rgba(16, 185, 129, 0.08)'}
+                                onMouseLeave={e => e.target.style.background = 'none'}>
+                                📊 Excel Laporan
+                            </button>
+                            <div style={{ height: '1px', background: 'var(--border-subtle)' }} />
                             <button type="button" onClick={() => {
                                 setShowPdfMenu(false);
                                 handleDownloadVerifikasiPdf('semua');
@@ -1120,11 +1151,11 @@ function RangkumanTransaksi() {
                                 style={{
                                     display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%', padding: '0.625rem 1rem',
                                     background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.8125rem', fontWeight: 600,
-                                    color: 'var(--text-primary)', textAlign: 'left',
+                                    color: '#ef4444', textAlign: 'left',
                                 }}
-                                onMouseEnter={e => e.target.style.background = 'var(--bg-glass)'}
+                                onMouseEnter={e => e.target.style.background = 'rgba(239, 68, 68, 0.08)'}
                                 onMouseLeave={e => e.target.style.background = 'none'}>
-                                📦 Semua
+                                📄 PDF Semua
                             </button>
                             <div style={{ height: '1px', background: 'var(--border-subtle)' }} />
                             <button type="button" onClick={() => {
@@ -1136,9 +1167,9 @@ function RangkumanTransaksi() {
                                     background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.8125rem', fontWeight: 600,
                                     color: '#f59e0b', textAlign: 'left',
                                 }}
-                                onMouseEnter={e => e.target.style.background = 'rgba(245,158,11,0.08)'}
+                                onMouseEnter={e => e.target.style.background = 'rgba(245, 158, 11, 0.08)'}
                                 onMouseLeave={e => e.target.style.background = 'none'}>
-                                ⏳ Belum Diterima
+                                ⏳ PDF Belum Diterima
                             </button>
                         </div>
                     )}
