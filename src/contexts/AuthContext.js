@@ -155,13 +155,21 @@ export function AuthProvider({ children }) {
                 if (mounted) setPermissionsLoading(false);
                 return;
             }
+            // Timeout fallback: jika API tidak respons dalam 4 detik, pakai permissions dari session
+            const fallbackTimer = setTimeout(() => {
+                if (mounted) setPermissionsLoading(false);
+            }, 4000);
             try {
                 const { apiGetPermissions } = await import('../api');
                 const permissions = await apiGetPermissions(session.class);
                 if (mounted && Array.isArray(permissions)) {
                     setCurrentUser(prev => prev ? { ...prev, permissions } : prev);
                 }
-            } catch (e) { /* ignore */ } finally {
+            } catch (e) {
+                // Jika API gagal, tetap gunakan permissions dari session yang ada
+                // permissionsLoading akan di-set false oleh fallbackTimer atau finally
+            } finally {
+                clearTimeout(fallbackTimer);
                 if (mounted) setPermissionsLoading(false);
             }
         };

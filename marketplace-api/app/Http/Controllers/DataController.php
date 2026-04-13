@@ -9,6 +9,13 @@ class DataController extends Controller
 {
     private function storeScope($storeId, $userId): array
     {
+        if ($storeId && $userId) {
+            // Include uploads for this store OR orphan uploads (no store) owned by this user
+            return [
+                'where'  => ' WHERE upload_id IN (SELECT id FROM uploads WHERE store_id = ? OR (store_id IS NULL AND user_id = ?))',
+                'params' => [$storeId, $userId],
+            ];
+        }
         if ($storeId) {
             return [
                 'where'  => ' WHERE upload_id IN (SELECT id FROM uploads WHERE store_id = ?)',

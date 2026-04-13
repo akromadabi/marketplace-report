@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import * as XLSX from "xlsx";
 import FileInputList from "./FileInputList";
-import { Upload as UploadIcon, FileSpreadsheet, AlertCircle, Loader2, CheckCircle2, Trash2, Clock, Database } from "lucide-react";
-import { apiUploadFiles, apiUploadParsedFiles, apiGetUploadHistory, apiDeleteUpload } from '../api';
+import { Upload as UploadIcon, FileSpreadsheet, AlertCircle, Loader2, CheckCircle2, Trash2, Clock, Database, Store } from "lucide-react";
+import { apiUploadFiles, apiUploadParsedFiles, apiGetUploadHistory, apiDeleteUpload, apiAssignOrphanUploads } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useStore } from '../contexts/StoreContext';
 import { useDataCache } from '../contexts/DataContext';
 import { useNotification } from '../contexts/NotificationContext';
+import { useNavigate } from 'react-router-dom';
 
 function formatDateIndo(date) {
   if (!(date instanceof Date) || isNaN(date)) return "";
@@ -21,11 +22,86 @@ function formatDateIndo(date) {
   return `${dayName}, ${day} ${monthName} ${year} (${hours}:${minutes})`;
 }
 
+// Banner: tampil jika ada file upload lama tanpa store_id
+function MigrateOrphanBanner({ userId, storeId, onMigrated, migratingOrphans, setMigratingOrphans, uploadHistory, historyLoading }) {
+  // Cek apakah ada item di history yang store_id-nya NULL (orphan)
+  // Server sudah include orphan di query setelah fix, tapi kita cek dari history yang sudah ada
+  // Kita tampilkan banner selama history belum di-load atau saat pertama kali
+  const [checked, setChecked] = useState(false);
+  const [hasOrphans, setHasOrphans] = useState(false);
+
+  useEffect(() => {
+    if (!historyLoading && !checked) {
+      setChecked(true);
+      // Jika history kosong padahal ada userId, mungkin ada orphan
+      // Kita cek dengan hit endpoint assign-store dengan dry-run approach
+      // Karena kita tidak punya dry-run, kita tampilkan banner selektif:
+      // Tampilkan jika history === 0 (kemungkinan data orphan belum terlink ke store)
+      setHasOrphans(uploadHistory.length === 0);
+    }
+  }, [historyLoading, uploadHistory, checked]);
+
+  if (!hasOrphans || historyLoading) return null;
+
+  async function handleMigrate() {
+    setMigratingOrphans(true);
+    try {
+      const res = await apiAssignOrphanUploads(userId, storeId);
+      onMigrated(res.updated || 0);
+    } catch (e) {
+      /* ignore */
+    }
+    setMigratingOrphans(false);
+  }
+
+  return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.75rem',
+      padding: '0.875rem 1rem',
+      background: 'rgba(6, 182, 212, 0.06)',
+      border: '1px solid rgba(6, 182, 212, 0.2)',
+      borderRadius: 'var(--radius-lg)',
+      marginBottom: '1.25rem',
+      flexWrap: 'wrap',
+    }}>
+      <Database size={18} color="#06b6d4" style={{ flexShrink: 0 }} />
+      <div style={{ flex: 1, minWidth: '200px' }}>
+        <p style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-primary)', marginBottom: '0.125rem' }}>
+          Data Sebelumnya Terdeteksi
+        </p>
+        <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+          Anda mungkin memiliki file yang diupload sebelum toko dibuat. Klik tombol untuk mengaitkan data tersebut ke toko aktif.
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={handleMigrate}
+        disabled={migratingOrphans}
+        style={{
+          display: 'flex', alignItems: 'center', gap: '0.375rem',
+          padding: '0.5rem 1rem', borderRadius: 'var(--radius-md)',
+          background: 'rgba(6, 182, 212, 0.12)', border: '1px solid rgba(6, 182, 212, 0.3)',
+          color: '#06b6d4', fontWeight: 600, fontSize: '0.8125rem', cursor: migratingOrphans ? 'not-allowed' : 'pointer',
+          flexShrink: 0,
+        }}
+      >
+        {migratingOrphans
+          ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /><span>Memproses...</span></>
+          : <><CheckCircle2 size={14} /><span>Tautkan Data Lama</span></>
+        }
+      </button>
+    </div>
+  );
+}
+
 function UploadFile() {
   const { user } = useAuth();
-  const { activeStoreId } = useStore();
+  const { activeStoreId, stores, loading: storesLoading } = useStore();
   const { invalidateAll } = useDataCache();
   const { addNotification, updateNotification } = useNotification();
+  const navigate = useNavigate();
   const [allFiles, setAllFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
@@ -37,9 +113,13 @@ function UploadFile() {
   const [uploadHistory, setUploadHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [deletingId, setDeletingId] = useState(null);
+  const [migratingOrphans, setMigratingOrphans] = useState(false);
+  const [orphanMigrated, setOrphanMigrated] = useState(null);
   const inputRef = useRef(null);
 
   const fetchHistory = useCallback(async () => {
+    setHistoryLoading(true);
+    setUploadHistory([]); // reset dulu agar tidak ada duplikat
     try {
       const data = await apiGetUploadHistory(user?.id, activeStoreId);
       setUploadHistory(data);
@@ -420,6 +500,9 @@ function UploadFile() {
 
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
 
+  // Gate: harus ada store dulu sebelum upload
+  const noStore = !storesLoading && stores.length === 0;
+
   return (
     <div>
       <div className="page-header">
@@ -427,7 +510,72 @@ function UploadFile() {
         <p style={isMobile ? { fontSize: '0.6875rem' } : undefined}>Upload file data dari TikTok Shop dan Shopee, sistem akan mendeteksi otomatis</p>
       </div>
 
-      <form onSubmit={handleSubmit}>
+      {/* Gate: belum ada toko */}
+      {noStore && (
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '1rem',
+          padding: '2.5rem 1.5rem',
+          background: 'rgba(245, 158, 11, 0.06)',
+          border: '1px solid rgba(245, 158, 11, 0.2)',
+          borderRadius: 'var(--radius-lg)',
+          marginBottom: '1.5rem',
+          textAlign: 'center',
+        }}>
+          <div style={{
+            width: '3.5rem', height: '3.5rem', borderRadius: 'var(--radius-lg)',
+            background: 'rgba(245, 158, 11, 0.12)', display: 'flex',
+            alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Store size={24} color="#f59e0b" />
+          </div>
+          <div>
+            <p style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-primary)', marginBottom: '0.375rem' }}>
+              Buat Toko Terlebih Dahulu
+            </p>
+            <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', maxWidth: '380px' }}>
+              Anda perlu membuat minimal satu toko sebelum bisa mengupload data. Toko digunakan untuk memisahkan data antar platform.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/stores')}
+            className="btn-primary"
+            style={{ padding: '0.625rem 1.5rem', fontSize: '0.875rem' }}
+          >
+            <Store size={16} />
+            <span>Buat Toko Sekarang</span>
+          </button>
+        </div>
+      )}
+
+      {/* Banner: migrate data lama ke store aktif */}
+      {!noStore && activeStoreId && (
+        <div id="migrate-orphan-banner" style={{ display: 'none' }}>
+          {/* Hidden by default, will be shown by JS below */}
+        </div>
+      )}
+
+      {/* Banner: migrate data lama — tampil jika ada histori tanpa store */}
+      {!noStore && activeStoreId && !orphanMigrated && (
+        <MigrateOrphanBanner
+          userId={user?.id}
+          storeId={activeStoreId}
+          onMigrated={(count) => {
+            setOrphanMigrated(count);
+            fetchHistory();
+            invalidateAll();
+          }}
+          migratingOrphans={migratingOrphans}
+          setMigratingOrphans={setMigratingOrphans}
+          uploadHistory={uploadHistory}
+          historyLoading={historyLoading}
+        />
+      )}
+
+      <form onSubmit={handleSubmit} style={{ opacity: noStore ? 0.4 : 1, pointerEvents: noStore ? 'none' : 'auto' }}>
         {/* Drop Zone */}
         <div
           className={`drop-zone ${dragActive ? 'active' : ''}`}

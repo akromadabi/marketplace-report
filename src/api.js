@@ -207,6 +207,13 @@ export async function apiDeleteUpload(id) {
     return apiFetch(`/upload/${id}`, { method: 'DELETE' });
 }
 
+export async function apiAssignOrphanUploads(userId, storeId) {
+    return apiFetch('/upload/assign-store', {
+        method: 'POST',
+        body: JSON.stringify({ user_id: userId, store_id: storeId }),
+    });
+}
+
 // ─── Data (scoped by store_id or user_id) ────────────────────────
 function dataQuery(storeId, userId) {
     const params = [];

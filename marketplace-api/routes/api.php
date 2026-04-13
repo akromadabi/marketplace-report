@@ -55,6 +55,7 @@ Route::prefix('upload')->group(function () {
     Route::post('/parsed', [UploadController::class, 'uploadParsed']);
     Route::get('/history', [UploadController::class, 'history']);
     Route::delete('/{id}', [UploadController::class, 'destroy']);
+    Route::post('/assign-store', [UploadController::class, 'assignStore']);
 });
 
 // ─── Data ───────────────────────────────────────────────────────────

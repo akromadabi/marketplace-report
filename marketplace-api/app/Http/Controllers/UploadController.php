@@ -400,14 +400,28 @@ class UploadController extends Controller
 
     public function history(Request $request)
     {
+        $userId  = $request->filled('user_id')  ? $request->query('user_id')  : null;
+        $storeId = $request->filled('store_id') ? $request->query('store_id') : null;
+
         $query = DB::table('uploads as u')
             ->leftJoin('users as us', 'u.user_id', '=', 'us.id')
             ->select('u.*', 'us.name as uploaded_by')
             ->orderBy('u.created_at', 'desc')
             ->limit(10000);
-            
-        if ($request->filled('user_id'))  $query->where('u.user_id', $request->query('user_id'));
-        if ($request->filled('store_id')) $query->where('u.store_id', $request->query('store_id'));
+
+        if ($storeId && $userId) {
+            // Include uploads scoped to this store OR orphan uploads (no store) from this user
+            $query->where(function ($q) use ($storeId, $userId) {
+                $q->where('u.store_id', $storeId)
+                  ->orWhere(function ($q2) use ($userId) {
+                      $q2->whereNull('u.store_id')->where('u.user_id', $userId);
+                  });
+            });
+        } elseif ($storeId) {
+            $query->where('u.store_id', $storeId);
+        } elseif ($userId) {
+            $query->where('u.user_id', $userId);
+        }
         
         $results = $query->get();
 
@@ -718,5 +732,20 @@ class UploadController extends Controller
                 'error' => 'API Backend Error: ' . $e->getMessage() . ' at line ' . $e->getLine()
             ], 400);
         }
+    }
+    // POST /api/upload/assign-store
+    // Assign semua orphan uploads (store_id IS NULL) milik user ke store tertentu
+    public function assignStore(Request $request)
+    {
+        $userId  = $request->input('user_id');
+        $storeId = $request->input('store_id');
+        if (!$userId || !$storeId) {
+            return response()->json(['error' => 'user_id dan store_id wajib'], 400);
+        }
+        $updated = DB::table('uploads')
+            ->where('user_id', $userId)
+            ->whereNull('store_id')
+            ->update(['store_id' => $storeId]);
+        return response()->json(['success' => true, 'updated' => $updated]);
     }
 }
