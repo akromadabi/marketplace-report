@@ -86,9 +86,13 @@ export function useProcessedOrders(overrideStoreId) {
             const lower = k.trim().toLowerCase();
             const standardKeys = {
                 'order/adjustment id': 'Order/adjustment ID',
+                'no. pesanan': 'Order/adjustment ID', // Shopee
                 'total settlement amount': 'Total settlement amount',
+                'total penghasilan': 'Total settlement amount', // Shopee
                 'affiliate commission': 'Affiliate commission',
+                'komisi affiliate': 'Affiliate commission', // Shopee fallback
                 'customer payment': 'Customer payment',
+                'total pembayaran pembeli': 'Customer payment', // Shopee
                 'return shipping costs (passed on to the customer)': 'Return shipping costs (passed on to the customer)',
             };
             newRow[standardKeys[lower] || k.trim()] = v;
