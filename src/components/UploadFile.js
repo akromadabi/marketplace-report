@@ -693,10 +693,12 @@ function UploadFile() {
             <FileInputList
               label=""
               files={allFiles}
-              onRemove={removeFile}
+              onRemove={removing => !uploading && removeFile(removing)}
               iconSrcGetter={getIconForFile}
               fileCategoryMap={fileCategoryMap}
               fileRowCountMap={fileRowCountMap}
+              uploadProgress={uploadProgress}
+              uploading={uploading}
             />
           </div>
         )}
@@ -748,65 +750,6 @@ function UploadFile() {
                 </span>
               )}
             </span>
-          </div>
-        )}
-
-        {/* ─── Upload Progress Panel ─────────────────────── */}
-        {uploadProgress.length > 0 && (
-          <div ref={progressRef} style={{
-            background: 'var(--bg-glass)',
-            border: '1px solid var(--border-medium)',
-            borderRadius: 'var(--radius-lg)',
-            padding: '1rem 1.25rem',
-            marginBottom: '1rem',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.875rem' }}>
-              <Loader2 size={15} color="var(--accent-primary)" style={{ animation: 'spin 1s linear infinite', flexShrink: 0 }} />
-              <span style={{ fontWeight: 700, fontSize: '0.8125rem', color: 'var(--text-primary)' }}>
-                Mengupload {uploadProgress.length} file...
-              </span>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
-              {uploadProgress.map((entry, idx) => {
-                const isActive = entry.pct > 0 && !entry.done;
-                const isDone = entry.done;
-                const shortName = entry.fileName.length > 36 ? entry.fileName.slice(0, 33) + '...' : entry.fileName;
-                return (
-                  <div key={idx}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', minWidth: 0, flex: 1 }}>
-                        {isDone
-                          ? <CheckCircle2 size={12} color="#10b981" style={{ flexShrink: 0 }} />
-                          : isActive
-                            ? <Loader2 size={12} color="var(--accent-primary)" style={{ animation: 'spin 1s linear infinite', flexShrink: 0 }} />
-                            : <Clock size={12} color="var(--text-tertiary)" style={{ flexShrink: 0 }} />
-                        }
-                        <span style={{
-                          fontSize: '0.6875rem', fontWeight: 600,
-                          color: isDone ? '#10b981' : isActive ? 'var(--text-primary)' : 'var(--text-tertiary)',
-                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                        }}>{shortName}</span>
-                      </div>
-                      <span style={{
-                        fontSize: '0.6875rem', fontWeight: 700, flexShrink: 0, marginLeft: '0.5rem',
-                        color: isDone ? '#10b981' : isActive ? 'var(--accent-primary)' : 'var(--text-tertiary)',
-                      }}>{entry.pct}%</span>
-                    </div>
-                    <div style={{ height: '4px', borderRadius: '999px', background: 'var(--border-subtle)', overflow: 'hidden' }}>
-                      <div style={{
-                        height: '100%', width: `${entry.pct}%`, borderRadius: '999px',
-                        background: isDone
-                          ? 'linear-gradient(90deg,#10b981,#34d399)'
-                          : isActive
-                            ? 'linear-gradient(90deg,var(--accent-primary),#a78bfa)'
-                            : 'var(--border-medium)',
-                        transition: 'width 0.3s ease',
-                      }} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
           </div>
         )}
 
