@@ -135,17 +135,28 @@ export async function apiUploadFiles(files, userId, storeId) {
     return res.json();
 }
 
-export async function apiUploadParsedFiles(filesData, userId, storeId) {
+export async function apiUploadParsedFiles(filesData, userId, storeId, onProgress) {
     const CHUNK_SIZE = 100;
     const aggregatedResults = { orders: 0, payments: 0, returns: 0, pengembalian: 0 };
     const aggregatedSkipped = { orders: 0, payments: 0, returns: 0, pengembalian: 0 };
     let totalSkipped = 0;
 
-    for (const fileData of filesData) {
-        let chunkIndex = 1;
-        const totalChunks = Math.ceil((fileData.jsonData?.length || 0) / CHUNK_SIZE) || 1;
+    for (let fileIdx = 0; fileIdx < filesData.length; fileIdx++) {
+        const fileData = filesData[fileIdx];
+        const totalRows = fileData.jsonData?.length || 0;
+        const totalChunks = Math.ceil(totalRows / CHUNK_SIZE) || 1;
         
-        for (let i = 0; i < (fileData.jsonData?.length || 0); i += CHUNK_SIZE) {
+        // Report start of this file
+        if (onProgress) onProgress({ fileIdx, fileName: fileData.filename, pct: 0, done: false });
+
+        if (totalRows === 0) {
+            // File kosong / tidak terbaca — skip tapi laporkan selesai
+            if (onProgress) onProgress({ fileIdx, fileName: fileData.filename, pct: 100, done: true });
+            continue;
+        }
+
+        for (let chunkIdx = 0; chunkIdx < totalChunks; chunkIdx++) {
+            const i = chunkIdx * CHUNK_SIZE;
             const chunk = fileData.jsonData.slice(i, i + CHUNK_SIZE);
             const singleFilePayload = [{
                 ...fileData,
@@ -181,7 +192,10 @@ export async function apiUploadParsedFiles(filesData, userId, storeId) {
             }
             totalSkipped += (jsonResponse.totalSkipped || 0);
 
-            chunkIndex++;
+            // Report progress for this file
+            const pct = Math.round(((chunkIdx + 1) / totalChunks) * 100);
+            if (onProgress) onProgress({ fileIdx, fileName: fileData.filename, pct, done: pct >= 100 });
+
             if (totalChunks > 1) await new Promise(r => setTimeout(r, 200));
         }
     }

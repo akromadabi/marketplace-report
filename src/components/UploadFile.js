@@ -115,6 +115,8 @@ function UploadFile() {
   const [deletingId, setDeletingId] = useState(null);
   const [migratingOrphans, setMigratingOrphans] = useState(false);
   const [orphanMigrated, setOrphanMigrated] = useState(null);
+  // uploadProgress: array of { fileName, pct, done } — one per file being uploaded
+  const [uploadProgress, setUploadProgress] = useState([]);
   const inputRef = useRef(null);
 
   const fetchHistory = useCallback(async () => {
@@ -433,28 +435,37 @@ function UploadFile() {
     setSuccess(null);
     if (allFiles.length === 0) { setError("Harap unggah minimal satu file."); return; }
     setUploading(true);
+    // Initialise progress entries for all files
+    const payloadData = allFiles.map((file) => {
+      const key = file.name + file.size;
+      return {
+        filename: file.name,
+        platform: filePlatformCache[key],
+        category: fileCategoryMap[key],
+        jsonData: fileParsedDataMap[key] || [],
+      };
+    });
+    setUploadProgress(payloadData.map(f => ({ fileName: f.filename, pct: 0, done: false, active: false })));
     const notifId = addNotification({
       type: 'loading',
       message: `Memproses ${allFiles.length} file... Anda bisa berpindah halaman, proses tetap berjalan.`,
       persistent: true,
     });
     try {
-      const payloadData = allFiles.map((file) => {
-        const key = file.name + file.size;
-        return {
-          filename: file.name,
-          platform: filePlatformCache[key],
-          category: fileCategoryMap[key],
-          jsonData: fileParsedDataMap[key] || [],
-        };
+      const result = await apiUploadParsedFiles(payloadData, user?.id, activeStoreId, ({ fileIdx, pct, done }) => {
+        setUploadProgress(prev => prev.map((entry, idx) => {
+          if (idx === fileIdx) return { ...entry, pct, done, active: !done };
+          if (idx < fileIdx) return { ...entry, done: true, pct: 100, active: false };
+          return entry;
+        }));
       });
-      const result = await apiUploadParsedFiles(payloadData, user?.id, activeStoreId);
       setSuccess({ ...result.results, skipped: result.skipped, totalSkipped: result.totalSkipped || 0 });
       setAllFiles([]);
       setFileCategoryMap({});
       setFileParsedDataMap({});
       setFileRowCountMap({});
       setFilePlatformCache({});
+      setUploadProgress([]);
       fetchHistory();
       invalidateAll();
       const parts = [];
@@ -746,6 +757,74 @@ function UploadFile() {
           )}
         </button>
       </form>
+
+      {/* ─── Upload Progress Panel ─────────────────────────────── */}
+      {uploading && uploadProgress.length > 0 && (
+        <div className="glass-card" style={{ padding: '1.25rem', marginTop: '1.25rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+            <Loader2 size={16} color="var(--accent-primary)" style={{ animation: 'spin 1s linear infinite', flexShrink: 0 }} />
+            <span style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--text-primary)' }}>
+              Mengupload {uploadProgress.length} file...
+            </span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {uploadProgress.map((entry, idx) => {
+              const isActive = entry.pct > 0 && !entry.done;
+              const isWaiting = entry.pct === 0 && !entry.done;
+              const isDone = entry.done;
+              const shortName = entry.fileName.length > 38 ? entry.fileName.slice(0, 35) + '...' : entry.fileName;
+              return (
+                <div key={idx}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.3rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', minWidth: 0 }}>
+                      {isDone
+                        ? <CheckCircle2 size={13} color="#10b981" style={{ flexShrink: 0 }} />
+                        : isActive
+                          ? <Loader2 size={13} color="var(--accent-primary)" style={{ animation: 'spin 1s linear infinite', flexShrink: 0 }} />
+                          : <Clock size={13} color="var(--text-tertiary)" style={{ flexShrink: 0 }} />
+                      }
+                      <span style={{
+                        fontSize: '0.75rem', fontWeight: 600,
+                        color: isDone ? '#10b981' : isActive ? 'var(--text-primary)' : 'var(--text-tertiary)',
+                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                      }}>
+                        {shortName}
+                      </span>
+                    </div>
+                    <span style={{
+                      fontSize: '0.75rem', fontWeight: 700, flexShrink: 0, marginLeft: '0.5rem',
+                      color: isDone ? '#10b981' : isActive ? 'var(--accent-primary)' : 'var(--text-tertiary)',
+                    }}>
+                      {entry.pct}%
+                    </span>
+                  </div>
+                  {/* Progress bar */}
+                  <div style={{
+                    height: '5px', borderRadius: '999px',
+                    background: 'var(--border-subtle)',
+                    overflow: 'hidden',
+                  }}>
+                    <div style={{
+                      height: '100%',
+                      width: `${entry.pct}%`,
+                      borderRadius: '999px',
+                      background: isDone
+                        ? 'linear-gradient(90deg, #10b981, #34d399)'
+                        : isActive
+                          ? 'linear-gradient(90deg, var(--accent-primary), #a78bfa)'
+                          : 'var(--border-medium)',
+                      transition: 'width 0.3s ease',
+                    }} />
+                  </div>
+                  <div style={{ fontSize: '0.625rem', color: 'var(--text-tertiary)', marginTop: '0.2rem' }}>
+                    {isDone ? 'Selesai' : isActive ? 'Sedang diupload...' : 'Menunggu...'}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Category summary boxes */}
       {allFiles.length > 0 && (
