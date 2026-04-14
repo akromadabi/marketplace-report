@@ -67,9 +67,15 @@ function useWindowWidth() {
 
 // ─── Protected Route for User ────────────────────────────────────
 function ProtectedRoute({ children, requiredPermission }) {
-    const { isAuthenticated, hasPermission, isAdmin } = useAuth();
+    const { isAuthenticated, hasPermission, isAdmin, permissionsLoading } = useAuth();
     if (!isAuthenticated) return <Navigate to="/login" replace />;
     if (isAdmin) return <Navigate to="/admin/dashboard" replace />;
+    
+    if (permissionsLoading) {
+        // Jangan render apapun atau kick user saat masih mengecek akses dari server
+        return null;
+    }
+    
     if (requiredPermission && !hasPermission(requiredPermission)) return <Navigate to="/upload" replace />;
     return children;
 }
@@ -119,16 +125,16 @@ function UserLayout() {
                                         <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
                                         <Route path="/upload" element={<ProtectedRoute><UploadFile /></ProtectedRoute>} />
                                         <Route path="/input-modal" element={<ProtectedRoute requiredPermission="/input-modal"><InputModal /></ProtectedRoute>} />
-                                        <Route path="/kampanye" element={<ProtectedRoute><KampanyeMain /></ProtectedRoute>} />
-                                        <Route path="/kalkulator" element={<ProtectedRoute><PricingCalculator /></ProtectedRoute>} />
+                                        <Route path="/kampanye" element={<ProtectedRoute requiredPermission="/kampanye"><KampanyeMain /></ProtectedRoute>} />
+                                        <Route path="/kalkulator" element={<ProtectedRoute requiredPermission="/kalkulator"><PricingCalculator /></ProtectedRoute>} />
                                         <Route path="/return" element={<ProtectedRoute requiredPermission="/return"><ReturnTable /></ProtectedRoute>} />
                                         <Route path="/pengembalian" element={<ProtectedRoute requiredPermission="/pengembalian"><PengembalianTable /></ProtectedRoute>} />
                                         <Route path="/analisis" element={<ProtectedRoute requiredPermission="/analisis"><ProductAnalysis /></ProtectedRoute>} />
                                         <Route path="/rangkuman" element={<ProtectedRoute requiredPermission="/rangkuman"><RangkumanTransaksi /></ProtectedRoute>} />
                                         <Route path="/olahan" element={<ProtectedRoute requiredPermission="/olahan"><OlahanDataPesanan /></ProtectedRoute>} />
                                         <Route path="/stores" element={<ProtectedRoute requiredPermission="/stores"><StoreManagement /></ProtectedRoute>} />
-                                        <Route path="/aset" element={<ProtectedRoute><AsetTable /></ProtectedRoute>} />
-                                        <Route path="/operasional" element={<ProtectedRoute><OperasionalTable /></ProtectedRoute>} />
+                                        <Route path="/aset" element={<ProtectedRoute requiredPermission="/aset"><AsetTable /></ProtectedRoute>} />
+                                        <Route path="/operasional" element={<ProtectedRoute requiredPermission="/operasional"><OperasionalTable /></ProtectedRoute>} />
                                         <Route path="/profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
                                         <Route path="*" element={<Navigate to="/upload" replace />} />
                                     </Routes>
