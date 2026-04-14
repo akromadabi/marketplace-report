@@ -131,6 +131,19 @@ function UploadFile() {
 
   useEffect(() => { fetchHistory(); }, [fetchHistory]);
 
+  // Cegah refresh / tutup tab saat upload sedang berjalan
+  useEffect(() => {
+    if (!uploading) return;
+    const handleBeforeUnload = (e) => {
+      e.preventDefault();
+      // Pesan ini mungkin tidak ditampilkan di Chrome modern, tapi dialog konfirmasi tetap muncul
+      e.returnValue = 'Upload sedang berjalan. Jika Anda refresh atau meninggalkan halaman, proses upload akan berhenti dan data mungkin tidak tersimpan.';
+      return e.returnValue;
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [uploading]);
+
   async function handleDeleteUpload(id) {
     if (!window.confirm('Hapus upload ini beserta semua datanya?')) return;
     setDeletingId(id);
