@@ -4,10 +4,12 @@ import {
   CheckCircle2, Circle, Layers, Zap, Filter, X, Loader2
 } from 'lucide-react';
 import { useApiData, useModalValues } from '../hooks/useApiData';
+import { useStore } from '../contexts/StoreContext';
 
 function InputModal() {
-  const { data: ordersData, loading: loadingOrders } = useApiData('orders');
-  const { modalValues, setModalValues, loading: loadingModal, saveAll, saveSingle } = useModalValues();
+  const { activeStoreId } = useStore();
+  const { data: ordersData, loading: loadingOrders } = useApiData('orders', activeStoreId);
+  const { modalValues, setModalValues, loading: loadingModal, saveAll, saveSingle } = useModalValues(activeStoreId);
   // ─── Data Processing (unchanged logic) ─────────────────────────────
   const skuIdToChannel = useMemo(() => {
     const map = new Map();
