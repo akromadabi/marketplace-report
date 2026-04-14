@@ -118,6 +118,7 @@ function UploadFile() {
   // uploadProgress: array of { fileName, pct, done } — one per file being uploaded
   const [uploadProgress, setUploadProgress] = useState([]);
   const inputRef = useRef(null);
+  const progressRef = useRef(null);
 
   const fetchHistory = useCallback(async () => {
     setHistoryLoading(true);
@@ -136,12 +137,18 @@ function UploadFile() {
     if (!uploading) return;
     const handleBeforeUnload = (e) => {
       e.preventDefault();
-      // Pesan ini mungkin tidak ditampilkan di Chrome modern, tapi dialog konfirmasi tetap muncul
       e.returnValue = 'Upload sedang berjalan. Jika Anda refresh atau meninggalkan halaman, proses upload akan berhenti dan data mungkin tidak tersimpan.';
       return e.returnValue;
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [uploading]);
+
+  // Auto-scroll ke progress panel saat upload mulai
+  useEffect(() => {
+    if (uploading && progressRef.current) {
+      progressRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
   }, [uploading]);
 
   async function handleDeleteUpload(id) {
@@ -744,6 +751,65 @@ function UploadFile() {
           </div>
         )}
 
+        {/* ─── Upload Progress Panel ─────────────────────── */}
+        {uploadProgress.length > 0 && (
+          <div ref={progressRef} style={{
+            background: 'var(--bg-glass)',
+            border: '1px solid var(--border-medium)',
+            borderRadius: 'var(--radius-lg)',
+            padding: '1rem 1.25rem',
+            marginBottom: '1rem',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.875rem' }}>
+              <Loader2 size={15} color="var(--accent-primary)" style={{ animation: 'spin 1s linear infinite', flexShrink: 0 }} />
+              <span style={{ fontWeight: 700, fontSize: '0.8125rem', color: 'var(--text-primary)' }}>
+                Mengupload {uploadProgress.length} file...
+              </span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
+              {uploadProgress.map((entry, idx) => {
+                const isActive = entry.pct > 0 && !entry.done;
+                const isDone = entry.done;
+                const shortName = entry.fileName.length > 36 ? entry.fileName.slice(0, 33) + '...' : entry.fileName;
+                return (
+                  <div key={idx}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', minWidth: 0, flex: 1 }}>
+                        {isDone
+                          ? <CheckCircle2 size={12} color="#10b981" style={{ flexShrink: 0 }} />
+                          : isActive
+                            ? <Loader2 size={12} color="var(--accent-primary)" style={{ animation: 'spin 1s linear infinite', flexShrink: 0 }} />
+                            : <Clock size={12} color="var(--text-tertiary)" style={{ flexShrink: 0 }} />
+                        }
+                        <span style={{
+                          fontSize: '0.6875rem', fontWeight: 600,
+                          color: isDone ? '#10b981' : isActive ? 'var(--text-primary)' : 'var(--text-tertiary)',
+                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                        }}>{shortName}</span>
+                      </div>
+                      <span style={{
+                        fontSize: '0.6875rem', fontWeight: 700, flexShrink: 0, marginLeft: '0.5rem',
+                        color: isDone ? '#10b981' : isActive ? 'var(--accent-primary)' : 'var(--text-tertiary)',
+                      }}>{entry.pct}%</span>
+                    </div>
+                    <div style={{ height: '4px', borderRadius: '999px', background: 'var(--border-subtle)', overflow: 'hidden' }}>
+                      <div style={{
+                        height: '100%', width: `${entry.pct}%`, borderRadius: '999px',
+                        background: isDone
+                          ? 'linear-gradient(90deg,#10b981,#34d399)'
+                          : isActive
+                            ? 'linear-gradient(90deg,var(--accent-primary),#a78bfa)'
+                            : 'var(--border-medium)',
+                        transition: 'width 0.3s ease',
+                      }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Submit Button */}
         <button
           type="submit"
@@ -770,74 +836,6 @@ function UploadFile() {
           )}
         </button>
       </form>
-
-      {/* ─── Upload Progress Panel ─────────────────────────────── */}
-      {uploading && uploadProgress.length > 0 && (
-        <div className="glass-card" style={{ padding: '1.25rem', marginTop: '1.25rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-            <Loader2 size={16} color="var(--accent-primary)" style={{ animation: 'spin 1s linear infinite', flexShrink: 0 }} />
-            <span style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--text-primary)' }}>
-              Mengupload {uploadProgress.length} file...
-            </span>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            {uploadProgress.map((entry, idx) => {
-              const isActive = entry.pct > 0 && !entry.done;
-              const isWaiting = entry.pct === 0 && !entry.done;
-              const isDone = entry.done;
-              const shortName = entry.fileName.length > 38 ? entry.fileName.slice(0, 35) + '...' : entry.fileName;
-              return (
-                <div key={idx}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.3rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', minWidth: 0 }}>
-                      {isDone
-                        ? <CheckCircle2 size={13} color="#10b981" style={{ flexShrink: 0 }} />
-                        : isActive
-                          ? <Loader2 size={13} color="var(--accent-primary)" style={{ animation: 'spin 1s linear infinite', flexShrink: 0 }} />
-                          : <Clock size={13} color="var(--text-tertiary)" style={{ flexShrink: 0 }} />
-                      }
-                      <span style={{
-                        fontSize: '0.75rem', fontWeight: 600,
-                        color: isDone ? '#10b981' : isActive ? 'var(--text-primary)' : 'var(--text-tertiary)',
-                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                      }}>
-                        {shortName}
-                      </span>
-                    </div>
-                    <span style={{
-                      fontSize: '0.75rem', fontWeight: 700, flexShrink: 0, marginLeft: '0.5rem',
-                      color: isDone ? '#10b981' : isActive ? 'var(--accent-primary)' : 'var(--text-tertiary)',
-                    }}>
-                      {entry.pct}%
-                    </span>
-                  </div>
-                  {/* Progress bar */}
-                  <div style={{
-                    height: '5px', borderRadius: '999px',
-                    background: 'var(--border-subtle)',
-                    overflow: 'hidden',
-                  }}>
-                    <div style={{
-                      height: '100%',
-                      width: `${entry.pct}%`,
-                      borderRadius: '999px',
-                      background: isDone
-                        ? 'linear-gradient(90deg, #10b981, #34d399)'
-                        : isActive
-                          ? 'linear-gradient(90deg, var(--accent-primary), #a78bfa)'
-                          : 'var(--border-medium)',
-                      transition: 'width 0.3s ease',
-                    }} />
-                  </div>
-                  <div style={{ fontSize: '0.625rem', color: 'var(--text-tertiary)', marginTop: '0.2rem' }}>
-                    {isDone ? 'Selesai' : isActive ? 'Sedang diupload...' : 'Menunggu...'}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
       {/* Category summary boxes */}
       {allFiles.length > 0 && (
