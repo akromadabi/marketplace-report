@@ -181,9 +181,18 @@ function UploadFile() {
   function detectPlatformAndCategory(headers, sheetNames) {
     const normalized = headers.map((h) => h.toString().trim().toLowerCase());
     const tiktokOrdersHeaders = ["order id", "order status", "order substatus", "cancelation/return type", "normal or pre-order", "sku id", "seller sku", "product name", "variation"];
-    const tiktokPaymentsHeaders = ["order/adjustment id", "total settlement amount", "total revenue", "subtotal after seller discounts", "customer payment"];
+    // Core TikTok payments headers (required)
+    const tiktokPaymentsCoreHeaders = ["order/adjustment id", "total settlement amount"];
+    // Extended headers — one group must match (old vs new format)
+    const tiktokPaymentsOldHeaders = ["total revenue", "subtotal after seller discounts", "customer payment"];
+    const tiktokPaymentsNewHeaders = ["total revenue", "subtotal after seller discounts"];
     const tiktokPaymentsFlexHeaders = ["order created time", "order settled time"];
     const tiktokReturnHeaders = ["return order id", "order id", "order amount", "order status", "order substatus", "payment method", "sku id"];
+    // TikTok Income format baru: sheet "Order details" dengan kolom settlement
+    if (sheetNames && sheetNames.includes('Order details')) {
+      const hasCore = tiktokPaymentsCoreHeaders.every((h) => normalized.some(fh => fh.startsWith(h)));
+      if (hasCore) return { platform: "tiktok", category: "payments" };
+    }
     // Shopee Income (payments): multi-sheet file with "Income" sheet — check first
     if (sheetNames && sheetNames.includes('Income')) return { platform: "shopee", category: "payments" };
     // Shopee return/refund — must come before generic pengembalian (both have tanggal+resi)
@@ -195,9 +204,12 @@ function UploadFile() {
     const hasResi = normalized.some((h) => h.includes("resi"));
     if (hasTanggal && hasResi) return { platform: "none", category: "pengembalian" };
     if (tiktokOrdersHeaders.every((h) => normalized.includes(h)) && normalized.length >= tiktokOrdersHeaders.length) return { platform: "tiktok", category: "orders" };
-    const hasTiktokPayments = tiktokPaymentsHeaders.every((h) => normalized.includes(h))
-      && tiktokPaymentsFlexHeaders.every((prefix) => normalized.some((h) => h.startsWith(prefix)));
-    if (hasTiktokPayments && normalized.length >= tiktokPaymentsHeaders.length) return { platform: "tiktok", category: "payments" };
+    // TikTok payments: core headers + either old or new extended headers + flex date headers
+    const hasCore = tiktokPaymentsCoreHeaders.every((h) => normalized.some(fh => fh.startsWith(h)));
+    const hasFlex = tiktokPaymentsFlexHeaders.every((prefix) => normalized.some((h) => h.startsWith(prefix)));
+    const hasOldFormat = tiktokPaymentsOldHeaders.every((h) => normalized.some(fh => fh.startsWith(h)));
+    const hasNewFormat = tiktokPaymentsNewHeaders.every((h) => normalized.some(fh => fh.startsWith(h)));
+    if (hasCore && hasFlex && (hasOldFormat || hasNewFormat)) return { platform: "tiktok", category: "payments" };
     if (tiktokReturnHeaders.every((h) => normalized.includes(h)) && normalized.length >= tiktokReturnHeaders.length) return { platform: "tiktok", category: "return" };
     return { platform: "unknown", category: "unknown" };
   }
@@ -254,8 +266,17 @@ function UploadFile() {
           }
           const { platform, category } = detectPlatformAndCategory(headers, workbook.SheetNames);
           let jsonData;
+          // Special handling for TikTok Income format baru (sheet: "Order details")
+          if (platform === 'tiktok' && category === 'payments' && workbook.SheetNames.includes('Order details')) {
+            const orderDetailsSheet = workbook.Sheets['Order details'];
+            if (orderDetailsSheet) {
+              // Read directly — format baru sudah punya header di baris pertama
+              jsonData = XLSX.utils.sheet_to_json(orderDetailsSheet, { defval: '' });
+            } else {
+              jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+            }
           // Special handling for Shopee Income (payments)
-          if (platform === 'shopee' && category === 'payments') {
+          } else if (platform === 'shopee' && category === 'payments') {
             const incomeSheet = workbook.Sheets['Income'];
             if (incomeSheet) {
               const incomeRange = XLSX.utils.decode_range(incomeSheet['!ref']);
