@@ -125,12 +125,14 @@ export function AuthProvider({ children }) {
         if (!currentUser) return false;
         // Admin has access to all admin pages but NOT user pages
         if (currentUser.role === 'admin') return false;
-        // User: check class-based permissions
-        if (!currentUser.permissions) return false;
         // /upload and / are always available for users
         if (page === '/upload' || page === '/') return true;
-        return currentUser.permissions.includes(page);
-    }, [currentUser]);
+        // Saat permissions API masih loading, gunakan permissions dari localStorage sebagai fallback
+        // agar menu tidak hilang saat pertama load
+        const perms = currentUser.permissions
+            || (permissionsLoading ? (getStoredSession()?.permissions || []) : []);
+        return Array.isArray(perms) && perms.includes(page);
+    }, [currentUser, permissionsLoading]);
 
     const hasAdminAccess = useCallback(() => {
         return currentUser?.role === 'admin';
