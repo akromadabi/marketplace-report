@@ -8,6 +8,7 @@ import {
     apiGetStats,
 } from '../api';
 import { useAuth } from './AuthContext';
+import { useStore } from './StoreContext';
 
 const DataContext = createContext(null);
 
@@ -19,6 +20,7 @@ const DataContext = createContext(null);
  */
 export function DataProvider({ children }) {
     const { user } = useAuth();
+    const { activeStoreId } = useStore();
     const userId = user?.id;
 
     // cache: Map<string, { data, loading, error, promise }>
@@ -125,6 +127,13 @@ export function DataProvider({ children }) {
         computedRef.current.clear();
         setVersion(v => v + 1);
     }, [userId]);
+
+    // When active store changes, clear all cache so stale data is not shown
+    useEffect(() => {
+        cacheRef.current.clear();
+        computedRef.current.clear();
+        setVersion(v => v + 1);
+    }, [activeStoreId]);
 
     /**
      * Get a computed/processed result from cache.

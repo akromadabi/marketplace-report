@@ -5,6 +5,7 @@ import {
     apiSaveModalSingle,
 } from '../api';
 import { useDataCache } from '../contexts/DataContext';
+import { useStore } from '../contexts/StoreContext';
 
 /**
  * Hook to fetch data from API with loading/error states.
@@ -17,16 +18,20 @@ import { useDataCache } from '../contexts/DataContext';
  */
 export function useApiData(type, storeId) {
     const { getData, fetchData, version } = useDataCache();
+    const { loading: storesLoading } = useStore();
     const [, setTick] = useState(0);
 
     // Check cache and trigger fetch if needed
     useEffect(() => {
+        // Wait until stores have finished loading before fetching data.
+        // This prevents fetching with storeId=null when a store exists.
+        if (storesLoading) return;
         const cached = getData(type, storeId);
         if (!cached) {
             // Not in cache — fetch it
             fetchData(type, storeId);
         }
-    }, [type, storeId, getData, fetchData, version]);
+    }, [type, storeId, getData, fetchData, version, storesLoading]);
 
     // Force re-render when version changes (cache updates)
     useEffect(() => {
@@ -41,7 +46,8 @@ export function useApiData(type, storeId) {
 
     return {
         data: cached?.data ?? (type === 'stats' ? null : []),
-        loading: cached ? cached.loading : true,
+        // If stores are still loading, report loading=true even if no cache yet
+        loading: storesLoading ? true : (cached ? cached.loading : true),
         error: cached?.error ?? null,
         refetch,
     };
