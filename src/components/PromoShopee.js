@@ -581,7 +581,7 @@ function PromoShopee() {
       });
     });
     setIsDirty(true);
-    setCardBulk(prev => ({ ...prev, [sellerSku]: { selections, harga: '', stok: '' } }));
+    setCardBulk(prev => ({ ...prev, [sellerSku]: { selections, harga: '', stok: '', batas: '' } }));
     setFlashSku(sellerSku);
     setTimeout(() => setFlashSku(null), 1500);
   }
@@ -1490,7 +1490,7 @@ function PromoShopee() {
                     <button
                       className="im-bulk-apply"
                       onClick={() => applyCardBulk(sellerSku, rows)}
-                      disabled={!bulk.harga && bulk.stok === ''}
+                      disabled={!bulk.harga && bulk.stok === '' && bulk.batas === ''}
                     >
                       <Save size={13} /> Terapkan
                     </button>
@@ -1514,7 +1514,21 @@ function PromoShopee() {
                   {/* Variation list */}
                   <div className="im-var-list">
                     {rows
-                      .filter(p => ignoreZeroStock ? Number(p.stok_saat_ini || 0) > 0 : true)
+                      .filter(p => {
+                        if (ignoreZeroStock && !(Number(p.stok_saat_ini || 0) > 0)) return false;
+                        if (varTypes.length === 0) return true;
+                        const selections = bulk.selections || [];
+                        const variation = p.variation_value || '';
+                        let parts = variation.split(' / ');
+                        if (parts.length === 1) parts = variation.split(',');
+                        parts = parts.map(s => s.trim());
+                        if (parts.length !== varTypes.length) return true;
+                        for (let i = 0; i < varTypes.length; i++) {
+                          const sel = selections[i] || 'Semua';
+                          if (sel !== 'Semua' && sel !== parts[i]) return false;
+                        }
+                        return true;
+                      })
                       .map(p => {
                       const hargaVal = localValues[p.id]?.harga_promo !== undefined ? localValues[p.id].harga_promo : fmtRp(p.harga_promo || '');
                       const stokVal = localValues[p.id]?.stok_promo !== undefined ? localValues[p.id].stok_promo : (p.stok_promo != null ? p.stok_promo : '');

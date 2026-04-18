@@ -511,7 +511,7 @@ function InputModal() {
             return (
               <div key={sellerSku} className={`im-card ${fillStatus === 'filled' ? 'im-card-filled' : ''} ${isInvalid ? 'im-card-invalid' : ''} ${isFlashSaved ? 'im-card-flash' : ''}`}>
                 {/* Card Main Row */}
-                <div className="im-card-header">
+                <div className="im-card-header" onClick={() => variationCount > 1 && toggleExpand(sellerSku)} style={{ cursor: variationCount > 1 ? 'pointer' : 'default' }}>
                   <div className="im-card-left">
                     {chInfo && (
                       <img src={chInfo.iconSrc} alt={chInfo.channel} className="im-channel-icon" loading="lazy" />
@@ -534,15 +534,15 @@ function InputModal() {
                         {fillStatus === 'filled' && <CheckCircle2 size={14} className="im-check" />}
                       </div>
                       {variationCount > 1 && (
-                        <button className="im-var-badge" onClick={() => toggleExpand(sellerSku)}>
+                        <span className="im-var-badge">
                           <Layers size={11} />
                           {variationCount} variasi
                           {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                        </button>
+                        </span>
                       )}
                     </div>
                   </div>
-                  <div className="im-card-right">
+                  <div className="im-card-right" onClick={e => e.stopPropagation()}>
                     {variationCount <= 1 || !anyVariationFilled ? (
                       <input
                         type="text" inputMode="numeric" pattern="[0-9]*"
@@ -553,7 +553,7 @@ function InputModal() {
                         disabled={anyVariationFilled}
                       />
                     ) : (
-                      <span className="im-multi-label">Multi-harga</span>
+                      <span className="im-multi-label" onClick={() => toggleExpand(sellerSku)} style={{ cursor: 'pointer' }}>Multi-variasi</span>
                     )}
                   </div>
                 </div>
@@ -605,7 +605,19 @@ function InputModal() {
 
                     {/* Variation Items */}
                     <div className="im-var-list">
-                      {variations.map(({ skuId, variation }) => {
+                      {variations.filter(({ variation }) => {
+                        if (variationTypes.length === 0) return true;
+                        const selections = bulk.selections || [];
+                        let parts = variation.split(' / ');
+                        if (parts.length === 1) parts = variation.split(',');
+                        parts = parts.map(p => p.trim());
+                        if (parts.length !== variationTypes.length) return true;
+                        for (let i = 0; i < variationTypes.length; i++) {
+                          const sel = selections[i] || 'Semua Variasi';
+                          if (sel !== 'Semua Variasi' && sel !== parts[i]) return false;
+                        }
+                        return true;
+                      }).map(({ skuId, variation }) => {
                         const key = sellerSku + '||' + skuId + '||' + variation;
                         const val = modalValues[key] || '';
                         let channel = skuIdToChannel.skuIdToChannel.get(skuId) || "";
