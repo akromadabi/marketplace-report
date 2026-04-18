@@ -530,14 +530,14 @@ function PromoShopee() {
   };
 
   // ─── Selection ───────────────────────────────────────────────
-  const allVisibleIds = useMemo(() => filteredGroups.flatMap(g => g.rows.map(r => r.id)), [filteredGroups]);
+  const allVisibleIds = useMemo(() => filteredGroups.flatMap(g => g.rows.filter(r => !ignoreZeroStock || Number(r.stok_saat_ini || 0) > 0).map(r => r.id)), [filteredGroups, ignoreZeroStock]);
   const isAllSelected = allVisibleIds.length > 0 && allVisibleIds.every(id => selectedIds.has(id));
 
   function toggleSelectAll() { setSelectedIds(isAllSelected ? new Set() : new Set(allVisibleIds)); }
 
   function toggleSelectGroup(rows) {
-    const ids = rows.map(r => r.id);
-    const allSel = ids.every(id => selectedIds.has(id));
+    const ids = rows.filter(r => !ignoreZeroStock || Number(r.stok_saat_ini || 0) > 0).map(r => r.id);
+    const allSel = ids.length > 0 && ids.every(id => selectedIds.has(id));
     setSelectedIds(prev => {
       const next = new Set(prev);
       ids.forEach(id => allSel ? next.delete(id) : next.add(id));
@@ -753,6 +753,7 @@ function PromoShopee() {
     let base;
     if (selectedIds.size > 0) {
       base = products.filter(p => selectedIds.has(p.id));
+      if (ignoreZeroStock) base = base.filter(p => Number(p.stok_saat_ini || 0) > 0);
     } else {
       // Ambil semua produk dari group yang sedang tampil (sudah difilter fail, stok 0, search, dll)
       const visibleIds = new Set(filteredGroups.flatMap(g => g.rows.map(r => r.id)));
@@ -765,9 +766,12 @@ function PromoShopee() {
     }
     return base.filter(p => toRawNum(getLocal(p.id, 'harga_promo')) > 0).map(p => ({
       product_id: p.product_id, sku_id: p.sku_id,
+      product_name: p.product_name, variation_value: p.variation_value, stok_saat_ini: p.stok_saat_ini,
       harga_promo: toRawNum(getLocal(p.id, 'harga_promo')),
       stok_promo: getLocal(p.id, 'stok_promo') !== null && getLocal(p.id, 'stok_promo') !== ''
         ? toRawNum(getLocal(p.id, 'stok_promo')) : null,
+      batas_pembelian: getLocal(p.id, 'batas_pembelian') !== null && getLocal(p.id, 'batas_pembelian') !== ''
+        ? toRawNum(getLocal(p.id, 'batas_pembelian')) : null,
     }));
   }
 
@@ -780,6 +784,7 @@ function PromoShopee() {
     let base;
     if (selectedIds.size > 0) {
       base = products.filter(p => selectedIds.has(p.id));
+      if (ignoreZeroStock) base = base.filter(p => Number(p.stok_saat_ini || 0) > 0);
     } else {
       const visibleIds = new Set(filteredGroups.flatMap(g => g.rows.map(r => r.id)));
       base = products.filter(p => {

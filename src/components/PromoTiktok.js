@@ -510,14 +510,14 @@ function PromoTiktok() {
   };
 
   // ─── Selection ───────────────────────────────────────────────
-  const allVisibleIds = useMemo(() => filteredGroups.flatMap(g => g.rows.map(r => r.id)), [filteredGroups]);
+  const allVisibleIds = useMemo(() => filteredGroups.flatMap(g => g.rows.filter(r => !ignoreZeroStock || Number(r.stok_saat_ini || 0) > 0).map(r => r.id)), [filteredGroups, ignoreZeroStock]);
   const isAllSelected = allVisibleIds.length > 0 && allVisibleIds.every(id => selectedIds.has(id));
 
   function toggleSelectAll() { setSelectedIds(isAllSelected ? new Set() : new Set(allVisibleIds)); }
 
   function toggleSelectGroup(rows) {
-    const ids = rows.map(r => r.id);
-    const allSel = ids.every(id => selectedIds.has(id));
+    const ids = rows.filter(r => !ignoreZeroStock || Number(r.stok_saat_ini || 0) > 0).map(r => r.id);
+    const allSel = ids.length > 0 && ids.every(id => selectedIds.has(id));
     setSelectedIds(prev => {
       const next = new Set(prev);
       ids.forEach(id => allSel ? next.delete(id) : next.add(id));
@@ -741,6 +741,7 @@ function PromoTiktok() {
     let base;
     if (selectedIds.size > 0) {
       base = products.filter(p => selectedIds.has(p.id));
+      if (ignoreZeroStock) base = base.filter(p => Number(p.stok_saat_ini || 0) > 0);
     } else {
       // Ambil semua produk dari group yang sedang tampil (sudah difilter fail, stok 0, search, dll)
       const visibleIds = new Set(filteredGroups.flatMap(g => g.rows.map(r => r.id)));
@@ -768,6 +769,7 @@ function PromoTiktok() {
     let base;
     if (selectedIds.size > 0) {
       base = products.filter(p => selectedIds.has(p.id));
+      if (ignoreZeroStock) base = base.filter(p => Number(p.stok_saat_ini || 0) > 0);
     } else {
       const visibleIds = new Set(filteredGroups.flatMap(g => g.rows.map(r => r.id)));
       base = products.filter(p => {
