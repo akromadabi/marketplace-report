@@ -130,6 +130,11 @@ function parseSalesInfoSheet(wb) {
 // ─── Excel: parse Fail Report ──────────────────────────────────────
 function parseFailReport(wb) {
   const ws = wb.Sheets[wb.SheetNames[0]];
+  if (ws['!ref']) {
+    const range = XLSX.utils.decode_range(ws['!ref']);
+    range.e.r = Math.max(range.e.r, 5000);
+    ws['!ref'] = XLSX.utils.encode_range(range);
+  }
   const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
 
   // Find header row — contains 'SKU ID' / 'sku id'
@@ -699,7 +704,13 @@ function PromoTiktok() {
     try {
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: 'array' });
-      setFailMap(parseFailReport(wb));
+      const parsedMap = parseFailReport(wb);
+      setFailMap(parsedMap);
+      if (parsedMap.size === 0) {
+        alert('Tidak ada data produk gagal yang terdeteksi di dalam file. Pastikan Anda mengupload file yang benar dan memiliki isi.');
+      } else {
+        alert(`Berhasil memuat ${parsedMap.size} data produk gagal.`);
+      }
     } catch (err) { alert('Gagal membaca fail report: ' + err.message); }
   }
 
