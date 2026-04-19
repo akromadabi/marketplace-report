@@ -54,7 +54,7 @@ export function StoreProvider({ children }) {
         if (activeStore && activeStore.logo_url) {
             link.href = `/api/${activeStore.logo_url}`;
         } else {
-            link.href = '/favicon.ico'; // default or fallback
+            link.href = `/api/logos/default_logo.png?v=${new Date().getTime()}`; // default or fallback
         }
     }, [activeStore]);
 

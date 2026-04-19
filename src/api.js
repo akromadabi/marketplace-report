@@ -44,6 +44,13 @@ export async function apiUpdateUser(id, data) {
     });
 }
 
+export async function apiUpdateGlobalLogo(logo_data) {
+    return apiFetch('/settings/logo', {
+        method: 'POST',
+        body: JSON.stringify({ logo_data }),
+    });
+}
+
 export async function apiDeleteUser(id) {
     return apiFetch(`/auth/users/${id}`, { method: 'DELETE' });
 }

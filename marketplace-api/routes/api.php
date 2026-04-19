@@ -54,7 +54,26 @@ Route::get('/logos/{filename}', function ($filename) {
     if (file_exists($path)) {
         return response()->file($path);
     }
-    abort(404);
+    return redirect('/favicon.ico');
+});
+
+Route::post('/settings/logo', function (Illuminate\Http\Request $request) {
+    $base64Data = $request->input('logo_data');
+    if (!$base64Data) return response()->json(['error' => 'No logo data'], 400);
+    
+    if (preg_match('/^data:image\/(\w+);base64,/', $base64Data, $type)) {
+        $data = substr($base64Data, strpos($base64Data, ',') + 1);
+        $data = base64_decode($data);
+        if ($data === false) return response()->json(['error' => 'Invalid base64'], 400);
+        
+        $path = public_path('logos/default_logo.png');
+        if (!Illuminate\Support\Facades\File::exists(public_path('logos'))) {
+            Illuminate\Support\Facades\File::makeDirectory(public_path('logos'), 0755, true);
+        }
+        file_put_contents($path, $data);
+        return response()->json(['success' => true]);
+    }
+    return response()->json(['error' => 'Invalid image format'], 400);
 });
 
 // ─── Upload ─────────────────────────────────────────────────────────
