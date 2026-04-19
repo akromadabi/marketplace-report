@@ -8,7 +8,7 @@ function StoreManagement() {
     const { user } = useAuth();
     const [showForm, setShowForm] = useState(false);
     const [editingId, setEditingId] = useState(null);
-    const [form, setForm] = useState({ name: '', platform: '', description: '' });
+    const [form, setForm] = useState({ name: '', platform: '', description: '', logo_data: '', logo_url: '' });
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
 
@@ -17,7 +17,7 @@ function StoreManagement() {
     const limitReached = stores.length >= storeLimit;
 
     const resetForm = useCallback(() => {
-        setForm({ name: '', platform: '', description: '' });
+        setForm({ name: '', platform: '', description: '', logo_data: '', logo_url: '' });
         setEditingId(null);
         setShowForm(false);
         setError('');
@@ -42,9 +42,26 @@ function StoreManagement() {
     };
 
     const handleEdit = (store) => {
-        setForm({ name: store.name, platform: store.platform || '', description: store.description || '' });
+        setForm({ 
+            name: store.name, 
+            platform: store.platform || '', 
+            description: store.description || '',
+            logo_data: '',
+            logo_url: store.logo_url || ''
+        });
         setEditingId(store.id);
         setShowForm(true);
+    };
+
+    const handleLogoChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+                setForm(f => ({ ...f, logo_data: evt.target.result }));
+            };
+            reader.readAsDataURL(file);
+        }
     };
 
     const handleDelete = async (store) => {
@@ -136,6 +153,22 @@ function StoreManagement() {
                                         style={{ width: '100%', padding: '0.625rem 0.875rem', background: 'var(--bg-primary)', border: '1px solid var(--border-medium)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontSize: '0.875rem', boxSizing: 'border-box' }}
                                     />
                                 </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.375rem' }}>Logo Toko & Favicon (Opsional)</label>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                        <div style={{
+                                            width: '3rem', height: '3rem', borderRadius: 'var(--radius-md)', background: 'var(--bg-secondary)',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', border: '1px solid var(--border-medium)'
+                                        }}>
+                                            {(form.logo_data || form.logo_url) ? (
+                                                <img src={form.logo_data || `/api/${form.logo_url}`} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                            ) : (
+                                                <Store size={20} color="var(--text-tertiary)" />
+                                            )}
+                                        </div>
+                                        <input type="file" accept="image/*" onChange={handleLogoChange} style={{ fontSize: '0.8125rem' }} />
+                                    </div>
+                                </div>
                             </div>
                             <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
                                 <button type="button" onClick={resetForm} style={{
@@ -185,9 +218,13 @@ function StoreManagement() {
                                         <div style={{
                                             width: '2.5rem', height: '2.5rem', borderRadius: 'var(--radius-md)',
                                             background: isActive ? 'linear-gradient(135deg, var(--accent-primary), #06b6d4)' : 'var(--bg-secondary)',
-                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', border: isActive ? 'none' : '1px solid var(--border-medium)'
                                         }}>
-                                            <Store size={18} color={isActive ? 'white' : 'var(--text-tertiary)'} />
+                                            {store.logo_url ? (
+                                                <img src={`/api/${store.logo_url}`} alt={store.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                            ) : (
+                                                <Store size={18} color={isActive ? 'white' : 'var(--text-tertiary)'} />
+                                            )}
                                         </div>
                                         <div>
                                             <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>{store.name}</h3>

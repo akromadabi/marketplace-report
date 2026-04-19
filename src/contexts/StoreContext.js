@@ -44,6 +44,20 @@ export function StoreProvider({ children }) {
         loadStores();
     }, [loadStores]);
 
+    useEffect(() => {
+        let link = document.querySelector("link[rel~='icon']");
+        if (!link) {
+            link = document.createElement('link');
+            link.rel = 'icon';
+            document.head.appendChild(link);
+        }
+        if (activeStore && activeStore.logo_url) {
+            link.href = `/api/${activeStore.logo_url}`;
+        } else {
+            link.href = '/favicon.ico'; // default or fallback
+        }
+    }, [activeStore]);
+
     const setActiveStore = useCallback((store) => {
         setActiveStoreState(store);
         if (store) {

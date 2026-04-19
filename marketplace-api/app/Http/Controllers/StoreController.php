@@ -4,9 +4,32 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 
 class StoreController extends Controller
 {
+    private function saveLogo($base64Data) {
+        if (!$base64Data) return null;
+        if (preg_match('/^data:image\/(\w+);base64,/', $base64Data, $type)) {
+            $data = substr($base64Data, strpos($base64Data, ',') + 1);
+            $type = strtolower($type[1]); // jpg, png, gif
+            if (!in_array($type, ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg+xml'])) {
+                return null;
+            }
+            if ($type === 'svg+xml') $type = 'svg';
+            $data = base64_decode($data);
+            if ($data === false) return null;
+            $filename = uniqid('logo_') . '.' . $type;
+            $path = public_path('logos/' . $filename);
+            if (!File::exists(public_path('logos'))) {
+                File::makeDirectory(public_path('logos'), 0755, true);
+            }
+            file_put_contents($path, $data);
+            return 'logos/' . $filename;
+        }
+        return null;
+    }
+
     // GET /api/stores?user_id=X
     public function index(Request $request)
     {
@@ -61,12 +84,18 @@ class StoreController extends Controller
             }
         }
 
+        $logoUrl = null;
+        if ($request->has('logo_data')) {
+            $logoUrl = $this->saveLogo($request->input('logo_data'));
+        }
+
         try {
             $id = DB::table('stores')->insertGetId([
                 'user_id'     => $userId,
                 'name'        => trim($name),
                 'platform'    => $request->input('platform', ''),
                 'description' => $request->input('description', ''),
+                'logo_url'    => $logoUrl,
                 'created_at'  => now(),
                 'updated_at'  => now(),
             ]);
@@ -87,6 +116,15 @@ class StoreController extends Controller
         if ($request->has('platform'))    $fields['platform'] = $request->input('platform');
         if ($request->has('description')) $fields['description'] = $request->input('description');
         if ($request->has('is_active'))   $fields['is_active'] = $request->input('is_active') ? 1 : 0;
+        
+        if ($request->has('logo_data')) {
+            $logoUrl = $this->saveLogo($request->input('logo_data'));
+            if ($logoUrl) {
+                // optionally delete old logo here if needed, but not strictly necessary for now
+                $fields['logo_url'] = $logoUrl;
+            }
+        }
+
         if (empty($fields)) return response()->json(['error' => 'Tidak ada data yang diubah'], 400);
 
         $fields['updated_at'] = now();

@@ -49,6 +49,14 @@ Route::prefix('stores')->group(function () {
     Route::delete('/{id}', [StoreController::class, 'destroy']);
 });
 
+Route::get('/logos/{filename}', function ($filename) {
+    $path = public_path('logos/' . $filename);
+    if (file_exists($path)) {
+        return response()->file($path);
+    }
+    abort(404);
+});
+
 // ─── Upload ─────────────────────────────────────────────────────────
 Route::prefix('upload')->group(function () {
     Route::post('/', [UploadController::class, 'upload']);
