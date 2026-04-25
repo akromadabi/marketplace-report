@@ -12,7 +12,6 @@ import {
     PackageCheck,
     Calendar,
     Store,
-    GitCompare,
     Grid3x3,
     X,
     ChevronDown,

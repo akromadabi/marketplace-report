@@ -21,7 +21,6 @@ import {
     ChevronDown,
     Tag,
     Calculator,
-    ShieldAlert,
 } from 'lucide-react';
 
 const menuGroups = [
