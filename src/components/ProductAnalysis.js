@@ -409,7 +409,7 @@ function ProductAnalysis() {
         <div>
           <h2 className="gradient-text" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <BarChart3 size={24} style={{ color: '#7c3aed' }} />
-            Produk Analisis
+            Wawasan
           </h2>
           <p>{viewMode === 'sku' ? `${skuAggregated.length} SKU • ${totalQuantityAllSkus.toLocaleString('id-ID')} total terjual` : `${regionalAggregated.length} Provinsi`}</p>
         </div>

@@ -46,7 +46,7 @@ const menuGroups = [
             { path: '/input-modal', label: 'Input HPP', icon: PenLine },
             { path: '/kalkulator', label: 'Kalkulator Harga', icon: Calculator },
             { path: '/kampanye', label: 'Kampanye', icon: Tag },
-            { path: '/analisis', label: 'Produk Analisis', icon: BarChart3 },
+            { path: '/analisis', label: 'Wawasan', icon: BarChart3 },
             { path: '/rangkuman', label: 'Rekap Transaksi', icon: FileSpreadsheet },
             { path: '/olahan', label: 'Analisis Pesanan', icon: Calendar },
         ],

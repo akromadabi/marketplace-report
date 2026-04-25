@@ -20,6 +20,8 @@ import {
     LogOut,
     Tag,
     Calculator,
+    Package,
+    Receipt,
 } from 'lucide-react';
 
 // ─── Bottom bar tabs ──────────────────────────────────────────────
@@ -28,7 +30,7 @@ const bottomTabs = [
     { path: '/upload', label: 'Upload', icon: Upload },
     { key: 'menu', label: 'Menu', icon: Grid3x3, isMenu: true },
     { path: '/rangkuman', label: 'Rekap', icon: FileSpreadsheet },
-    { path: '/analisis', label: 'Analisis', icon: BarChart3 },
+    { path: '/analisis', label: 'Wawasan', icon: BarChart3 },
 ];
 
 // ─── Menu items shown in the dropup ──────────────────────────────
@@ -40,7 +42,8 @@ const dropupMenuItems = [
     { path: '/return', label: 'Retur', icon: RotateCcw },
     { path: '/pengembalian', label: 'Pengembalian', icon: PackageCheck },
     { path: '/stores', label: 'Kelola Toko', icon: Store },
-    { path: '/compare', label: 'Perbandingan', icon: GitCompare },
+    { path: '/aset', label: 'Aset', icon: Package },
+    { path: '/operasional', label: 'Operasional', icon: Receipt },
 ];
 
 function MobileNav({ currentPath }) {
