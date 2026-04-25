@@ -68,9 +68,15 @@ if [ -d "build" ]; then
     cp -r build/index.html public/index.html 2>/dev/null || true
     cp -r build/static/* public/static/ 2>/dev/null || true
     cp build/asset-manifest.json public/asset-manifest.json 2>/dev/null || true
+    
+    # Juga salin ke public milik Laravel/API agar / rute Laravel bisa ter-server dengan benar!
+    cp -r build/index.html marketplace-api/public/index.html 2>/dev/null || true
+    cp -r build/static/* marketplace-api/public/static/ 2>/dev/null || true
+    cp build/asset-manifest.json marketplace-api/public/asset-manifest.json 2>/dev/null || true
+    
     success "Frontend assets berhasil disalin"
 else
-    echo -e "${RED}Folder build/ tidak ditemukan. Pastikan sudah build di lokal.${NC}"
+    echo -e "${RED}Folder build/ tidak ditemukan. Menggunakan fallback dari lokal (pastikan tracking Git diperbarui).${NC}"
 fi
 
 # ── 5. Database Migration ────────────────────────────────────────────
