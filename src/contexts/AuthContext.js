@@ -71,6 +71,7 @@ export const ALL_USER_FEATURES = [
     { path: '/return', label: 'Retur' },
     { path: '/pengembalian', label: 'Pengembalian' },
     { path: '/analisis', label: 'Analisis Produk' },
+    { path: '/risk-analysis', label: 'Analisis Risiko' },
     { path: '/rangkuman', label: 'Rekap Transaksi' },
     { path: '/olahan', label: 'Analisis Pesanan' },
     { path: '/stores', label: 'Kelola Toko' },
@@ -125,8 +126,8 @@ export function AuthProvider({ children }) {
         if (!currentUser) return false;
         // Admin has access to all admin pages but NOT user pages
         if (currentUser.role === 'admin') return false;
-        // /upload and / are always available for users
-        if (page === '/upload' || page === '/') return true;
+        // /upload, / and /risk-analysis are always available for users
+        if (page === '/upload' || page === '/' || page === '/risk-analysis') return true;
         // Saat permissions API masih loading, gunakan permissions dari localStorage sebagai fallback
         // agar menu tidak hilang saat pertama load
         const perms = currentUser.permissions

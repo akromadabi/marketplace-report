@@ -30,7 +30,7 @@ const normalizeStatus = (status) => {
     return map[s] || s;
 };
 
-function RangkumanTransaksi() {
+export default function RangkumanTransaksi({ isHidden = false }) {
     const { getComputed, setComputed } = useDataCache();
     const { data: ordersData, loading: loadingOrders } = useApiData('orders');
     const { data: paymentsData, loading: loadingPayments } = useApiData('payments');
@@ -380,9 +380,11 @@ function RangkumanTransaksi() {
                 let totalCustomerPayment = 0;
                 paymentsForOrder.forEach(p => { const val = parseFloat(p['Customer payment']); if (!isNaN(val)) totalCustomerPayment += val; });
                 const metode = order['Payment Method'] || '';
-                const regencyCity = order['Regency and City'] || '';
-                const province = order['Province'] || '';
-                const alamat = regencyCity && province ? `${regencyCity}, ${province}` : regencyCity || province || '';
+                const regencyCity = order['Regency and City'] || order['Kota / Kabupaten'] || order['Kota/Kabupaten'] || order['City'] || '';
+                const province = order['Province'] || order['Provinsi'] || '';
+                const customerName = order['Nama Penerima'] || order['Recipient'] || order['Username (Buyer)'] || 'Unknown';
+                const alamatText = regencyCity && province ? `${regencyCity}, ${province}` : regencyCity || province || '';
+                const alamat = `${customerName}, ${alamatText}`;
                 let terkirim = '';
                 const statusLower = statusOrder.toLowerCase();
                 if (['canceled', 'cancelled'].includes(statusLower)) terkirim = 'Cancel';
@@ -486,6 +488,7 @@ function RangkumanTransaksi() {
 
             // Cache the processed result for future revisits
             setComputed(dataFingerprint, rows);
+            setComputed('LATEST_RANGKUMAN', rows);
             processedFingerprintRef.current = dataFingerprint;
             setRawTableData(rows);
             setDataProcessing(false);
@@ -564,9 +567,9 @@ function RangkumanTransaksi() {
 
         let filterTitle = 'Filter: Semua';
         let fileName = 'Verifikasi_Paket.pdf';
-        if (mode === 'belum') { 
-            filterTitle = 'Filter: Belum Diterima'; 
-            fileName = 'Verifikasi_Paket_Belum_Diterima.pdf'; 
+        if (mode === 'belum') {
+            filterTitle = 'Filter: Belum Diterima';
+            fileName = 'Verifikasi_Paket_Belum_Diterima.pdf';
         }
 
         if (hasCustomFilter) {
@@ -592,7 +595,7 @@ function RangkumanTransaksi() {
                     const hm = (parts[4] || '00:00').split(':');
                     const mIdx = monthsIndo.indexOf(mName);
                     if (!isNaN(d) && !isNaN(y) && mIdx >= 0) {
-                        return new Date(y, mIdx, d, parseInt(hm[0]||0), parseInt(hm[1]||0)).getTime();
+                        return new Date(y, mIdx, d, parseInt(hm[0] || 0), parseInt(hm[1] || 0)).getTime();
                     }
                 }
                 return 0;
@@ -992,7 +995,7 @@ function RangkumanTransaksi() {
     }
 
     // Status color helper
-    function getStatusStyle(val) {
+    function getStatusBadgeStyle(val) {
         if (!val) return {};
         const lower = val.toString().toLowerCase();
         if (['canceled', 'cancelled', 'cancel'].includes(lower)) return { color: '#f87171', fontWeight: 600 };
@@ -1001,6 +1004,10 @@ function RangkumanTransaksi() {
         if (lower === 'completed' || lower === 'terkirim') return { color: '#34d399', fontWeight: 600 };
         if (lower === 'proses') return { color: '#60a5fa', fontWeight: 600 };
         return {};
+    }
+
+    if (isHidden) {
+        return null; // Mounts the component, runs the hooks to save data to cache, but renders nothing to the DOM
     }
 
     return (
@@ -1071,7 +1078,7 @@ function RangkumanTransaksi() {
                             color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.8125rem', fontWeight: 600,
                             transition: 'background 0.2s', height: '36px'
                         }}>
-                        <Filter size={14} /> 
+                        <Filter size={14} />
                         Status Filter {(pdfChecked.retur || pdfChecked.gagal_kirim || pdfChecked.cancel) ? ' (Aktif)' : ''} ▾
                     </button>
                     {showFilterMenu && (
@@ -1082,15 +1089,15 @@ function RangkumanTransaksi() {
                             display: 'flex', flexDirection: 'column', gap: '0.625rem'
                         }}>
                             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                                <input type="checkbox" checked={pdfChecked.retur} onChange={e => setPdfChecked({...pdfChecked, retur: e.target.checked})} style={{ accentColor: '#3b82f6', width: '1rem', height: '1rem' }} />
+                                <input type="checkbox" checked={pdfChecked.retur} onChange={e => setPdfChecked({ ...pdfChecked, retur: e.target.checked })} style={{ accentColor: '#3b82f6', width: '1rem', height: '1rem' }} />
                                 <span>🔄 Retur</span>
                             </label>
                             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                                <input type="checkbox" checked={pdfChecked.gagal_kirim} onChange={e => setPdfChecked({...pdfChecked, gagal_kirim: e.target.checked})} style={{ accentColor: '#f97316', width: '1rem', height: '1rem' }} />
+                                <input type="checkbox" checked={pdfChecked.gagal_kirim} onChange={e => setPdfChecked({ ...pdfChecked, gagal_kirim: e.target.checked })} style={{ accentColor: '#f97316', width: '1rem', height: '1rem' }} />
                                 <span>🚚 Gagal Kirim</span>
                             </label>
                             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                                <input type="checkbox" checked={pdfChecked.cancel} onChange={e => setPdfChecked({...pdfChecked, cancel: e.target.checked})} style={{ accentColor: '#ef4444', width: '1rem', height: '1rem' }} />
+                                <input type="checkbox" checked={pdfChecked.cancel} onChange={e => setPdfChecked({ ...pdfChecked, cancel: e.target.checked })} style={{ accentColor: '#ef4444', width: '1rem', height: '1rem' }} />
                                 <span>❌ Cancel</span>
                             </label>
                         </div>
@@ -1142,6 +1149,35 @@ function RangkumanTransaksi() {
                                 onMouseEnter={e => e.target.style.background = 'rgba(16, 185, 129, 0.08)'}
                                 onMouseLeave={e => e.target.style.background = 'none'}>
                                 📊 Excel Laporan
+                            </button>
+                            <div style={{ height: '1px', background: 'var(--border-subtle)' }} />
+                            <button type="button" onClick={() => {
+                                setShowPdfMenu(false);
+                                const exportColumns = columns;
+                                const worksheetData = sortedData.map(row => {
+                                    const obj = {};
+                                    exportColumns.forEach(col => {
+                                        if (col === 'Verifikasi Paket') {
+                                            if (typeof row[col] === 'string') obj[col] = row[col];
+                                            else if (typeof row[col] === 'object' && row[col] !== null && 'text' in row[col]) obj[col] = row[col].text;
+                                            else obj[col] = '';
+                                        } else obj[col] = row[col] || '';
+                                    });
+                                    return obj;
+                                });
+                                const worksheet = XLSX.utils.json_to_sheet(worksheetData, { header: exportColumns });
+                                const workbook = XLSX.utils.book_new();
+                                XLSX.utils.book_append_sheet(workbook, worksheet, 'Semua Data');
+                                XLSX.writeFile(workbook, 'Rekap_Transaksi_All.xlsx');
+                            }}
+                                style={{
+                                    display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%', padding: '0.625rem 1rem',
+                                    background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.8125rem', fontWeight: 600,
+                                    color: '#3b82f6', textAlign: 'left',
+                                }}
+                                onMouseEnter={e => e.target.style.background = 'rgba(59, 130, 246, 0.08)'}
+                                onMouseLeave={e => e.target.style.background = 'none'}>
+                                📥 Excel Semua Data
                             </button>
                             <div style={{ height: '1px', background: 'var(--border-subtle)' }} />
                             <button type="button" onClick={() => {
@@ -1265,7 +1301,7 @@ function RangkumanTransaksi() {
                                                         }
                                                     }
                                                     if (col === 'STATUS ORDER' || col === 'TERKIRIM') {
-                                                        return <td key={col} title={row[col]} style={getStatusStyle(row[col])}>{row[col]}</td>;
+                                                        return <td key={col} title={row[col]} style={getStatusBadgeStyle(row[col])}>{row[col]}</td>;
                                                     }
                                                     if (col === 'PROFIT') {
                                                         const profitVal = row[col];
@@ -1510,16 +1546,16 @@ function RangkumanTransaksi() {
                                         let val = selectedRow[col];
                                         if (typeof val === 'object' && val !== null && 'text' in val) val = val.text;
                                         const isResi = col && typeof col === 'string' && col.trim().toLowerCase() === 'resi';
-                                        
+
                                         return (
                                             <div key={col} style={{ display: 'flex', flexDirection: 'column', gap: '0.125rem', padding: '0.5rem 0.75rem', background: 'var(--bg-glass)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }}>
                                                 <span style={{ fontSize: '0.6875rem', color: 'var(--text-tertiary)', fontWeight: 600, textTransform: 'uppercase' }}>{col}</span>
                                                 {isResi && val && val.toString().trim() !== '-' && val.toString().trim() !== '' ? (
                                                     <span onClick={(e) => { e.stopPropagation(); setQrPopupResi(val.toString().trim()); }}
-                                                          title="Tampilkan QR Code"
-                                                          style={{ cursor: 'pointer', color: '#818cf8', fontWeight: 600, textDecoration: 'underline', textDecorationColor: 'rgba(129,140,248,0.3)', wordBreak: 'break-word', fontSize: '0.8125rem' }}
-                                                          onMouseEnter={e => e.currentTarget.style.color = '#c4b5fd'}
-                                                          onMouseLeave={e => e.currentTarget.style.color = '#818cf8'}>
+                                                        title="Tampilkan QR Code"
+                                                        style={{ cursor: 'pointer', color: '#818cf8', fontWeight: 600, textDecoration: 'underline', textDecorationColor: 'rgba(129,140,248,0.3)', wordBreak: 'break-word', fontSize: '0.8125rem' }}
+                                                        onMouseEnter={e => e.currentTarget.style.color = '#c4b5fd'}
+                                                        onMouseLeave={e => e.currentTarget.style.color = '#818cf8'}>
                                                         {val}
                                                     </span>
                                                 ) : (
@@ -1712,4 +1748,3 @@ function DateRangePicker({ startDate, endDate, onChange, onClose }) {
     );
 }
 
-export default RangkumanTransaksi;

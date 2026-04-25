@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useRef, useEffect } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useApiData, useModalValues } from './useApiData';
 import { useStore } from '../contexts/StoreContext';
 import { useDataCache } from '../contexts/DataContext';
@@ -43,6 +43,63 @@ const translatePaketGagalKirim = (value) => {
     return value.toString();
 };
 
+// ─── Province/City normalization (EN → ID) ───────────────────────────────
+const PROVINCE_MAP = {
+    'NORTH SUMATRA': 'SUMATERA UTARA', 'NORTH SUMATERA': 'SUMATERA UTARA',
+    'SOUTH SUMATRA': 'SUMATERA SELATAN', 'SOUTH SUMATERA': 'SUMATERA SELATAN',
+    'WEST SUMATRA': 'SUMATERA BARAT', 'WEST SUMATERA': 'SUMATERA BARAT',
+    'NORTH KALIMANTAN': 'KALIMANTAN UTARA', 'SOUTH KALIMANTAN': 'KALIMANTAN SELATAN',
+    'EAST KALIMANTAN': 'KALIMANTAN TIMUR', 'WEST KALIMANTAN': 'KALIMANTAN BARAT',
+    'CENTRAL KALIMANTAN': 'KALIMANTAN TENGAH',
+    'NORTH SULAWESI': 'SULAWESI UTARA', 'SOUTH SULAWESI': 'SULAWESI SELATAN',
+    'SOUTHEAST SULAWESI': 'SULAWESI TENGGARA', 'CENTRAL SULAWESI': 'SULAWESI TENGAH',
+    'WEST SULAWESI': 'SULAWESI BARAT',
+    'EAST JAVA': 'JAWA TIMUR', 'WEST JAVA': 'JAWA BARAT', 'CENTRAL JAVA': 'JAWA TENGAH',
+    'EAST NUSA TENGGARA': 'NUSA TENGGARA TIMUR', 'WEST NUSA TENGGARA': 'NUSA TENGGARA BARAT',
+    'NORTH MALUKU': 'MALUKU UTARA',
+    'BANGKA-BELITUNG ISLANDS': 'KEPULAUAN BANGKA BELITUNG',
+    'BANGKA BELITUNG ISLANDS': 'KEPULAUAN BANGKA BELITUNG',
+    'BANGKA BELITUNG': 'KEPULAUAN BANGKA BELITUNG',
+    'RIAU ISLANDS': 'KEPULAUAN RIAU',
+    'SPECIAL CAPITAL REGION OF JAKARTA': 'DKI JAKARTA', 'JAKARTA': 'DKI JAKARTA',
+    'SPECIAL REGION OF YOGYAKARTA': 'DI YOGYAKARTA', 'YOGYAKARTA SPECIAL REGION': 'DI YOGYAKARTA',
+    'YOGYAKARTA': 'DI YOGYAKARTA',
+    'WEST PAPUA': 'PAPUA BARAT', 'HIGHLAND PAPUA': 'PAPUA PEGUNUNGAN',
+    'SOUTH PAPUA': 'PAPUA SELATAN', 'CENTRAL PAPUA': 'PAPUA TENGAH',
+    'SOUTHWEST PAPUA': 'PAPUA BARAT DAYA',
+};
+
+const normalizeProvince = (raw) => {
+    if (!raw) return '';
+    let s = raw.toString().trim();
+    // Non-Latin script detection (Arabic, Chinese, Japanese, Korean, Thai, Lao etc.)
+    if (/[\u0600-\u06FF\u4E00-\u9FFF\u3040-\u30FF\u0E00-\u0E7F\u0E80-\u0EFF\u1100-\u11FF\u0900-\u097F]/.test(s)) {
+        return 'TIDAK DIKETAHUI';
+    }
+    // Replace separators: + → space, _ → space, multiple spaces → single
+    s = s.replace(/[+_]+/g, ' ').replace(/\s+/g, ' ').trim().toUpperCase();
+    // Strip " PROVINCE" suffix
+    if (s.endsWith(' PROVINCE')) s = s.slice(0, -9).trim();
+    // Strip " ISLANDS" that isn't part of a valid name
+    return PROVINCE_MAP[s] || s;
+};
+
+const normalizeCity = (raw) => {
+    if (!raw) return '';
+    // Non-Latin script → discard
+    if (/[\u0600-\u06FF\u4E00-\u9FFF\u3040-\u30FF\u0E00-\u0E7F\u0E80-\u0EFF\u1100-\u11FF\u0900-\u097F]/.test(raw)) {
+        return 'TIDAK DIKETAHUI';
+    }
+    let s = raw.toString().replace(/[+_]+/g, ' ').replace(/\s+/g, ' ').trim().toUpperCase();
+    if (s.endsWith(' CITY')) return 'KOTA ' + s.slice(0, -5).trim();
+    if (s.endsWith(' MUNICIPALITY')) return 'KOTA ' + s.slice(0, -13).trim();
+    if (s.endsWith(' REGENCY')) return 'KABUPATEN ' + s.slice(0, -8).trim();
+    if (s.endsWith(' DISTRICT')) return 'KABUPATEN ' + s.slice(0, -9).trim();
+    const dirMap = [['NORTH ', ' UTARA'],['SOUTH ', ' SELATAN'],['EAST ', ' TIMUR'],['WEST ', ' BARAT'],['CENTRAL ', ' TENGAH']];
+    for (const [en, id] of dirMap) if (s.startsWith(en)) return s.slice(en.length).trim() + id;
+    return s;
+};
+
 export const formatDateKey = (date) => {
     if (!(date instanceof Date) || isNaN(date)) return '';
     return `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
@@ -73,9 +130,17 @@ export function useProcessedOrders(overrideStoreId) {
     const { data: ordersData, loading: loadingOrders } = useApiData('orders', storeId);
     const { data: paymentsData, loading: loadingPayments } = useApiData('payments', storeId);
     const { data: returnData, loading: loadingReturns } = useApiData('returns', storeId);
+    const { data: pengembalianData, loading: loadingPengembalian } = useApiData('pengembalian', storeId);
     const { modalValues, setModalValues, loading: loadingModal, saveAll, saveSingle } = useModalValues(storeId);
+    const [scanData, setScanData] = useState([]);
+    useEffect(() => {
+        fetch('/api/scan', { headers: { Accept: 'application/json' } })
+            .then(r => r.ok ? r.json() : [])
+            .then(d => setScanData(Array.isArray(d) ? d : []))
+            .catch(() => { });
+    }, []);
 
-    const loading = loadingOrders || loadingPayments || loadingReturns || loadingModal;
+    const loading = loadingOrders || loadingPayments || loadingReturns || loadingPengembalian || loadingModal;
 
     // Build a fingerprint from raw data lengths to detect changes
     const dataFingerprint = `${ordersData.length}::${paymentsData.length}::${returnData.length}::${Object.keys(modalValues).length}::${storeId || 'all'}`;
@@ -135,6 +200,37 @@ export function useProcessedOrders(overrideStoreId) {
         return map;
     }, [returnData]);
 
+    // Build resi set from pengembalianData + scanData (same as RangkumanTransaksi)
+    const pengembalianResiSet = useMemo(() => {
+        const set = new Set();
+        for (const row of pengembalianData) {
+            const resiKey = Object.keys(row).find(k => k.toLowerCase().includes('resi'));
+            if (resiKey && row[resiKey]) set.add(row[resiKey].toString().trim());
+        }
+        for (const s of scanData) {
+            if (s.resi) set.add(s.resi.toString().trim());
+        }
+        return set;
+    }, [pengembalianData, scanData]);
+
+    // Map Order ID → 'Diterima' | 'Belum Diterima' | '-'  (same as RangkumanTransaksi)
+    const returnStatusBarangByOrderId = useMemo(() => {
+        const map = new Map();
+        for (const row of returnData) {
+            const orderId = (row['Order ID'] || '').toString().trim();
+            if (!orderId) continue;
+            const rs = (row['Return Status'] || '').toString().trim().toLowerCase();
+            if (['rejected', 'refund rejected', 'cancelled', 'canceled', 'dibatalkan'].includes(rs)) continue;
+            const trackingId = (row['Return Logistics Tracking ID'] || '').toString().trim();
+            if (!trackingId) {
+                if (!map.has(orderId)) map.set(orderId, '-');
+            } else {
+                map.set(orderId, pengembalianResiSet.has(trackingId) ? 'Diterima' : 'Belum Diterima');
+            }
+        }
+        return map;
+    }, [returnData, pengembalianResiSet]);
+
     const getModalForItem = useCallback((order) => {
         const sellerSku = (order['Seller SKU'] || '').toString().trim();
         const skuId = (order['SKU ID'] || '').toString().trim();
@@ -176,6 +272,25 @@ export function useProcessedOrders(overrideStoreId) {
             const paketGagalKirim = translatePaketGagalKirim(paketGagalKirimRaw);
             if (paketGagalKirim === 'Gagal Kirim Paket' || paketGagalKirim === 'Paket Ditolak') statusOrder = 'Pengembalian';
 
+            // Verifikasi Paket — same logic as RangkumanTransaksi
+            let verifikasiPaket = '-';
+            const statusLower = statusOrder.toLowerCase();
+            if (statusLower === 'completed') {
+                verifikasiPaket = '✓';
+            } else if (['canceled', 'cancelled', 'pengembalian'].includes(statusLower)) {
+                // Gagal Kirim / Cancel: match order's own Tracking ID against pengembalianResiSet
+                const resi = (order['Tracking ID'] || '').toString().trim();
+                if (!resi || resi === '-') verifikasiPaket = '✓';
+                else if (pengembalianResiSet.has(resi)) verifikasiPaket = 'Diterima';
+                else verifikasiPaket = 'Belum Diterima';
+            } else if (statusLower === 'return') {
+                // Return: use resi retur matched against pengembalianResiSet
+                const statusBarang = returnStatusBarangByOrderId.get(orderId) || '-';
+                if (statusBarang === 'Diterima') verifikasiPaket = 'Diterima';
+                else if (statusBarang === 'Belum Diterima') verifikasiPaket = 'Belum Diterima';
+                else verifikasiPaket = statusBarang;
+            }
+
             const paymentsForOrder = paymentsByOrderId.get(orderId) || [];
             let totalSettlementAmount = 0, totalAffiliateCommission = 0, totalCustomerPayment = 0;
             const parseAmount = (val) => {
@@ -201,10 +316,10 @@ export function useProcessedOrders(overrideStoreId) {
                 metode: order['Payment Method'] || '',
                 ketAffiliasi: totalAffiliateCommission > 0 ? 'YA' : (totalAffiliateCommission < 0 ? 'Affiliasi' : 'Tidak'),
                 // Location fields
-                regencyAndCity: (order['Regency and City'] || '').toString().trim(),
+                regencyAndCity: normalizeCity((order['Regency and City'] || '').toString().trim()),
                 district: (order['Districts'] || '').toString().trim(),
                 detailAddress: (order['Detail Address'] || '').toString().trim(),
-                province: (order['Province'] || '').toString().trim(),
+                province: normalizeProvince((order['Province'] || '').toString().trim()),
                 // Tracking & buyer
                 trackingId: (order['Tracking ID'] || '').toString().trim(),
                 buyerUsername: (order['Buyer Username'] || '').toString().trim(),
@@ -213,6 +328,7 @@ export function useProcessedOrders(overrideStoreId) {
                 sellerSku: (order['Seller SKU'] || '').toString().trim(),
                 variation: (order['Variation'] || '').toString().trim(),
                 orders, // keep all line items for product-level aggregation
+                verifikasiPaket,
             });
         }
         return rows;

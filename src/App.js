@@ -25,6 +25,7 @@ const OperasionalTable = lazy(() => import('./components/OperasionalTable'));
 const UserProfile = lazy(() => import('./components/UserProfile'));
 const KampanyeMain = lazy(() => import('./components/KampanyeMain'));
 const PricingCalculator = lazy(() => import('./components/PricingCalculator'));
+const RiskAnalysis = lazy(() => import('./components/RiskAnalysis'));
 // Admin pages
 const AdminDashboard = lazy(() => import('./components/admin/AdminDashboard'));
 const AdminUserManagement = lazy(() => import('./components/admin/AdminUserManagement'));
@@ -70,12 +71,12 @@ function ProtectedRoute({ children, requiredPermission }) {
     const { isAuthenticated, hasPermission, isAdmin, permissionsLoading } = useAuth();
     if (!isAuthenticated) return <Navigate to="/login" replace />;
     if (isAdmin) return <Navigate to="/admin/dashboard" replace />;
-    
+
     if (permissionsLoading) {
         // Jangan render apapun atau kick user saat masih mengecek akses dari server
         return null;
     }
-    
+
     if (requiredPermission && !hasPermission(requiredPermission)) return <Navigate to="/upload" replace />;
     return children;
 }
@@ -130,6 +131,7 @@ function UserLayout() {
                                         <Route path="/return" element={<ProtectedRoute requiredPermission="/return"><ReturnTable /></ProtectedRoute>} />
                                         <Route path="/pengembalian" element={<ProtectedRoute requiredPermission="/pengembalian"><PengembalianTable /></ProtectedRoute>} />
                                         <Route path="/analisis" element={<ProtectedRoute requiredPermission="/analisis"><ProductAnalysis /></ProtectedRoute>} />
+                                        <Route path="/risk-analysis" element={<ProtectedRoute requiredPermission="/risk-analysis"><RiskAnalysis /></ProtectedRoute>} />
                                         <Route path="/rangkuman" element={<ProtectedRoute requiredPermission="/rangkuman"><RangkumanTransaksi /></ProtectedRoute>} />
                                         <Route path="/olahan" element={<ProtectedRoute requiredPermission="/olahan"><OlahanDataPesanan /></ProtectedRoute>} />
                                         <Route path="/stores" element={<ProtectedRoute requiredPermission="/stores"><StoreManagement /></ProtectedRoute>} />

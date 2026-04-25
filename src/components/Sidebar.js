@@ -21,6 +21,7 @@ import {
     ChevronDown,
     Tag,
     Calculator,
+    ShieldAlert,
 } from 'lucide-react';
 
 const menuGroups = [
@@ -41,6 +42,7 @@ const menuGroups = [
     {
         label: 'Analisis',
         items: [
+            { path: '/risk-analysis', label: 'Analisis Risiko', icon: ShieldAlert },
             { path: '/input-modal', label: 'Input HPP', icon: PenLine },
             { path: '/kalkulator', label: 'Kalkulator Harga', icon: Calculator },
             { path: '/kampanye', label: 'Kampanye', icon: Tag },
@@ -281,8 +283,8 @@ function Sidebar({ currentPath, isOpen, onToggle }) {
                                                 borderRadius: 'var(--radius-md)',
                                                 cursor: 'pointer',
                                                 color: isActive
-                                                        ? '#6c5ce7'
-                                                        : 'var(--text-secondary)',
+                                                    ? '#6c5ce7'
+                                                    : 'var(--text-secondary)',
                                                 transition: 'all var(--transition-fast)',
                                                 marginBottom: '0.125rem',
                                                 position: 'relative',
