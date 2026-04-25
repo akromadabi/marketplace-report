@@ -42,7 +42,7 @@ const menuGroups = [
     {
         label: 'Analisis',
         items: [
-            { path: '/risk-analysis', label: 'Analisis Risiko', icon: ShieldAlert },
+
             { path: '/input-modal', label: 'Input HPP', icon: PenLine },
             { path: '/kalkulator', label: 'Kalkulator Harga', icon: Calculator },
             { path: '/kampanye', label: 'Kampanye', icon: Tag },
