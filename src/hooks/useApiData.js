@@ -1,6 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-    apiGetModalValues,
     apiSaveModalValues,
     apiSaveModalSingle,
 } from '../api';
@@ -55,37 +54,64 @@ export function useApiData(type, storeId) {
 
 /**
  * Hook for modal values with save capability.
- * Modal values are NOT cached in DataContext since they involve
- * local editing state. They are fetched per-component.
+ * Modal values are now cached in DataContext so they are fetched once
+ * and reused across components — no more re-fetch on every mount.
+ * Invalidates cache after save so the next read gets fresh data.
  */
 export function useModalValues(storeId) {
-    const [modalValues, setModalValues] = useState({});
-    const [loading, setLoading] = useState(true);
+    const { getData, fetchData, invalidateType, version } = useDataCache();
+    const [localEdits, setLocalEdits] = useState({});
+    const [, setTick] = useState(0);
 
+    // Trigger fetch if not in cache
     useEffect(() => {
-        (async () => {
-            try {
-                const values = await apiGetModalValues(storeId);
-                const formatted = {};
-                Object.entries(values).forEach(([key, val]) => {
-                    const num = parseInt(String(val).replace(/[^0-9]/g, ''), 10);
-                    if (num > 0) {
-                        formatted[key] = 'Rp' + num.toLocaleString('id-ID');
-                    }
-                });
-                setModalValues(formatted);
-            } catch { /* ignore */ }
-            setLoading(false);
-        })();
-    }, [storeId]);
+        const cached = getData('modal', storeId);
+        if (!cached) {
+            fetchData('modal', storeId);
+        }
+    }, [storeId, getData, fetchData, version]);
+
+    // Force re-render when cache version changes
+    useEffect(() => {
+        setTick(t => t + 1);
+    }, [version]);
+
+    const cached = getData('modal', storeId);
+    const loading = cached ? cached.loading : true;
+
+    // Format raw numeric values as "RpXXX" display strings
+    const modalValues = useMemo(() => {
+        const rawValues = cached?.data ?? {};
+        const formatted = {};
+        Object.entries(rawValues).forEach(([key, val]) => {
+            const num = parseInt(String(val).replace(/[^0-9]/g, ''), 10);
+            if (num > 0) {
+                formatted[key] = 'Rp' + num.toLocaleString('id-ID');
+            }
+        });
+        // Overlay any unsaved local edits
+        return { ...formatted, ...localEdits };
+    }, [cached, localEdits]);
+
+    const setModalValues = useCallback((updater) => {
+        setLocalEdits(prev => {
+            const next = typeof updater === 'function' ? updater(prev) : updater;
+            return next;
+        });
+    }, []);
 
     const saveAll = useCallback(async (values) => {
         await apiSaveModalValues(values, storeId);
-    }, [storeId]);
+        setLocalEdits({});
+        invalidateType('modal');
+    }, [storeId, invalidateType]);
 
     const saveSingle = useCallback(async (key, value) => {
         await apiSaveModalSingle(key, value, storeId);
-    }, [storeId]);
+        // Update local cache optimistically so UI reflects change immediately
+        setLocalEdits(prev => ({ ...prev, [key]: value }));
+        invalidateType('modal');
+    }, [storeId, invalidateType]);
 
     return { modalValues, setModalValues, loading, saveAll, saveSingle };
 }

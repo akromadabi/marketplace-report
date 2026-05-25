@@ -30,13 +30,15 @@ export function DataProvider({ children }) {
     // A counter that, when bumped, tells consumers to re-check cache
     const [version, setVersion] = useState(0);
 
-    const fetchFns = {
+    const fetchFnsRef = useRef({
         orders: apiGetOrders,
         payments: apiGetPayments,
         returns: apiGetReturns,
         pengembalian: apiGetPengembalian,
         stats: apiGetStats,
-    };
+        // modal values — cached globally so every component reads from same source
+        modal: (storeId, _userId) => apiGetModalValues(storeId),
+    });
 
     const getCacheKey = useCallback((type, storeId) => {
         return `${type}::${storeId || 'all'}::${userId || 'none'}`;
@@ -59,7 +61,7 @@ export function DataProvider({ children }) {
      * Fetch data and store in cache. Returns a promise.
      */
     const fetchData = useCallback(async (type, storeId) => {
-        const fetchFn = fetchFns[type];
+        const fetchFn = fetchFnsRef.current[type];
         if (!fetchFn) return;
 
         const key = getCacheKey(type, storeId);
@@ -97,7 +99,8 @@ export function DataProvider({ children }) {
         setVersion(v => v + 1);
 
         return promise;
-    }, [getCacheKey, userId]);
+    }, [getCacheKey, userId]); // fetchFnsRef is a ref — stable, no need in deps
+
 
     /**
      * Invalidate all cached data — forces re-fetch on next access.

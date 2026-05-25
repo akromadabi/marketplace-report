@@ -18,6 +18,52 @@ async function apiFetch(path, options = {}) {
     return res.json();
 }
 
+/**
+ * Fetch NDJSON (newline-delimited JSON) stream and return all records as an array.
+ * Each line in the response is parsed as a separate JSON object.
+ * This allows the server to start sending data immediately without
+ * buffering the entire dataset in memory first.
+ */
+async function fetchNdjson(path, options = {}) {
+    const res = await fetch(`${API_BASE}${path}`, {
+        headers: { 'Accept': 'application/x-ndjson', ...options.headers },
+        ...options,
+    });
+    if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        let errObj = {};
+        try { errObj = JSON.parse(text); } catch (e) {
+            throw new Error(`HTTP ${res.status} - ${text.substring(0, 60).replace(/<[^>]+>/g, '') || 'Server Error'}`);
+        }
+        throw new Error(errObj.error || `Server Error ${res.status}`);
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    const result = [];
+    let buffer = '';
+
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        // Keep the last (potentially incomplete) line in the buffer
+        buffer = lines.pop();
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+            try { result.push(JSON.parse(trimmed)); } catch { /* skip malformed lines */ }
+        }
+    }
+    // Parse any remaining data in the buffer
+    if (buffer.trim()) {
+        try { result.push(JSON.parse(buffer.trim())); } catch { /* ignore */ }
+    }
+    return result;
+}
+
+
 // ─── Auth ────────────────────────────────────────────────────────
 export async function apiLogin(username, password) {
     return apiFetch('/auth/login', {
@@ -244,19 +290,19 @@ function dataQuery(storeId, userId) {
 }
 
 export async function apiGetOrders(storeId, userId) {
-    return apiFetch(`/data/orders${dataQuery(storeId, userId)}`);
+    return fetchNdjson(`/data/orders${dataQuery(storeId, userId)}`);
 }
 
 export async function apiGetPayments(storeId, userId) {
-    return apiFetch(`/data/payments${dataQuery(storeId, userId)}`);
+    return fetchNdjson(`/data/payments${dataQuery(storeId, userId)}`);
 }
 
 export async function apiGetReturns(storeId, userId) {
-    return apiFetch(`/data/returns${dataQuery(storeId, userId)}`);
+    return fetchNdjson(`/data/returns${dataQuery(storeId, userId)}`);
 }
 
 export async function apiGetPengembalian(storeId, userId) {
-    return apiFetch(`/data/pengembalian${dataQuery(storeId, userId)}`);
+    return fetchNdjson(`/data/pengembalian${dataQuery(storeId, userId)}`);
 }
 
 export async function apiGetStats(storeId, userId) {

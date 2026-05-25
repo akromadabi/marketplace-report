@@ -1,314 +1,60 @@
-import React, { useMemo, useState, useRef, useEffect, useCallback } from "react";
+import React, { useMemo, useState, useRef, useEffect } from "react";
 import * as XLSX from "xlsx";
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { ClipboardList, Filter, ArrowUp, ArrowDown, ArrowUpDown, X, Download, CheckCircle, XCircle, Calendar, ChevronLeft, ChevronRight, Search, Copy, Check, FileText } from 'lucide-react';
-import { useApiData, useModalValues } from '../hooks/useApiData';
+import { ClipboardList, Filter, ArrowUp, ArrowDown, ArrowUpDown, X, Download, CheckCircle, XCircle, Calendar, ChevronLeft, ChevronRight, Search, Copy, Check } from 'lucide-react';
+import { useProcessedOrders } from '../hooks/useProcessedOrders';
 import { useDataCache } from '../contexts/DataContext';
-
-// Normalize status labels from Indonesian or English to lowercase English
-const normalizeStatus = (status) => {
-    if (!status) return '';
-    const s = status.toString().trim().toLowerCase();
-    const map = {
-        'perlu dikirim': 'to ship',
-        'dikirim': 'shipped',
-        'dibatalkan': 'canceled',
-        'selesai': 'completed',
-        'belum dibayar': 'unpaid',
-        'pengembalian': 'gagal kirim',
-        'gagal kirim': 'gagal kirim',
-        'return': 'return',
-        'canceled': 'canceled',
-        'cancelled': 'canceled',
-        'shipped': 'shipped',
-        'completed': 'completed',
-        'to ship': 'to ship',
-        'in transit': 'shipped',
-        'delivered': 'completed',
-    };
-    return map[s] || s;
-};
 
 export default function RangkumanTransaksi({ isHidden = false }) {
     const { getComputed, setComputed } = useDataCache();
-    const { data: ordersData, loading: loadingOrders } = useApiData('orders');
-    const { data: paymentsData, loading: loadingPayments } = useApiData('payments');
-    const { data: returnData, loading: loadingReturns } = useApiData('returns');
-    const { data: pengembalianData, loading: loadingPengembalian } = useApiData('pengembalian');
-    const { modalValues, loading: loadingModal } = useModalValues();
-    // ─── Fetch scan data (barcode-scanned resi) ──────────────────
-    const [scanData, setScanData] = useState([]);
-    const [loadingScan, setLoadingScan] = useState(true);
-    const fetchScanData = useCallback(async () => {
-        try {
-            const res = await fetch('/api/scan', { headers: { 'Accept': 'application/json' } });
-            if (res.ok) {
-                const ct = res.headers.get('content-type');
-                if (ct && ct.includes('application/json')) setScanData(await res.json());
-            }
-        } catch (err) { console.error('Fetch scan data error:', err); }
-        setLoadingScan(false);
-    }, []);
-    useEffect(() => { fetchScanData(); }, [fetchScanData]);
 
-    const isLoading = loadingOrders || loadingPayments || loadingReturns || loadingPengembalian || loadingModal || loadingScan;
-
-    // Fingerprint to detect raw data changes
-    const dataFingerprint = `rangkuman::${ordersData.length}::${paymentsData.length}::${returnData.length}::${pengembalianData.length}::${Object.keys(modalValues).length}::${scanData.length}`;
-    const normalizedPayments = useMemo(() => paymentsData.map(row => {
-        const newRow = {};
-        Object.entries(row).forEach(([k, v]) => {
-            const trimmed = k.trim();
-            const lower = trimmed.toLowerCase();
-            const standardKeys = {
-                'order/adjustment id': 'Order/adjustment ID',
-                'total settlement amount': 'Total settlement amount',
-                'affiliate commission': 'Affiliate commission',
-                'customer payment': 'Customer payment',
-                'return shipping costs (passed on to the customer)': 'Return shipping costs (passed on to the customer)',
-            };
-            newRow[standardKeys[lower] || trimmed] = v;
-        });
-        return newRow;
-    }), [paymentsData]);
-
-    const paymentsByOrderId = useMemo(() => {
-        const map = new Map();
-        normalizedPayments.forEach(p => {
-            const orderIdKey = Object.keys(p).find(k => k.toLowerCase() === 'order/adjustment id');
-            const orderId = orderIdKey ? p[orderIdKey] : '';
-            if (!orderId) return;
-            if (!map.has(orderId)) map.set(orderId, []);
-            map.get(orderId).push(p);
-        });
-        return map;
-    }, [normalizedPayments]);
-
-    const ordersGroupedById = useMemo(() => {
-        const map = new Map();
-        ordersData.forEach(order => {
-            const orderId = order['Order ID'] || '';
-            if (!orderId) return;
-            if (!map.has(orderId)) map.set(orderId, []);
-            map.get(orderId).push(order);
-        });
-        return map;
-    }, [ordersData]);
-
-    const normalizedReturnData = useMemo(() => returnData.map(row => {
-        const newRow = {};
-        Object.entries(row).forEach(([k, v]) => newRow[k.trim()] = v);
-        return newRow;
-    }), [returnData]);
-
-    const returnStatusByOrderId = useMemo(() => {
-        const map = new Map();
-        normalizedReturnData.forEach(r => {
-            const orderId = r['Order ID'] || '';
-            const returnStatusRaw = r['Return Status'] || '';
-            const returnStatus = returnStatusRaw.toString().toLowerCase();
-            if (!orderId) return;
-            if (!map.has(orderId)) map.set(orderId, []);
-            map.get(orderId).push(returnStatus);
-        });
-        return map;
-    }, [normalizedReturnData]);
-
-    const pengembalianResiSet = useMemo(() => {
-        const set = new Set();
-        // From uploaded pengembalian file data
-        for (const row of pengembalianData) {
-            const resiKey = Object.keys(row).find(k => k.toLowerCase().includes('resi'));
-            if (resiKey) {
-                const val = row[resiKey];
-                if (val && val.toString().trim() !== '') set.add(val.toString().trim());
-            }
-        }
-        // From barcode-scanned resi data
-        for (const s of scanData) {
-            if (s.resi && s.resi.toString().trim() !== '') set.add(s.resi.toString().trim());
-        }
-        return set;
-    }, [pengembalianData, scanData]);
-
-    const pengembalianDateByResi = useMemo(() => {
-        const map = new Map();
-        for (const s of scanData) {
-            if (s.resi && s.scan_date) map.set(s.resi.toString().trim(), s.scan_date);
-        }
-        for (const row of pengembalianData) {
-            const resiKey = Object.keys(row).find(k => k.toLowerCase().includes('resi'));
-            if (resiKey) {
-                const resi = row[resiKey];
-                const waktuKey = Object.keys(row).find(k => k.toLowerCase().includes('waktu pengembalian'));
-                if (resi && waktuKey && row[waktuKey]) map.set(resi.toString().trim(), row[waktuKey].toString());
-            }
-        }
-        return map;
-    }, [pengembalianData, scanData]);
-
-    const returnStatusBarangByOrderId = useMemo(() => {
-        const map = new Map();
-        for (const row of returnData) {
-            const orderId = row['Order ID'] || '';
-            if (!orderId) continue;
-            // Skip rejected/cancelled return entries — they should not overwrite valid data
-            const rs = (row['Return Status'] || '').toString().trim().toLowerCase();
-            if (['rejected', 'refund rejected', 'cancelled', 'canceled', 'dibatalkan'].includes(rs)) continue;
-            const trackingId = row['Return Logistics Tracking ID'];
-            if (!trackingId || trackingId.toString().trim() === '') {
-                // Only set '-' if there's no better value already
-                if (!map.has(orderId)) map.set(orderId, '-');
-            } else {
-                map.set(orderId, pengembalianResiSet.has(trackingId.toString().trim()) ? 'Diterima' : 'Belum Diterima');
-            }
-        }
-        return map;
-    }, [returnData, pengembalianResiSet]);
-
-    // Map Order ID → Return Logistics Tracking ID (resi retur) for PDF export
-    const returnResiByOrderId = useMemo(() => {
-        const map = new Map();
-        for (const row of returnData) {
-            const orderId = row['Order ID'] || '';
-            if (!orderId) continue;
-            const rs = (row['Return Status'] || '').toString().trim().toLowerCase();
-            if (['rejected', 'refund rejected', 'cancelled', 'canceled', 'dibatalkan'].includes(rs)) continue;
-            const trackingId = (row['Return Logistics Tracking ID'] || '').toString().trim();
-            if (trackingId) map.set(orderId, trackingId);
-        }
-        return map;
-    }, [returnData]);
-
-    // Map Order ID → Time Returned from scan data (for Tanggal Kembali on return orders)
-    const returnTimeByOrderId = useMemo(() => {
-        const map = new Map();
-        for (const row of returnData) {
-            const orderId = row['Order ID'] || '';
-            const trackingId = (row['Return Logistics Tracking ID'] || '').toString().trim();
-            if (!orderId) continue;
-            const rs = (row['Return Status'] || '').toString().trim().toLowerCase();
-            if (['rejected', 'refund rejected', 'cancelled', 'canceled', 'dibatalkan'].includes(rs)) continue;
-
-            if (trackingId && pengembalianResiSet.has(trackingId)) {
-                const dateStr = pengembalianDateByResi.get(trackingId);
-                if (dateStr) {
-                    const dateObj = parseIndonesianDateTime(dateStr);
-                    map.set(orderId, dateObj ? formatIndonesianDateTime(dateObj) : dateStr);
-                    continue;
-                }
-            }
-            map.set(orderId, '-');
-        }
-        return map;
-    }, [returnData, pengembalianResiSet, pengembalianDateByResi]);
+    // ─── All data processing is now handled by useProcessedOrders ────────
+    // This hook fetches data, builds lookup maps, and computes all row fields
+    // in ONE place — shared with Dashboard, OlahanDataPesanan, etc.
+    // No more duplicate calculation on this page.
+    const {
+        rangkumanData,
+        loading: isLoading,
+        returnTimeByOrderId,
+        returnResiByOrderId,
+        ordersGroupedById,
+        modalValues,
+    } = useProcessedOrders();
 
     function formatRupiah(number) {
         if (typeof number !== 'number' || isNaN(number)) return '';
         return 'Rp' + number.toLocaleString('id-ID', { maximumFractionDigits: 0 });
     }
 
-    function parseIndonesianDateTime(dateTimeStr) {
-        if (typeof dateTimeStr !== 'string' || !dateTimeStr.trim()) return null;
-        const parts = dateTimeStr.trim().split(' ');
-        if (parts.length === 0) return null;
-        const datePart = parts[0];
-        const timePart = parts[1] || '00:00:00';
-        const timeParts2 = timePart.split(':');
-        const hour = timeParts2.length > 0 ? parseInt(timeParts2[0], 10) : 0;
-        const minute = timeParts2.length > 1 ? parseInt(timeParts2[1], 10) : 0;
-        const second = timeParts2.length > 2 ? parseInt(timeParts2[2], 10) : 0;
-        if (isNaN(hour) || isNaN(minute) || isNaN(second)) return null;
-        // Try YYYY-MM-DD format (Shopee)
-        if (datePart.includes('-')) {
-            const dp = datePart.split('-');
-            if (dp.length !== 3) return null;
-            const year = parseInt(dp[0], 10);
-            const month = parseInt(dp[1], 10) - 1;
-            const day = parseInt(dp[2], 10);
-            if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
-            return new Date(year, month, day, hour, minute, second);
+    // ─── Build verifikasiPaket JSX from pre-computed text in rangkumanData ──
+    // The text ('✓', 'Diterima', 'Belum Diterima', '-') is already in each row.
+    // We only add JSX decoration here, in the render layer.
+    function verifikasiJSX(text) {
+        if (text === '✓' || text === 'Diterima') {
+            return (
+                <span style={{ color: '#34d399', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                    title={text === '✓' ? 'Pesanan selesai / cancel tanpa resi' : 'Resi ditemukan'}>
+                    <CheckCircle size={14} />{text !== '✓' ? 'Diterima' : ''}
+                </span>
+            );
         }
-        // Try dd/mm/yyyy format (TikTok)
-        const dateParts = datePart.split('/');
-        if (dateParts.length !== 3) return null;
-        const day = parseInt(dateParts[0], 10);
-        const month = parseInt(dateParts[1], 10) - 1;
-        const year = parseInt(dateParts[2], 10);
-        if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
-        return new Date(year, month, day, hour, minute, second);
+        if (text === 'Belum Diterima') {
+            return (
+                <span style={{ color: '#f87171', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                    title="Resi tidak ditemukan">
+                    <XCircle size={14} />Belum Diterima
+                </span>
+            );
+        }
+        return text || '-';
     }
 
-    function formatIndonesianDateTime(date) {
-        if (!(date instanceof Date) || isNaN(date)) return '';
-        const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', "Jumat", 'Sabtu'];
-        const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-        return `${days[date.getDay()]}, ${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
-    }
+    // ─── Map rangkumanData → table rows (VERY fast — no recalculation) ───
+    const dataFingerprint = `rangkuman::${rangkumanData.length}`;
 
-    function calculateTotalModalForOrderId(orderId) {
-        const orders = ordersGroupedById.get(orderId);
-        if (!orders || orders.length === 0) return NaN;
-        let totalModal = 0;
-        let modalValid = true;
-        orders.forEach(order => {
-            const quantityRaw = order['Quantity'];
-            const quantity = typeof quantityRaw === 'string' ? parseInt(quantityRaw.replace(/\D/g, ''), 10) : Number(quantityRaw);
-            if (isNaN(quantity) || quantity <= 0) { modalValid = false; return; }
-            const sellerSku = (order['Seller SKU'] || '').toString().trim();
-            const skuIdRaw = order['SKU ID'];
-            const skuId = skuIdRaw !== undefined && skuIdRaw !== null ? skuIdRaw.toString().trim() : '';
-            const variationRaw = order['Variation'];
-            const variation = variationRaw !== undefined && variationRaw !== null ? variationRaw.toString().trim() : '';
-            let modalValueStr = '';
-            let foundModal = false;
-            // Normal lookup: by variation key or sellerSku
-            const variationKey = sellerSku + '||' + skuId + '||' + variation;
-            if (modalValues && modalValues[variationKey]) { modalValueStr = modalValues[variationKey]; foundModal = true; }
-            else if (modalValues && modalValues[sellerSku] && sellerSku) { modalValueStr = modalValues[sellerSku]; foundModal = true; }
-            // Fallback for products without Seller SKU: use __NSKU__ + productName
-            if (!foundModal && !sellerSku) {
-                const pName = (order['Product Name'] || '').toString().trim();
-                if (pName) {
-                    const noSkuKey = '__NSKU__' + pName;
-                    const noSkuVarKey = noSkuKey + '||' + skuId + '||' + variation;
-                    if (modalValues && modalValues[noSkuVarKey]) { modalValueStr = modalValues[noSkuVarKey]; foundModal = true; }
-                    else if (modalValues && modalValues[noSkuKey]) { modalValueStr = modalValues[noSkuKey]; foundModal = true; }
-                }
-            }
-            if (!foundModal) { modalValid = false; return; }
-            const modalValueNum = parseInt(modalValueStr.toString().replace(/[^0-9]/g, ''), 10);
-            if (isNaN(modalValueNum)) { modalValid = false; return; }
-            totalModal += quantity * modalValueNum;
-        });
-        if (!modalValid) return NaN;
-        return totalModal;
-    }
-
-    function translatePaketGagalKirim(value) {
-        if (!value) return '-';
-        const lowerVal = value.toString().toLowerCase();
-        const translations = {
-            'lost': 'Hilang', 'damaged': 'Rusak', 'address not found': 'Alamat Tidak Ditemukan',
-            'customer not available': 'Pelanggan Tidak Tersedia', 'failed delivery': 'Gagal Kirim',
-            'returned to sender': 'Dikembalikan ke Pengirim', 'cancelled by customer': 'Dibatalkan oleh Pelanggan',
-            'package delayed': 'Paket Tertunda', 'wrong address': 'Alamat Salah',
-            'refused by customer': 'Ditolak oleh Pelanggan', 'other': 'Lainnya',
-            'package delivery failed': 'Gagal Kirim Paket', 'package rejected': 'Paket Ditolak',
-        };
-        if (translations[lowerVal]) return translations[lowerVal];
-        for (const key in translations) if (lowerVal.includes(key)) return translations[key];
-        return value.toString();
-    }
-
-    // ─── Deferred data processing ────────────────────────────────────
-    // Instead of a blocking useMemo that freezes the page, we process
-    // data in a deferred useEffect so the page shell renders instantly.
-    // On revisit, cached results display immediately.
     const [rawTableData, setRawTableData] = useState(() => {
-        // Try cache first for instant display on revisit
-        const cached = getComputed(dataFingerprint);
+        const cached = getComputed(dataFingerprint + '::table');
         return cached && cached.length > 0 ? cached : [];
     });
     const [dataProcessing, setDataProcessing] = useState(false);
@@ -316,199 +62,60 @@ export default function RangkumanTransaksi({ isHidden = false }) {
     // Track which fingerprint we've processed to avoid re-running
     const processedFingerprintRef = useRef(null);
 
-    useEffect(() => {
-        // Skip if still loading raw data
+    // Convert rangkumanData rows (already computed) into table rows with JSX
+    useMemo(() => {
         if (isLoading) return;
-        // Skip if we already processed this fingerprint
+        if (rangkumanData.length === 0) { setRawTableData([]); return; }
         if (processedFingerprintRef.current === dataFingerprint) return;
-        // Skip if no data to process
-        if (ordersGroupedById.size === 0) {
-            setRawTableData([]);
-            processedFingerprintRef.current = dataFingerprint;
-            return;
-        }
 
-        // Check cache first — instant display if available
-        const cached = getComputed(dataFingerprint);
+        const cached = getComputed(dataFingerprint + '::table');
         if (cached && cached.length > 0) {
             setRawTableData(cached);
             processedFingerprintRef.current = dataFingerprint;
             return;
         }
 
-        // Defer heavy processing so page shell paints first
         setDataProcessing(true);
-        const timerId = setTimeout(() => {
-            const rows = [];
-            for (const [orderId, orders] of ordersGroupedById.entries()) {
-                const totalModal = calculateTotalModalForOrderId(orderId);
-                const modalValid = !isNaN(totalModal);
-                const order = orders[0];
-                const createdDateObj = parseIndonesianDateTime(order['Created Time']);
-                const waktuPesananDibuat = createdDateObj ? formatIndonesianDateTime(createdDateObj) : '';
-                const shippedDateObj = parseIndonesianDateTime(order['Shipped Time']);
-                const waktuPengiriman = shippedDateObj ? formatIndonesianDateTime(shippedDateObj) : '';
-                let totalQuantity = 0;
-                orders.forEach(o => {
-                    const quantityRaw = o['Quantity'];
-                    const quantity = typeof quantityRaw === 'string' ? parseInt(quantityRaw.replace(/\D/g, ''), 10) : Number(quantityRaw);
-                    if (!isNaN(quantity)) totalQuantity += quantity;
-                });
-                let statusOrder = normalizeStatus(order['Order Status']);
-                const returnStatuses = returnStatusByOrderId.get(orderId) || [];
-                const hasReturnStatus = returnStatuses.some(rs => rs && !['rejected', 'refund rejected', 'cancelled', 'canceled', 'dibatalkan'].includes(rs));
-                if (hasReturnStatus) statusOrder = 'Return';
-                const cancelReasonRaw = order['Cancel Reason'];
-                const paketGagalKirimRaw = cancelReasonRaw && cancelReasonRaw.toString().trim() !== '' ? cancelReasonRaw.toString() : '-';
-                const paketGagalKirim = translatePaketGagalKirim(paketGagalKirimRaw);
-                if (paketGagalKirim === 'Gagal Kirim Paket' || paketGagalKirim === 'Paket Ditolak') statusOrder = 'Gagal Kirim';
-                const paymentsForOrder = paymentsByOrderId.get(orderId) || [];
-                let totalSettlementAmount = 0;
-                paymentsForOrder.forEach(p => { const val = parseFloat(p['Total settlement amount']); if (!isNaN(val)) totalSettlementAmount += val; });
-                let menanggungOngkirTotal = 0;
-                paymentsForOrder.forEach(p => {
-                    const val = p['Return shipping costs (passed on to the customer)'];
-                    const numVal = typeof val === 'string' ? parseFloat(val.replace(/[^0-9.-]+/g, '')) : parseFloat(val);
-                    if (!isNaN(numVal)) menanggungOngkirTotal += numVal;
-                });
-                const menanggungOngkirDisplay = menanggungOngkirTotal > 0 ? formatRupiah(menanggungOngkirTotal) : '-';
-                let totalAffiliateCommission = 0;
-                paymentsForOrder.forEach(p => { const val = parseFloat(p['Affiliate commission']); if (!isNaN(val)) totalAffiliateCommission += val; });
-                let ketAffiliasi = 'YA';
-                if (totalAffiliateCommission === 0) ketAffiliasi = 'Tidak';
-                else if (totalAffiliateCommission < 0) ketAffiliasi = 'Affiliasi';
-                let totalCustomerPayment = 0;
-                paymentsForOrder.forEach(p => { const val = parseFloat(p['Customer payment']); if (!isNaN(val)) totalCustomerPayment += val; });
-                const metode = order['Payment Method'] || '';
-                const regencyCity = order['Regency and City'] || order['Kota / Kabupaten'] || order['Kota/Kabupaten'] || order['City'] || '';
-                const province = order['Province'] || order['Provinsi'] || '';
-                const customerName = order['Nama Penerima'] || order['Recipient'] || order['Username (Buyer)'] || 'Unknown';
-                const alamatText = regencyCity && province ? `${regencyCity}, ${province}` : regencyCity || province || '';
-                const alamat = `${customerName}, ${alamatText}`;
-                let terkirim = '';
-                const statusLower = statusOrder.toLowerCase();
-                if (['canceled', 'cancelled'].includes(statusLower)) terkirim = 'Cancel';
-                else if (statusLower === 'return') terkirim = 'Return';
-                else if (statusLower === 'gagal kirim') terkirim = 'Gagal Kirim';
-                else terkirim = order['Delivered Time'] && order['Delivered Time'].toString().trim() !== '' ? 'Terkirim' : 'Proses';
-                let waktuPengembalian = '-';
-                if (paketGagalKirim === 'Paket Ditolak' || paketGagalKirim === 'Gagal Kirim Paket') {
-                    const cancelledDateObj = parseIndonesianDateTime(order['Cancelled Time']);
-                    waktuPengembalian = cancelledDateObj ? formatIndonesianDateTime(cancelledDateObj) : 'Dalam Proses';
-                } else if (['canceled', 'cancelled'].includes(statusLower) && !['Paket Ditolak', 'Gagal Kirim Paket'].includes(paketGagalKirim)) {
-                    waktuPengembalian = 'Cancel';
-                }
-                let verifikasiPaketText = '-';
-                let verifikasiPaketJSX = '-';
-                if (statusLower === 'completed') {
-                    // Selesai → langsung tanda centang
-                    verifikasiPaketText = '✓';
-                    verifikasiPaketJSX = (
-                        <span style={{ color: '#34d399', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem' }} title="Pesanan selesai">
-                            <CheckCircle size={14} />
-                        </span>
-                    );
-                } else if (['canceled', 'cancelled'].includes(statusLower) || statusLower === 'gagal kirim') {
-                    // Canceled & Gagal Kirim → cocokkan resi pesanan langsung dengan resi pengembalian
-                    const resi = (order['Tracking ID'] || '').toString().trim();
-                    if (!resi || resi === '-') {
-                        // Cancel tanpa resi → otomatis ✅
-                        verifikasiPaketText = '✓';
-                        verifikasiPaketJSX = (
-                            <span style={{ color: '#34d399', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem' }} title="Cancel tanpa resi">
-                                <CheckCircle size={14} />
-                            </span>
-                        );
-                    } else if (pengembalianResiSet.has(resi)) {
-                        verifikasiPaketText = 'Diterima';
-                        verifikasiPaketJSX = (
-                            <span style={{ color: '#34d399', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem' }} title="Resi ditemukan">
-                                <CheckCircle size={14} />Diterima
-                            </span>
-                        );
-                    } else {
-                        verifikasiPaketText = 'Belum Diterima';
-                        verifikasiPaketJSX = (
-                            <span style={{ color: '#f87171', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem' }} title="Resi tidak ditemukan">
-                                <XCircle size={14} />Belum Diterima
-                            </span>
-                        );
-                    }
-                } else if (statusLower === 'return') {
-                    // Retur → cari Order ID di data retur, ambil resi retur, cocokkan dengan pengembalian
-                    const statusBarang = returnStatusBarangByOrderId.get(orderId) || '-';
-                    if (statusBarang === 'Diterima') {
-                        verifikasiPaketText = 'Diterima';
-                        verifikasiPaketJSX = (
-                            <span style={{ color: '#34d399', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem' }} title="Resi retur ditemukan di Pengembalian">
-                                <CheckCircle size={14} />Diterima
-                            </span>
-                        );
-                    } else if (statusBarang === 'Belum Diterima') {
-                        verifikasiPaketText = 'Belum Diterima';
-                        verifikasiPaketJSX = (
-                            <span style={{ color: '#f87171', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem' }} title="Resi retur tidak ditemukan di Pengembalian">
-                                <XCircle size={14} />Belum Diterima
-                            </span>
-                        );
-                    }
-                }
-                // Determine effective modal based on status and verifikasi paket
-                let effectiveModal = totalModal;
-                let effectiveModalValid = modalValid;
-                if (['canceled', 'cancelled'].includes(statusLower)) {
-                    effectiveModal = 0;
-                    effectiveModalValid = true;
-                } else if (['return', 'gagal kirim'].includes(statusLower) && verifikasiPaketText === 'Diterima') {
-                    effectiveModal = 0;
-                    effectiveModalValid = true;
-                }
-                let profitDisplay = '';
-                if (['canceled', 'cancelled'].includes(statusLower)) profitDisplay = 'CANCEL';
-                else if (statusLower === 'gagal kirim') profitDisplay = 'Gagal Kirim';
-                else {
-                    if (totalSettlementAmount === 0) profitDisplay = 'Belum Cair';
-                    else profitDisplay = effectiveModalValid ? formatRupiah(totalSettlementAmount - effectiveModal) : 'HPP Belum Diinput';
-                }
-                rows.push({
-                    'ORDER ID': orderId, 'WAKTU PESANAN DIBUAT': waktuPesananDibuat, 'WAKTU PENGIRIMAN': waktuPengiriman,
-                    'QTT': totalQuantity.toString(), 'STATUS ORDER': statusOrder,
-                    'HPP': effectiveModalValid ? formatRupiah(effectiveModal) : 'HPP Belum Diinput',
-                    '_hppRaw': modalValid ? totalModal : 0,
-                    'PENCAIRAN': formatRupiah(totalSettlementAmount), 'LABA': profitDisplay,
-                    'AFFILIASI': totalAffiliateCommission.toString(), 'KET AFFILIASI': ketAffiliasi,
-                    'PEMBAYARAN CS': formatRupiah(totalCustomerPayment), 'METODE': metode, 'ALAMAT': alamat,
-                    'TERKIRIM': terkirim, 'Menanggung Ongkir': menanggungOngkirDisplay,
-                    'Alasan Cancel': paketGagalKirim, 'Waktu Pengembalian': waktuPengembalian,
-                    'Resi': (statusLower === 'return' && returnResiByOrderId.has(orderId)) ? returnResiByOrderId.get(orderId) : (order['Tracking ID'] || '-'),
-                    'Verifikasi Paket': { jsx: verifikasiPaketJSX, text: verifikasiPaketText },
-                    'Kerugian': verifikasiPaketText === 'Belum Diterima' && modalValid && totalModal > 0 ? formatRupiah(totalModal) : '-',
-                });
-            }
+        const rows = rangkumanData.map(r => {
+            const verifikasiPaketText = r.verifikasiPaket || '-';
+            const verifikasiPaketJSX = verifikasiJSX(verifikasiPaketText);
+            return {
+                'ORDER ID': r.orderId,
+                'WAKTU PESANAN DIBUAT': r.waktuPesananDibuat,
+                'WAKTU PENGIRIMAN': r.waktuPengiriman,
+                'QTT': r.totalQuantity.toString(),
+                'STATUS ORDER': r.statusOrder,
+                'HPP': r.hppDisplay,
+                '_hppRaw': r._hppRaw,
+                'PENCAIRAN': r.pencairanDisplay,
+                'LABA': r.profitDisplay,
+                'AFFILIASI': r.totalAffiliateCommission.toString(),
+                'KET AFFILIASI': r.ketAffiliasi,
+                'PEMBAYARAN CS': formatRupiah(r.totalCustomerPayment),
+                'METODE': r.metode,
+                'ALAMAT': r.alamat,
+                'TERKIRIM': r.terkirim,
+                'Menanggung Ongkir': r.menanggungOngkir,
+                'Alasan Cancel': r.paketGagalKirim,
+                'Waktu Pengembalian': r.waktuPengembalian,
+                'Resi': r.resi,
+                'Verifikasi Paket': { jsx: verifikasiPaketJSX, text: verifikasiPaketText },
+                'Kerugian': r.kerugian,
+            };
+        });
 
-            // Cache the processed result for future revisits
-            setComputed(dataFingerprint, rows);
-            setComputed('LATEST_RANGKUMAN', rows);
-            processedFingerprintRef.current = dataFingerprint;
-            setRawTableData(rows);
-            setDataProcessing(false);
-        }, 0);
+        setComputed(dataFingerprint + '::table', rows);
+        setComputed('LATEST_RANGKUMAN', rows);
+        processedFingerprintRef.current = dataFingerprint;
+        setRawTableData(rows);
+        setDataProcessing(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isLoading, rangkumanData, dataFingerprint]);
 
-        return () => clearTimeout(timerId);
-    }, [isLoading, dataFingerprint, ordersGroupedById, paymentsByOrderId, modalValues, returnStatusByOrderId, pengembalianResiSet, returnStatusBarangByOrderId]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Effective loading: show skeleton if API still loading or if processing deferred data
     const effectiveTableData = rawTableData;
     const effectiveLoading = isLoading || (dataProcessing && rawTableData.length === 0);
-
-    const [showOnlyCancel, setShowOnlyCancel] = useState(false);
-    const [filterPaketGagalKirim, setFilterPaketGagalKirim] = useState('');
-    const paketGagalKirimOptions = useMemo(() => {
-        const setOptions = new Set();
-        effectiveTableData.forEach(row => { const val = row['Alasan Cancel'] || '-'; if (val && val !== '-') setOptions.add(val); });
-        return Array.from(setOptions).sort((a, b) => a.localeCompare(b));
-    }, [effectiveTableData]);
-
     const [columnFilters, setColumnFilters] = useState({});
     const [filterPopupOpen, setFilterPopupOpen] = useState(null);
     const filterPopupRef = useRef(null);
@@ -923,35 +530,45 @@ export default function RangkumanTransaksi({ isHidden = false }) {
 
     const sortedData = useMemo(() => {
         if (!sortConfig.key) return filteredTableData;
-        const key = sortConfig.key; const direction = sortConfig.direction;
-        return [...filteredTableData].sort((a, b) => {
-            let aVal = a[key]; let bVal = b[key];
-            if (key === 'Verifikasi Paket') {
-                if (typeof aVal === 'object' && aVal !== null && 'text' in aVal) aVal = aVal.text;
-                if (typeof bVal === 'object' && bVal !== null && 'text' in bVal) bVal = bVal.text;
-            }
-            const monthsIndo = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-            const dayNamesIndo = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-            function parseDateForSort(val) {
-                if (!val || typeof val !== 'string') return null;
-                const isDateTime = dayNamesIndo.some(day => val.includes(day)) && monthsIndo.some(month => val.includes(month));
-                if (isDateTime) {
-                    const parts = val.split(' ');
-                    if (parts.length >= 4) {
-                        const dayNum = parseInt(parts[1], 10); const monthName = parts[2]; const yearNum = parseInt(parts[3], 10);
-                        const hourMinute = parts[4] || '00:00'; const [hour, minute] = hourMinute.split(':').map(x => parseInt(x, 10));
-                        const monthIndex = monthsIndo.indexOf(monthName);
-                        if (dayNum && monthIndex >= 0 && yearNum && !isNaN(hour) && !isNaN(minute)) return new Date(yearNum, monthIndex, dayNum, hour, minute);
-                    }
+        const key = sortConfig.key;
+        const direction = sortConfig.direction;
+        // Pre-compute sort keys once per row instead of inside the comparator
+        const monthsIndo = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+        const dayNamesIndo = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+        function parseDateForSort(val) {
+            if (!val || typeof val !== 'string') return null;
+            const isDateTime = dayNamesIndo.some(day => val.includes(day)) && monthsIndo.some(month => val.includes(month));
+            if (isDateTime) {
+                const parts = val.split(' ');
+                if (parts.length >= 4) {
+                    const dayNum = parseInt(parts[1], 10); const monthName = parts[2]; const yearNum = parseInt(parts[3], 10);
+                    const hourMinute = parts[4] || '00:00'; const [hour, minute] = hourMinute.split(':').map(x => parseInt(x, 10));
+                    const monthIndex = monthsIndo.indexOf(monthName);
+                    if (dayNum && monthIndex >= 0 && yearNum && !isNaN(hour) && !isNaN(minute))
+                        return new Date(yearNum, monthIndex, dayNum, hour, minute).getTime();
                 }
-                return null;
             }
-            const aDate = parseDateForSort(aVal); const bDate = parseDateForSort(bVal);
-            if (aDate && bDate) { const cmp = aDate - bDate; return direction === 'asc' ? cmp : -cmp; }
-            const cmp = sortValues(aVal, bVal);
+            return null;
+        }
+        // Pre-compute sort key for each row once
+        const keyed = filteredTableData.map(row => {
+            let val = row[key];
+            if (key === 'Verifikasi Paket') {
+                if (typeof val === 'object' && val !== null && 'text' in val) val = val.text;
+            }
+            const dateTs = parseDateForSort(typeof val === 'string' ? val : null);
+            return { row, val: val ?? '', dateTs };
+        });
+        keyed.sort((a, b) => {
+            if (a.dateTs !== null && b.dateTs !== null) {
+                return direction === 'asc' ? a.dateTs - b.dateTs : b.dateTs - a.dateTs;
+            }
+            const cmp = sortValues(a.val, b.val);
             return direction === 'asc' ? cmp : -cmp;
         });
+        return keyed.map(k => k.row);
     }, [filteredTableData, sortConfig]);
+
 
     function SortIcon({ columnKey }) {
         const size = 12;

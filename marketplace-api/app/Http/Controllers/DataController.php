@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DataController extends Controller
 {
@@ -34,7 +35,6 @@ class DataController extends Controller
     // GET /api/data/orders
     public function orders(Request $request)
     {
-        ini_set('memory_limit', '-1');
         $scope = $this->storeScope($request->query('store_id'), $request->query('user_id'));
         
         $query = DB::table('orders')->select('data', 'channel')->orderBy('id');
@@ -42,20 +42,21 @@ class DataController extends Controller
             $query->whereRaw(ltrim($scope['where'], ' WHERE'), $scope['params']);
         }
 
-        $result = [];
-        foreach ($query->cursor() as $r) {
-            $parsed = is_string($r->data) ? json_decode($r->data, true) : (array) $r->data;
-            if (!is_array($parsed)) $parsed = [];
-            $parsed['Channel Marketplace'] = $r->channel;
-            $result[] = $parsed;
-        }
-        return response()->json($result);
+        return new StreamedResponse(function () use ($query) {
+            foreach ($query->cursor() as $r) {
+                $parsed = is_string($r->data) ? json_decode($r->data, true) : (array) $r->data;
+                if (!is_array($parsed)) $parsed = [];
+                $parsed['Channel Marketplace'] = $r->channel;
+                echo json_encode($parsed) . "\n";
+                if (ob_get_level() > 0) ob_flush();
+                flush();
+            }
+        }, 200, ['Content-Type' => 'application/x-ndjson']);
     }
 
     // GET /api/data/payments
     public function payments(Request $request)
     {
-        ini_set('memory_limit', '-1');
         $scope = $this->storeScope($request->query('store_id'), $request->query('user_id'));
         
         $query = DB::table('payments')->select('data')->orderBy('id');
@@ -63,18 +64,21 @@ class DataController extends Controller
             $query->whereRaw(ltrim($scope['where'], ' WHERE'), $scope['params']);
         }
 
-        $result = [];
-        foreach ($query->cursor() as $r) {
-            $parsed = is_string($r->data) ? json_decode($r->data, true) : (array) $r->data;
-            if (is_array($parsed)) $result[] = $parsed;
-        }
-        return response()->json($result);
+        return new StreamedResponse(function () use ($query) {
+            foreach ($query->cursor() as $r) {
+                $parsed = is_string($r->data) ? json_decode($r->data, true) : (array) $r->data;
+                if (is_array($parsed)) {
+                    echo json_encode($parsed) . "\n";
+                    if (ob_get_level() > 0) ob_flush();
+                    flush();
+                }
+            }
+        }, 200, ['Content-Type' => 'application/x-ndjson']);
     }
 
     // GET /api/data/returns
     public function returns(Request $request)
     {
-        ini_set('memory_limit', '-1');
         $scope = $this->storeScope($request->query('store_id'), $request->query('user_id'));
         
         $query = DB::table('returns_data')->select('data')->orderBy('id');
@@ -82,18 +86,21 @@ class DataController extends Controller
             $query->whereRaw(ltrim($scope['where'], ' WHERE'), $scope['params']);
         }
 
-        $result = [];
-        foreach ($query->cursor() as $r) {
-            $parsed = is_string($r->data) ? json_decode($r->data, true) : (array) $r->data;
-            if (is_array($parsed)) $result[] = $parsed;
-        }
-        return response()->json($result);
+        return new StreamedResponse(function () use ($query) {
+            foreach ($query->cursor() as $r) {
+                $parsed = is_string($r->data) ? json_decode($r->data, true) : (array) $r->data;
+                if (is_array($parsed)) {
+                    echo json_encode($parsed) . "\n";
+                    if (ob_get_level() > 0) ob_flush();
+                    flush();
+                }
+            }
+        }, 200, ['Content-Type' => 'application/x-ndjson']);
     }
 
     // GET /api/data/pengembalian
     public function pengembalian(Request $request)
     {
-        ini_set('memory_limit', '-1');
         $scope = $this->storeScope($request->query('store_id'), $request->query('user_id'));
         
         $query = DB::table('pengembalian')->select('data')->orderBy('id');
@@ -101,12 +108,16 @@ class DataController extends Controller
             $query->whereRaw(ltrim($scope['where'], ' WHERE'), $scope['params']);
         }
 
-        $result = [];
-        foreach ($query->cursor() as $r) {
-            $parsed = is_string($r->data) ? json_decode($r->data, true) : (array) $r->data;
-            if (is_array($parsed)) $result[] = $parsed;
-        }
-        return response()->json($result);
+        return new StreamedResponse(function () use ($query) {
+            foreach ($query->cursor() as $r) {
+                $parsed = is_string($r->data) ? json_decode($r->data, true) : (array) $r->data;
+                if (is_array($parsed)) {
+                    echo json_encode($parsed) . "\n";
+                    if (ob_get_level() > 0) ob_flush();
+                    flush();
+                }
+            }
+        }, 200, ['Content-Type' => 'application/x-ndjson']);
     }
 
     // GET /api/data/stats
