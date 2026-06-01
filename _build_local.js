@@ -31,9 +31,9 @@ if (!fs.existsSync('build')) {
 
 console.log('Copying build files to public directories...');
 
-// 1. Copy everything from build/ to root public/ (safe to overwrite)
-copyDirSync('build', 'public');
-console.log('✓ Copied build assets to root public/');
+// 1. Copy everything from build/ to root public/ (EXCLUDING index.html to prevent template pollution)
+copyDirSync('build', 'public', ['index.html']);
+console.log('✓ Copied build assets to root public/ (excluding index.html)');
 
 // 2. Copy everything from build/ to marketplace-api/public/ (EXCLUDING index.php and .htaccess)
 copyDirSync('build', 'marketplace-api/public', ['index.php', '.htaccess']);
