@@ -10,3 +10,7 @@ node_modules
 
 # Server-specific files (managed by cPanel/hosting)
 public/.htaccess
+
+# Local client directories / test data
+PAK IRHAM/
+

@@ -40,10 +40,6 @@ class UploadController extends Controller
     private function detectPlatformAndCategory(array $headers, array $sheetNames): array
     {
         $normalized = array_map(fn($h) => strtolower(trim($h)), $headers);
-        $tiktokOrdersH = ["order id", "order status", "order substatus", "cancelation/return type", "normal or pre-order", "sku id", "seller sku", "product name", "variation"];
-        $tiktokPaymentsH = ["order/adjustment id", "total settlement amount", "total revenue", "subtotal after seller discounts", "customer payment"];
-        $tiktokPaymentsFlex = ["order created time", "order settled time"];
-        $tiktokReturnH = ["return order id", "order id", "order amount", "order status", "order substatus", "payment method", "sku id"];
 
         if (in_array('Income', $sheetNames))
             return ['platform' => 'shopee', 'category' => 'payments'];
@@ -57,18 +53,220 @@ class UploadController extends Controller
         if ($hasTanggal && $hasResi)
             return ['platform' => 'none', 'category' => 'pengembalian'];
 
-        if (!array_diff($tiktokOrdersH, $normalized) && count($normalized) >= count($tiktokOrdersH))
-            return ['platform' => 'tiktok', 'category' => 'orders'];
+        // TikTok Payments
+        $isTiktokPaymentsSheet = in_array('Order details', $sheetNames) || in_array('Detail pesanan', $sheetNames);
+        
+        $hasOrderIdKey = false;
+        foreach (["order/adjustment id", "id pesanan/penyesuaian"] as $k) {
+            if (count(preg_grep('/^' . preg_quote($k, '/') . '/', $normalized)) > 0) {
+                $hasOrderIdKey = true;
+                break;
+            }
+        }
+        
+        $hasSettlementKey = false;
+        foreach (["total settlement amount", "jumlah penyelesaian pembayaran"] as $k) {
+            if (count(preg_grep('/^' . preg_quote($k, '/') . '/', $normalized)) > 0) {
+                $hasSettlementKey = true;
+                break;
+            }
+        }
+        
+        $hasTiktokPaymentsCore = $hasOrderIdKey && $hasSettlementKey;
 
-        $hasTiktokPayments = !array_diff($tiktokPaymentsH, $normalized)
-            && count(array_filter($tiktokPaymentsFlex, fn($p) => (bool) preg_grep('/^' . preg_quote($p, '/') . '/', $normalized))) === count($tiktokPaymentsFlex);
-        if ($hasTiktokPayments && count($normalized) >= count($tiktokPaymentsH))
+        $hasCreated = false;
+        foreach (["order created time", "waktu pemesanan", "waktu pembuatan pesanan"] as $k) {
+            if (count(preg_grep('/^' . preg_quote($k, '/') . '/', $normalized)) > 0) {
+                $hasCreated = true;
+                break;
+            }
+        }
+        $hasSettled = false;
+        foreach (["order settled time", "waktu pembayaran pesanan", "waktu penyelesaian pesanan"] as $k) {
+            if (count(preg_grep('/^' . preg_quote($k, '/') . '/', $normalized)) > 0) {
+                $hasSettled = true;
+                break;
+            }
+        }
+        $hasTiktokPaymentsFlex = $hasCreated && $hasSettled;
+
+        $hasRev = false;
+        foreach (["total revenue", "total pendapatan", "pendapatan total"] as $k) {
+            if (count(preg_grep('/^' . preg_quote($k, '/') . '/', $normalized)) > 0) {
+                $hasRev = true;
+                break;
+            }
+        }
+        $hasDisc = false;
+        foreach (["subtotal after seller discounts", "subtotal setelah diskon penjual"] as $k) {
+            if (count(preg_grep('/^' . preg_quote($k, '/') . '/', $normalized)) > 0) {
+                $hasDisc = true;
+                break;
+            }
+        }
+        $hasTiktokPaymentsRevenue = $hasRev && $hasDisc;
+
+        if ($hasTiktokPaymentsCore && ($isTiktokPaymentsSheet || ($hasTiktokPaymentsFlex && $hasTiktokPaymentsRevenue))) {
             return ['platform' => 'tiktok', 'category' => 'payments'];
+        }
 
-        if (!array_diff($tiktokReturnH, $normalized) && count($normalized) >= count($tiktokReturnH))
+        // TikTok Orders
+        $hasOrderId = count(preg_grep('/^(order id|id pesanan)$/', $normalized)) > 0;
+        $hasStatus = count(preg_grep('/^(order status|status pesanan)$/', $normalized)) > 0;
+        $hasSkuId = count(preg_grep('/^(sku id|id sku)$/', $normalized)) > 0;
+        $hasSellerSku = count(preg_grep('/^(seller sku|sku penjual)$/', $normalized)) > 0;
+        $hasProductName = count(preg_grep('/^(product name|nama produk)$/', $normalized)) > 0;
+        if ($hasOrderId && $hasStatus && $hasSkuId && $hasSellerSku && $hasProductName) {
+            return ['platform' => 'tiktok', 'category' => 'orders'];
+        }
+
+        // TikTok Returns
+        $hasReturnOrderId = false;
+        foreach (["return order id", "id pengembalian", "id pesanan pengembalian"] as $k) {
+            if (in_array($k, $normalized)) {
+                $hasReturnOrderId = true;
+                break;
+            }
+        }
+        if ($hasReturnOrderId && $hasOrderId && $hasSkuId) {
             return ['platform' => 'tiktok', 'category' => 'return'];
+        }
 
         return ['platform' => 'unknown', 'category' => 'unknown'];
+    }
+
+    private function mapTiktokHeaders(array $data): array
+    {
+        $tiktokHeaderMap = [
+            // Payments / Income
+            "order/adjustment id" => "Order/adjustment ID",
+            "id pesanan/penyesuaian" => "Order/adjustment ID",
+            "total settlement amount" => "Total settlement amount",
+            "jumlah penyelesaian pembayaran" => "Total settlement amount",
+            "total revenue" => "Total revenue",
+            "total pendapatan" => "Total revenue",
+            "pendapatan total" => "Total revenue",
+            "subtotal after seller discounts" => "Subtotal after seller discounts",
+            "subtotal setelah diskon penjual" => "Subtotal after seller discounts",
+            "customer payment" => "Customer payment",
+            "pembayaran pelanggan" => "Customer payment",
+            "order created time" => "Order created time",
+            "waktu pemesanan" => "Order created time",
+            "waktu pembuatan pesanan" => "Order created time",
+            "order settled time" => "Order settled time",
+            "waktu pembayaran pesanan" => "Order settled time",
+            "waktu penyelesaian pesanan" => "Order settled time",
+            "affiliate commission" => "Affiliate commission",
+            "komisi affiliate" => "Affiliate commission",
+            "komisi afiliasi" => "Affiliate commission",
+            "biaya komisi platform" => "Affiliate commission",
+            "return shipping costs (passed on to the customer)" => "Return shipping costs (passed on to the customer)",
+            "ongkos kirim pengembalian (dibebankan kepada pelanggan)" => "Return shipping costs (passed on to the customer)",
+            "ongkos kirim pengembalian" => "Return shipping costs (passed on to the customer)",
+            "tanggal dana dilepaskan" => "Tanggal Dana Dilepaskan",
+            "waktu dana dilepaskan" => "Tanggal Dana Dilepaskan",
+            "waktu pelepasan dana" => "Tanggal Dana Dilepaskan",
+            "metode pembayaran pembeli" => "Metode pembayaran pembeli",
+            "biaya layanan" => "Biaya Layanan",
+            "biaya administrasi" => "Biaya Administrasi",
+            "biaya proses pesanan" => "Biaya Proses Pesanan",
+
+            // Orders
+            "order id" => "Order ID",
+            "id pesanan" => "Order ID",
+            "order status" => "Order Status",
+            "status pesanan" => "Order Status",
+            "order substatus" => "Order Substatus",
+            "substatus pesanan" => "Order Substatus",
+            "sub-status pesanan" => "Order Substatus",
+            "cancelation/return type" => "Cancelation/Return Type",
+            "tipe pembatalan/pengembalian" => "Cancelation/Return Type",
+            "tipe pembatalan" => "Cancelation/Return Type",
+            "normal or pre-order" => "Normal or Pre-order",
+            "normal atau pre-order" => "Normal or Pre-order",
+            "sku id" => "SKU ID",
+            "id sku" => "SKU ID",
+            "seller sku" => "Seller SKU",
+            "sku penjual" => "Seller SKU",
+            "product name" => "Product Name",
+            "nama produk" => "Product Name",
+            "variation" => "Variation",
+            "variasi" => "Variation",
+            "quantity" => "Quantity",
+            "jumlah" => "Quantity",
+            "kuantitas" => "Quantity",
+            "jumlah produk" => "Quantity",
+            "cancel reason" => "Cancel Reason",
+            "alasan pembatalan" => "Cancel Reason",
+            "tracking id" => "Tracking ID",
+            "id pelacakan" => "Tracking ID",
+            "no. resi" => "Tracking ID",
+            "resi" => "Tracking ID",
+            "buyer username" => "Buyer Username",
+            "nama pembeli" => "Buyer Username",
+            "username pembeli" => "Buyer Username",
+            "recipient" => "Nama Penerima",
+            "nama penerima" => "Nama Penerima",
+            "penerima" => "Nama Penerima",
+            "phone #" => "Phone #",
+            "nomor telepon" => "Phone #",
+            "no. telp" => "Phone #",
+            "province" => "Province",
+            "provinsi" => "Province",
+            "regency and city" => "Regency and City",
+            "kota dan kabupaten" => "Regency and City",
+            "kota/kabupaten" => "Regency and City",
+            "detail address" => "Detail Address",
+            "alamat detail" => "Detail Address",
+            "alamat" => "Detail Address",
+            "payment method" => "Payment Method",
+            "created time" => "Created Time",
+            "waktu dibuat" => "Created Time",
+            "waktu pembuatan" => "Created Time",
+            "waktu pesanan dibuat" => "Created Time",
+            "shipped time" => "Shipped Time",
+            "waktu dikirim" => "Shipped Time",
+            "waktu pengiriman" => "Shipped Time",
+            "delivered time" => "Delivered Time",
+            "waktu diterima" => "Delivered Time",
+            "waktu pesanan selesai" => "Delivered Time",
+            "cancelled time" => "Cancelled Time",
+            "waktu dibatalkan" => "Cancelled Time",
+
+            // Returns
+            "return order id" => "Return Order ID",
+            "id pengembalian" => "Return Order ID",
+            "id pesanan pengembalian" => "Return Order ID",
+            "order amount" => "Order Amount",
+            "jumlah pesanan" => "Order Amount",
+            "nominal pesanan" => "Order Amount",
+            "return status" => "Return Status",
+            "status pengembalian" => "Return Status",
+            "return logistics tracking id" => "Return Logistics Tracking ID",
+            "resi pengembalian" => "Return Logistics Tracking ID",
+            "no. resi pengembalian" => "Return Logistics Tracking ID",
+            "nomor pelacakan logistik pengembalian" => "Return Logistics Tracking ID",
+            "return type" => "Return Type",
+            "tipe pengembalian" => "Return Type",
+            "return reason" => "Return Reason",
+            "alasan pengembalian" => "Return Reason",
+            "refund amount" => "Refund Amount",
+            "jumlah pengembalian dana" => "Refund Amount",
+            "total pengembalian dana" => "Refund Amount",
+        ];
+
+        return array_map(function ($row) use ($tiktokHeaderMap) {
+            $newRow = [];
+            foreach ($row as $k => $v) {
+                $lk = strtolower(trim($k));
+                if (isset($tiktokHeaderMap[$lk])) {
+                    $newRow[$tiktokHeaderMap[$lk]] = $v;
+                } else {
+                    $newRow[$k] = $v;
+                }
+            }
+            return $newRow;
+        }, $data);
     }
 
     private function mapShopeeHeaders(array $data): array
@@ -316,8 +514,21 @@ class UploadController extends Controller
                         continue;
                     $incomeSheet = $spreadsheet->getSheetByName('Income');
                     $jsonData = $this->mapShopeeIncomeToStandard($this->readSheetToArray($incomeSheet, 5));
+                } elseif ($platform === 'tiktok' && $category === 'payments') {
+                    // TikTok payments sheet: check "Order details" or "Detail pesanan"
+                    $targetSheetName = in_array('Order details', $sheetNames) ? 'Order details' : (in_array('Detail pesanan', $sheetNames) ? 'Detail pesanan' : null);
+                    if ($targetSheetName) {
+                        $targetSheet = $spreadsheet->getSheetByName($targetSheetName);
+                        $jsonData = $this->readSheetToArray($targetSheet, 0);
+                    } else {
+                        $jsonData = $this->readSheetToArray($sheet, 0);
+                    }
                 } else {
                     $jsonData = $this->readSheetToArray($sheet, 0);
+                }
+
+                if ($platform === 'tiktok') {
+                    $jsonData = $this->mapTiktokHeaders($jsonData);
                 }
 
                 if ($platform === 'tiktok' && $category === 'orders') {

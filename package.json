@@ -6,6 +6,7 @@
     "scripts": {
         "start": "react-scripts start",
         "build": "react-scripts build",
+        "build:local": "react-scripts build && node _build_local.js",
         "test": "react-scripts test",
         "eject": "react-scripts eject",
         "server": "cd marketplace-api && php artisan serve --port=8000",

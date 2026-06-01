@@ -88,7 +88,7 @@ function Dashboard() {
         let affiliateYes = 0, affiliateNo = 0;
 
         rangkumanData.forEach(row => {
-            const dateObj = row.waktuPesananDibuat;
+            const dateObj = row.waktuPesananDibuatObj;
             if (!dateObj) return;
 
             // Date filter

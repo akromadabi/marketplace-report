@@ -200,21 +200,127 @@ function UploadFile() {
 
   const shopeeReturnHeaders = ["no. pengembalian", "no. pesanan", "solusi pengembalian barang/dana", "tipe pengembalian", "status pembatalan/ pengembalian"];
 
+  const tiktokHeaderMap = {
+    // Payments / Income
+    "order/adjustment id": "Order/adjustment ID",
+    "id pesanan/penyesuaian": "Order/adjustment ID",
+    "total settlement amount": "Total settlement amount",
+    "jumlah penyelesaian pembayaran": "Total settlement amount",
+    "total revenue": "Total revenue",
+    "total pendapatan": "Total revenue",
+    "pendapatan total": "Total revenue",
+    "subtotal after seller discounts": "Subtotal after seller discounts",
+    "subtotal setelah diskon penjual": "Subtotal after seller discounts",
+    "customer payment": "Customer payment",
+    "pembayaran pelanggan": "Customer payment",
+    "order created time": "Order created time",
+    "waktu pemesanan": "Order created time",
+    "waktu pembuatan pesanan": "Order created time",
+    "order settled time": "Order settled time",
+    "waktu pembayaran pesanan": "Order settled time",
+    "waktu penyelesaian pesanan": "Order settled time",
+    "affiliate commission": "Affiliate commission",
+    "komisi affiliate": "Affiliate commission",
+    "komisi afiliasi": "Affiliate commission",
+    "biaya komisi platform": "Affiliate commission",
+    "return shipping costs (passed on to the customer)": "Return shipping costs (passed on to the customer)",
+    "ongkos kirim pengembalian (dibebankan kepada pelanggan)": "Return shipping costs (passed on to the customer)",
+    "ongkos kirim pengembalian": "Return shipping costs (passed on to the customer)",
+    "tanggal dana dilepaskan": "Tanggal Dana Dilepaskan",
+    "waktu dana dilepaskan": "Tanggal Dana Dilepaskan",
+    "waktu pelepasan dana": "Tanggal Dana Dilepaskan",
+    "metode pembayaran pembeli": "Metode pembayaran pembeli",
+    "biaya layanan": "Biaya Layanan",
+    "biaya administrasi": "Biaya Administrasi",
+    "biaya proses pesanan": "Biaya Proses Pesanan",
+
+    // Orders
+    "order id": "Order ID",
+    "id pesanan": "Order ID",
+    "order status": "Order Status",
+    "status pesanan": "Order Status",
+    "order substatus": "Order Substatus",
+    "substatus pesanan": "Order Substatus",
+    "sub-status pesanan": "Order Substatus",
+    "cancelation/return type": "Cancelation/Return Type",
+    "tipe pembatalan/pengembalian": "Cancelation/Return Type",
+    "tipe pembatalan": "Cancelation/Return Type",
+    "normal or pre-order": "Normal or Pre-order",
+    "normal atau pre-order": "Normal or Pre-order",
+    "sku id": "SKU ID",
+    "id sku": "SKU ID",
+    "seller sku": "Seller SKU",
+    "sku penjual": "Seller SKU",
+    "product name": "Product Name",
+    "nama produk": "Product Name",
+    "variation": "Variation",
+    "variasi": "Variation",
+    "quantity": "Quantity",
+    "jumlah": "Quantity",
+    "kuantitas": "Quantity",
+    "jumlah produk": "Quantity",
+    "cancel reason": "Cancel Reason",
+    "alasan pembatalan": "Cancel Reason",
+    "tracking id": "Tracking ID",
+    "id pelacakan": "Tracking ID",
+    "no. resi": "Tracking ID",
+    "resi": "Tracking ID",
+    "buyer username": "Buyer Username",
+    "nama pembeli": "Buyer Username",
+    "username pembeli": "Buyer Username",
+    "recipient": "Nama Penerima",
+    "nama penerima": "Nama Penerima",
+    "penerima": "Nama Penerima",
+    "phone #": "Phone #",
+    "nomor telepon": "Phone #",
+    "no. telp": "Phone #",
+    "province": "Province",
+    "provinsi": "Province",
+    "regency and city": "Regency and City",
+    "kota dan kabupaten": "Regency and City",
+    "kota/kabupaten": "Regency and City",
+    "detail address": "Detail Address",
+    "alamat detail": "Detail Address",
+    "alamat": "Detail Address",
+    "payment method": "Payment Method",
+    "created time": "Created Time",
+    "waktu dibuat": "Created Time",
+    "waktu pembuatan": "Created Time",
+    "waktu pesanan dibuat": "Created Time",
+    "shipped time": "Shipped Time",
+    "waktu dikirim": "Shipped Time",
+    "waktu pengiriman": "Shipped Time",
+    "delivered time": "Delivered Time",
+    "waktu diterima": "Delivered Time",
+    "waktu pesanan selesai": "Delivered Time",
+    "cancelled time": "Cancelled Time",
+    "waktu dibatalkan": "Cancelled Time",
+
+    // Returns
+    "return order id": "Return Order ID",
+    "id pengembalian": "Return Order ID",
+    "id pesanan pengembalian": "Return Order ID",
+    "order amount": "Order Amount",
+    "jumlah pesanan": "Order Amount",
+    "nominal pesanan": "Order Amount",
+    "return status": "Return Status",
+    "status pengembalian": "Return Status",
+    "return logistics tracking id": "Return Logistics Tracking ID",
+    "resi pengembalian": "Return Logistics Tracking ID",
+    "no. resi pengembalian": "Return Logistics Tracking ID",
+    "nomor pelacakan logistik pengembalian": "Return Logistics Tracking ID",
+    "return type": "Return Type",
+    "tipe pengembalian": "Return Type",
+    "return reason": "Return Reason",
+    "alasan pengembalian": "Return Reason",
+    "refund amount": "Refund Amount",
+    "jumlah pengembalian dana": "Refund Amount",
+    "total pengembalian dana": "Refund Amount",
+  };
+
   function detectPlatformAndCategory(headers, sheetNames) {
     const normalized = headers.map((h) => h.toString().trim().toLowerCase());
-    const tiktokOrdersHeaders = ["order id", "order status", "order substatus", "cancelation/return type", "normal or pre-order", "sku id", "seller sku", "product name", "variation"];
-    // Core TikTok payments headers (required)
-    const tiktokPaymentsCoreHeaders = ["order/adjustment id", "total settlement amount"];
-    // Extended headers — one group must match (old vs new format)
-    const tiktokPaymentsOldHeaders = ["total revenue", "subtotal after seller discounts", "customer payment"];
-    const tiktokPaymentsNewHeaders = ["total revenue", "subtotal after seller discounts"];
-    const tiktokPaymentsFlexHeaders = ["order created time", "order settled time"];
-    const tiktokReturnHeaders = ["return order id", "order id", "order amount", "order status", "order substatus", "payment method", "sku id"];
-    // TikTok Income format baru: sheet "Order details" dengan kolom settlement
-    if (sheetNames && sheetNames.includes('Order details')) {
-      const hasCore = tiktokPaymentsCoreHeaders.every((h) => normalized.some(fh => fh.startsWith(h)));
-      if (hasCore) return { platform: "tiktok", category: "payments" };
-    }
+    
     // Shopee Income (payments): multi-sheet file with "Income" sheet — check first
     if (sheetNames && sheetNames.includes('Income')) return { platform: "shopee", category: "payments" };
     // Shopee return/refund — must come before generic pengembalian (both have tanggal+resi)
@@ -222,17 +328,46 @@ function UploadFile() {
     // Shopee orders — must come before generic pengembalian (failed_delivery has tanggal+resi too)
     const hasShopeeHeaders = shopeeOrdersHeaders.every((h) => normalized.includes(h));
     if (hasShopeeHeaders) return { platform: "shopee", category: "orders" };
+    
     const hasTanggal = normalized.some((h) => h.includes("tanggal"));
     const hasResi = normalized.some((h) => h.includes("resi"));
     if (hasTanggal && hasResi) return { platform: "none", category: "pengembalian" };
-    if (tiktokOrdersHeaders.every((h) => normalized.includes(h)) && normalized.length >= tiktokOrdersHeaders.length) return { platform: "tiktok", category: "orders" };
-    // TikTok payments: core headers + either old or new extended headers + flex date headers
-    const hasCore = tiktokPaymentsCoreHeaders.every((h) => normalized.some(fh => fh.startsWith(h)));
-    const hasFlex = tiktokPaymentsFlexHeaders.every((prefix) => normalized.some((h) => h.startsWith(prefix)));
-    const hasOldFormat = tiktokPaymentsOldHeaders.every((h) => normalized.some(fh => fh.startsWith(h)));
-    const hasNewFormat = tiktokPaymentsNewHeaders.every((h) => normalized.some(fh => fh.startsWith(h)));
-    if (hasCore && hasFlex && (hasOldFormat || hasNewFormat)) return { platform: "tiktok", category: "payments" };
-    if (tiktokReturnHeaders.every((h) => normalized.includes(h)) && normalized.length >= tiktokReturnHeaders.length) return { platform: "tiktok", category: "return" };
+
+    // TikTok Payments
+    const isTiktokPaymentsSheet = sheetNames && (sheetNames.includes('Order details') || sheetNames.includes('Detail pesanan'));
+    const hasTiktokPaymentsCore = ["order/adjustment id", "id pesanan/penyesuaian"].some(h => normalized.some(fh => fh.startsWith(h)))
+      && ["total settlement amount", "jumlah penyelesaian pembayaran"].some(h => normalized.some(fh => fh.startsWith(h)));
+    
+    const hasTiktokPaymentsFlex = ["order created time", "waktu pemesanan", "waktu pembuatan pesanan"].some(h => normalized.some(fh => fh.startsWith(h)))
+      && ["order settled time", "waktu pembayaran pesanan", "waktu penyelesaian pesanan"].some(h => normalized.some(fh => fh.startsWith(h)));
+    
+    const hasTiktokPaymentsRevenue = ["total revenue", "total pendapatan", "pendapatan total"].some(h => normalized.some(fh => fh.startsWith(h)))
+      && ["subtotal after seller discounts", "subtotal setelah diskon penjual"].some(h => normalized.some(fh => fh.startsWith(h)));
+
+    if (hasTiktokPaymentsCore && (isTiktokPaymentsSheet || (hasTiktokPaymentsFlex && hasTiktokPaymentsRevenue))) {
+      return { platform: "tiktok", category: "payments" };
+    }
+
+    // TikTok Orders
+    const hasTiktokOrders = ["order id", "id pesanan"].some(h => normalized.includes(h))
+      && ["order status", "status pesanan"].some(h => normalized.includes(h))
+      && ["sku id", "id sku"].some(h => normalized.includes(h))
+      && ["seller sku", "sku penjual"].some(h => normalized.includes(h))
+      && ["product name", "nama produk"].some(h => normalized.includes(h));
+      
+    if (hasTiktokOrders) {
+      return { platform: "tiktok", category: "orders" };
+    }
+
+    // TikTok Returns
+    const hasTiktokReturn = ["return order id", "id pengembalian", "id pesanan pengembalian"].some(h => normalized.includes(h))
+      && ["order id", "id pesanan"].some(h => normalized.includes(h))
+      && ["sku id", "id sku"].some(h => normalized.includes(h));
+      
+    if (hasTiktokReturn) {
+      return { platform: "tiktok", category: "return" };
+    }
+
     return { platform: "unknown", category: "unknown" };
   }
 
@@ -242,6 +377,21 @@ function UploadFile() {
       Object.entries(row).forEach(([key, value]) => {
         const lowerKey = key.toString().trim().toLowerCase();
         if (shopeeHeaderMap[lowerKey]) newRow[shopeeHeaderMap[lowerKey]] = value;
+      });
+      return newRow;
+    });
+  }
+
+  function mapTiktokHeadersToStandard(data) {
+    return data.map((row) => {
+      const newRow = {};
+      Object.entries(row).forEach(([key, value]) => {
+        const lowerKey = key.toString().trim().toLowerCase();
+        if (tiktokHeaderMap[lowerKey]) {
+          newRow[tiktokHeaderMap[lowerKey]] = value;
+        } else {
+          newRow[key] = value;
+        }
       });
       return newRow;
     });
@@ -288,9 +438,10 @@ function UploadFile() {
           }
           const { platform, category } = detectPlatformAndCategory(headers, workbook.SheetNames);
           let jsonData;
-          // Special handling for TikTok Income format baru (sheet: "Order details")
-          if (platform === 'tiktok' && category === 'payments' && workbook.SheetNames.includes('Order details')) {
-            const orderDetailsSheet = workbook.Sheets['Order details'];
+          // Special handling for TikTok Income format baru (sheet: "Order details" or "Detail pesanan")
+          if (platform === 'tiktok' && category === 'payments' && (workbook.SheetNames.includes('Order details') || workbook.SheetNames.includes('Detail pesanan'))) {
+            const targetSheetName = workbook.SheetNames.includes('Order details') ? 'Order details' : 'Detail pesanan';
+            const orderDetailsSheet = workbook.Sheets[targetSheetName];
             if (orderDetailsSheet) {
               // Read directly — format baru sudah punya header di baris pertama
               jsonData = XLSX.utils.sheet_to_json(orderDetailsSheet, { defval: '' });
@@ -363,6 +514,7 @@ function UploadFile() {
             });
           }
           if (platform === "shopee" && category === "orders") jsonData = mapShopeeHeadersToStandard(jsonData);
+          if (platform === "tiktok") jsonData = mapTiktokHeadersToStandard(jsonData);
           resolve({ file, platform, category, data: jsonData });
         } catch {
           reject("Gagal membaca salah satu file. Pastikan file valid.");

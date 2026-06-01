@@ -103,8 +103,8 @@ function OlahanDataPesanan() {
     // Date-filtered base data
     const filteredData = useMemo(() => {
         let data = rangkumanData;
-        if (filterStartDate) data = data.filter(r => r.waktuPesananDibuat && r.waktuPesananDibuat >= new Date(filterStartDate));
-        if (filterEndDate) data = data.filter(r => r.waktuPesananDibuat && r.waktuPesananDibuat <= new Date(filterEndDate));
+        if (filterStartDate) data = data.filter(r => r.waktuPesananDibuatObj && r.waktuPesananDibuatObj >= new Date(filterStartDate));
+        if (filterEndDate) data = data.filter(r => r.waktuPesananDibuatObj && r.waktuPesananDibuatObj <= new Date(filterEndDate));
         return data;
     }, [rangkumanData, filterStartDate, filterEndDate]);
 
@@ -148,7 +148,7 @@ function OlahanDataPesanan() {
                     break;
                 }
                 default: // waktu
-                    groupKey = row.waktuPesananDibuat ? formatDateKey(row.waktuPesananDibuat) : 'Tidak Diketahui';
+                    groupKey = row.waktuPesananDibuatObj ? formatDateKey(row.waktuPesananDibuatObj) : 'Tidak Diketahui';
                     break;
             }
             if (!groupMap.has(groupKey)) groupMap.set(groupKey, []);
@@ -161,7 +161,7 @@ function OlahanDataPesanan() {
             let displayLabel = key;
             let secondaryLabel = '';
             if (analysisMode === 'waktu') {
-                const dateObj = groupRows[0]?.waktuPesananDibuat;
+                const dateObj = groupRows[0]?.waktuPesananDibuatObj;
                 if (dateObj) displayLabel = formatIndonesianDateFromDateObj(dateObj);
             } else if (key.includes('|||')) {
                 const parts = key.split('|||');
