@@ -20,6 +20,7 @@ export default function RangkumanTransaksi({ isHidden = false }) {
         returnResiByOrderId,
         ordersGroupedById,
         modalValues,
+        paymentsData,
     } = useProcessedOrders();
 
     function formatRupiah(number) {
@@ -51,7 +52,7 @@ export default function RangkumanTransaksi({ isHidden = false }) {
     }
 
     // ─── Map rangkumanData → table rows (VERY fast — no recalculation) ───
-    const dataFingerprint = `rangkuman::${rangkumanData.length}`;
+    const dataFingerprint = `rangkuman::${rangkumanData.length}::${paymentsData ? paymentsData.length : 0}::${Object.keys(modalValues || {}).length}`;
 
     const [rawTableData, setRawTableData] = useState(() => {
         const cached = getComputed(dataFingerprint + '::table');

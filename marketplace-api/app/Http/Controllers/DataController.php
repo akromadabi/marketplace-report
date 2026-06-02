@@ -32,91 +32,126 @@ class DataController extends Controller
         return ['where' => '', 'params' => []];
     }
 
+    private function getUploadIds(Request $request): ?array
+    {
+        $storeId = $request->query('store_id');
+        $userId = $request->query('user_id');
+
+        if ($storeId || $userId) {
+            $query = DB::table('uploads')->select('id');
+            if ($storeId && $userId) {
+                $query->where(function ($q) use ($storeId, $userId) {
+                    $q->where('store_id', $storeId)
+                      ->orWhere(function ($q2) use ($userId) {
+                          $q2->whereNull('store_id')->where('user_id', $userId);
+                      });
+                });
+            } elseif ($storeId) {
+                $query->where('store_id', $storeId);
+            } else {
+                $query->where('user_id', $userId);
+            }
+            return $query->pluck('id')->toArray();
+        }
+        return null;
+    }
+
+    private function applyUploadScope($query, Request $request)
+    {
+        $uploadIds = $this->getUploadIds($request);
+        if ($uploadIds !== null) {
+            if (!empty($uploadIds)) {
+                $query->whereIn('upload_id', $uploadIds);
+            } else {
+                $query->whereRaw('1 = 0');
+            }
+        }
+        return $query;
+    }
+
     // GET /api/data/orders
     public function orders(Request $request)
     {
-        $scope = $this->storeScope($request->query('store_id'), $request->query('user_id'));
-        
-        $query = DB::table('orders')->select('data', 'channel')->orderBy('id');
-        if ($scope['where'] !== '') {
-            $query->whereRaw(ltrim($scope['where'], ' WHERE'), $scope['params']);
-        }
+        $query = DB::table('orders')->select('id', 'data', 'channel');
+        $this->applyUploadScope($query, $request);
 
         return new StreamedResponse(function () use ($query) {
-            foreach ($query->cursor() as $r) {
-                $parsed = is_string($r->data) ? json_decode($r->data, true) : (array) $r->data;
-                if (!is_array($parsed)) $parsed = [];
-                $parsed['Channel Marketplace'] = $r->channel;
-                echo json_encode($parsed) . "\n";
+            $query->chunkById(2000, function ($rows) {
+                foreach ($rows as $r) {
+                    $parsed = is_string($r->data) ? json_decode($r->data, true) : (array) $r->data;
+                    if (!is_array($parsed)) $parsed = [];
+                    $parsed['Channel Marketplace'] = $r->channel;
+                    echo json_encode($parsed) . "\n";
+                }
                 if (ob_get_level() > 0) ob_flush();
                 flush();
-            }
+            });
         }, 200, ['Content-Type' => 'application/x-ndjson']);
     }
 
     // GET /api/data/payments
     public function payments(Request $request)
     {
-        $scope = $this->storeScope($request->query('store_id'), $request->query('user_id'));
-        
-        $query = DB::table('payments')->select('data')->orderBy('id');
-        if ($scope['where'] !== '') {
-            $query->whereRaw(ltrim($scope['where'], ' WHERE'), $scope['params']);
-        }
+        $query = DB::table('payments')->select('id', 'data');
+        $this->applyUploadScope($query, $request);
 
         return new StreamedResponse(function () use ($query) {
-            foreach ($query->cursor() as $r) {
-                $parsed = is_string($r->data) ? json_decode($r->data, true) : (array) $r->data;
-                if (is_array($parsed)) {
-                    echo json_encode($parsed) . "\n";
-                    if (ob_get_level() > 0) ob_flush();
-                    flush();
+            $query->chunkById(2000, function ($rows) {
+                foreach ($rows as $r) {
+                    $d = $r->data;
+                    if (is_array($d) || is_object($d)) {
+                        echo json_encode($d) . "\n";
+                    } else {
+                        echo $d . "\n";
+                    }
                 }
-            }
+                if (ob_get_level() > 0) ob_flush();
+                flush();
+            });
         }, 200, ['Content-Type' => 'application/x-ndjson']);
     }
 
     // GET /api/data/returns
     public function returns(Request $request)
     {
-        $scope = $this->storeScope($request->query('store_id'), $request->query('user_id'));
-        
-        $query = DB::table('returns_data')->select('data')->orderBy('id');
-        if ($scope['where'] !== '') {
-            $query->whereRaw(ltrim($scope['where'], ' WHERE'), $scope['params']);
-        }
+        $query = DB::table('returns_data')->select('id', 'data');
+        $this->applyUploadScope($query, $request);
 
         return new StreamedResponse(function () use ($query) {
-            foreach ($query->cursor() as $r) {
-                $parsed = is_string($r->data) ? json_decode($r->data, true) : (array) $r->data;
-                if (is_array($parsed)) {
-                    echo json_encode($parsed) . "\n";
-                    if (ob_get_level() > 0) ob_flush();
-                    flush();
+            $query->chunkById(2000, function ($rows) {
+                foreach ($rows as $r) {
+                    $d = $r->data;
+                    if (is_array($d) || is_object($d)) {
+                        echo json_encode($d) . "\n";
+                    } else {
+                        echo $d . "\n";
+                    }
                 }
-            }
+                if (ob_get_level() > 0) ob_flush();
+                flush();
+            });
         }, 200, ['Content-Type' => 'application/x-ndjson']);
     }
 
     // GET /api/data/pengembalian
     public function pengembalian(Request $request)
     {
-        $scope = $this->storeScope($request->query('store_id'), $request->query('user_id'));
-        
-        $query = DB::table('pengembalian')->select('data')->orderBy('id');
-        if ($scope['where'] !== '') {
-            $query->whereRaw(ltrim($scope['where'], ' WHERE'), $scope['params']);
-        }
+        $query = DB::table('pengembalian')->select('id', 'data');
+        $this->applyUploadScope($query, $request);
 
         return new StreamedResponse(function () use ($query) {
-            foreach ($query->cursor() as $r) {
-                $parsed = is_string($r->data) ? json_decode($r->data, true) : (array) $r->data;
-                if (is_array($parsed)) {
-                    echo json_encode($parsed) . "\n";
-                    if (ob_get_level() > 0) ob_flush();
-                    flush();
+            $query->chunkById(2000, function ($rows) {
+                foreach ($rows as $r) {
+                    $d = $r->data;
+                    if (is_array($d) || is_object($d)) {
+                        echo json_encode($d) . "\n";
+                    } else {
+                        echo $d . "\n";
+                    }
                 }
-            }
+                if (ob_get_level() > 0) ob_flush();
+                flush();
+            });
         }, 200, ['Content-Type' => 'application/x-ndjson']);
     }
 

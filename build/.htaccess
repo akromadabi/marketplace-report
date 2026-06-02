@@ -1,3 +1,5 @@
+DirectoryIndex index.php
+
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
@@ -10,6 +12,6 @@
     RewriteCond %{REQUEST_FILENAME} -d
     RewriteRule ^ - [L]
 
-    # Semua route lain ke React SPA
-    RewriteRule ^ index.html [L]
+    # Semua route lain ke Laravel index.php (agar diserve oleh Laravel web.php)
+    RewriteRule ^ index.php [L]
 </IfModule>

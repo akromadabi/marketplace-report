@@ -142,6 +142,8 @@ export function useProcessedOrders(overrideStoreId) {
     const { data: returnData, loading: loadingReturns } = useApiData('returns', storeId);
     const { data: pengembalianData, loading: loadingPengembalian } = useApiData('pengembalian', storeId);
     const { modalValues, setModalValues, loading: loadingModal, saveAll, saveSingle } = useModalValues(storeId);
+
+    console.log(`[useProcessedOrders] storeId=${storeId} loadingOrders=${loadingOrders} loadingPayments=${loadingPayments} ordersCount=${ordersData?.length} paymentsCount=${paymentsData?.length}`);
     const [scanData, setScanData] = useState([]);
     useEffect(() => {
         fetch('/api/scan', { headers: { Accept: 'application/json' } })
