@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Package, Plus, Pencil, Trash2, Save, X, Search, DollarSign, Boxes, TrendingUp } from 'lucide-react';
 
-const API = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const API = process.env.REACT_APP_API_URL || '';
 
 function AsetTable() {
     const [data, setData] = useState([]);

@@ -28,28 +28,37 @@ export default function RangkumanTransaksi({ isHidden = false }) {
         return 'Rp' + number.toLocaleString('id-ID', { maximumFractionDigits: 0 });
     }
 
-    // ─── Build verifikasiPaket JSX from pre-computed text in rangkumanData ──
-    // The text ('✓', 'Diterima', 'Belum Diterima', '-') is already in each row.
-    // We only add JSX decoration here, in the render layer.
-    function verifikasiJSX(text) {
-        if (text === '✓' || text === 'Diterima') {
-            return (
+    // ─── Pre-built Verifikasi Paket objects (reused across all rows, 0 allocations per row) ──
+    const verifikasiObjMap = useMemo(() => ({
+        '✓': {
+            text: '✓',
+            jsx: (
                 <span style={{ color: '#34d399', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem' }}
-                    title={text === '✓' ? 'Pesanan selesai / cancel tanpa resi' : 'Resi ditemukan'}>
-                    <CheckCircle size={14} />{text !== '✓' ? 'Diterima' : ''}
+                    title="Pesanan selesai / cancel tanpa resi">
+                    <CheckCircle size={14} />
                 </span>
-            );
-        }
-        if (text === 'Belum Diterima') {
-            return (
+            ),
+        },
+        'Diterima': {
+            text: 'Diterima',
+            jsx: (
+                <span style={{ color: '#34d399', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                    title="Resi ditemukan">
+                    <CheckCircle size={14} />Diterima
+                </span>
+            ),
+        },
+        'Belum Diterima': {
+            text: 'Belum Diterima',
+            jsx: (
                 <span style={{ color: '#f87171', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem' }}
                     title="Resi tidak ditemukan">
                     <XCircle size={14} />Belum Diterima
                 </span>
-            );
-        }
-        return text || '-';
-    }
+            ),
+        },
+        '-': { text: '-', jsx: '-' },
+    }), []);
 
     // ─── Map rangkumanData → table rows (VERY fast — no recalculation) ───
     const dataFingerprint = `rangkuman::${rangkumanData.length}::${paymentsData ? paymentsData.length : 0}::${Object.keys(modalValues || {}).length}`;
@@ -79,7 +88,7 @@ export default function RangkumanTransaksi({ isHidden = false }) {
         setDataProcessing(true);
         const rows = rangkumanData.map(r => {
             const verifikasiPaketText = r.verifikasiPaket || '-';
-            const verifikasiPaketJSX = verifikasiJSX(verifikasiPaketText);
+            const verifikasiObj = verifikasiObjMap[verifikasiPaketText] || { text: verifikasiPaketText, jsx: verifikasiPaketText };
             return {
                 'ORDER ID': r.orderId,
                 'WAKTU PESANAN DIBUAT': r.waktuPesananDibuat,
@@ -88,6 +97,8 @@ export default function RangkumanTransaksi({ isHidden = false }) {
                 'STATUS ORDER': r.statusOrder,
                 'HPP': r.hppDisplay,
                 '_hppRaw': r._hppRaw,
+                '_dateKey': r._dateKey || '',
+                '_timestamp': r._timestamp || 0,
                 'PENCAIRAN': r.pencairanDisplay,
                 'LABA': r.profitDisplay,
                 'AFFILIASI': r.totalAffiliateCommission.toString(),
@@ -100,7 +111,7 @@ export default function RangkumanTransaksi({ isHidden = false }) {
                 'Alasan Cancel': r.paketGagalKirim,
                 'Waktu Pengembalian': r.waktuPengembalian,
                 'Resi': r.resi,
-                'Verifikasi Paket': { jsx: verifikasiPaketJSX, text: verifikasiPaketText },
+                'Verifikasi Paket': verifikasiObj,
                 'Kerugian': r.kerugian,
             };
         });
@@ -411,36 +422,41 @@ export default function RangkumanTransaksi({ isHidden = false }) {
         doc.save(fileName);
     };
 
-    // Memoized unique values for all columns (computed once, not 19 times per render)
-    const uniqueValuesByColumn = useMemo(() => {
-        const monthsIndo = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-        const dayNamesIndo = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-        const result = {};
-        const allCols = ['ORDER ID', 'WAKTU PESANAN DIBUAT', 'WAKTU PENGIRIMAN', 'QTT', 'STATUS ORDER', 'HPP', 'PENCAIRAN', 'LABA', 'AFFILIASI', 'KET AFFILIASI', 'PEMBAYARAN CS', 'METODE', 'ALAMAT', 'TERKIRIM', 'Menanggung Ongkir', 'Alasan Cancel', 'Waktu Pengembalian', 'Resi', 'Verifikasi Paket', 'Kerugian'];
-        allCols.forEach(col => {
-            const valuesSet = new Set();
-            effectiveTableData.forEach(row => {
-                let val = row[col];
-                if (val !== undefined && val !== null) {
-                    if (col === 'Verifikasi Paket') {
-                        if (typeof val === 'object' && val !== null && 'text' in val) val = val.text;
-                        else if (typeof val !== 'string') val = '';
-                    } else val = val.toString();
-                    const isDateTime = dayNamesIndo.some(day => val.includes(day)) && monthsIndo.some(month => val.includes(month));
-                    if (isDateTime) {
-                        const parts = val.split(' ');
-                        if (parts.length >= 3) { const monthName = parts[2]; if (monthsIndo.includes(monthName)) { valuesSet.add(monthName); return; } }
-                        valuesSet.add(val);
-                    } else valuesSet.add(val);
-                }
-            });
-            result[col] = Array.from(valuesSet).sort((a, b) => a.localeCompare(b));
-        });
-        return result;
-    }, [effectiveTableData]);
-
+    // Lazy-computed unique values per column (only computed when filterPopupOpen is set for that column)
+    const uniqueColCacheRef = useRef({ dataRef: null, cols: {} });
     function getUniqueValuesForColumn(col) {
-        return uniqueValuesByColumn[col] || [];
+        if (!col) return [];
+        if (uniqueColCacheRef.current.dataRef !== effectiveTableData) {
+            uniqueColCacheRef.current = { dataRef: effectiveTableData, cols: {} };
+        }
+        if (uniqueColCacheRef.current.cols[col]) {
+            return uniqueColCacheRef.current.cols[col];
+        }
+        const monthsIndo = new Set(['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']);
+        const isDateCol = col === 'WAKTU PESANAN DIBUAT' || col === 'WAKTU PENGIRIMAN' || col === 'Waktu Pengembalian';
+        const valuesSet = new Set();
+        for (let i = 0; i < effectiveTableData.length; i++) {
+            const row = effectiveTableData[i];
+            let val = row[col];
+            if (val !== undefined && val !== null) {
+                if (col === 'Verifikasi Paket') {
+                    val = (typeof val === 'object' && val !== null && 'text' in val) ? val.text : (typeof val === 'string' ? val : '');
+                } else {
+                    val = val.toString();
+                }
+                if (isDateCol) {
+                    const parts = val.split(' ');
+                    if (parts.length >= 3 && monthsIndo.has(parts[2])) {
+                        valuesSet.add(parts[2]);
+                        continue;
+                    }
+                }
+                valuesSet.add(val);
+            }
+        }
+        const arr = Array.from(valuesSet).sort();
+        uniqueColCacheRef.current.cols[col] = arr;
+        return arr;
     }
 
     function toggleFilterValue(col, val) {
@@ -458,56 +474,59 @@ export default function RangkumanTransaksi({ isHidden = false }) {
     }
 
     const filteredTableData = useMemo(() => {
+        const hasDateFilter = Boolean(filterStartDate || filterEndDate);
+        const q = searchQuery.trim().toLowerCase();
+        const hasCustomFilter = pdfChecked.retur || pdfChecked.gagal_kirim || pdfChecked.cancel;
+        const activeColFilters = Object.entries(columnFilters).filter(([, s]) => s && s.size > 0);
+        const monthsIndoSet = new Set(['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']);
+
+        if (!hasDateFilter && !q && !hasCustomFilter && activeColFilters.length === 0) {
+            return effectiveTableData;
+        }
+
         return effectiveTableData.filter(row => {
-            // Date range filter on WAKTU PESANAN DIBUAT
-            if (filterStartDate || filterEndDate) {
-                const dateStr = row['WAKTU PESANAN DIBUAT'];
-                if (!dateStr) return false;
-                // Format: "Kamis, 19 Desember 2025 14:30"
-                const monthsIndo = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-                const stripped = dateStr.replace(/^\S+,\s*/, ''); // remove "Kamis, " → "19 Desember 2025 14:30"
-                const parts = stripped.split(' ');
-                if (parts.length < 3) return false;
-                const day = parseInt(parts[0], 10);
-                const monthIdx = monthsIndo.indexOf(parts[1]);
-                const year = parseInt(parts[2], 10);
-                if (isNaN(day) || monthIdx < 0 || isNaN(year)) return false;
-                const dateKey = `${year}-${(monthIdx + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+            // Fast date range filter using pre-computed _dateKey
+            if (hasDateFilter) {
+                const dateKey = row._dateKey;
+                if (!dateKey) return false;
                 if (filterStartDate && dateKey < filterStartDate) return false;
                 if (filterEndDate && dateKey > filterEndDate) return false;
             }
             // Search filter
-            if (searchQuery.trim()) {
-                const q = searchQuery.trim().toLowerCase();
-                const searchable = [
-                    row['ORDER ID'], row['STATUS ORDER'], row['ALAMAT'],
-                    row['METODE'], row['Resi'], row['Alasan Cancel'],
-                    row['HPP'], row['PENCAIRAN'], row['LABA'],
-                ].map(v => (v || '').toString().toLowerCase());
-                if (!searchable.some(v => v.includes(q))) return false;
+            if (q) {
+                const match =
+                    (row['ORDER ID'] && row['ORDER ID'].toString().toLowerCase().includes(q)) ||
+                    (row['ALAMAT'] && row['ALAMAT'].toString().toLowerCase().includes(q)) ||
+                    (row['Resi'] && row['Resi'].toString().toLowerCase().includes(q)) ||
+                    (row['STATUS ORDER'] && row['STATUS ORDER'].toString().toLowerCase().includes(q)) ||
+                    (row['METODE'] && row['METODE'].toString().toLowerCase().includes(q)) ||
+                    (row['Alasan Cancel'] && row['Alasan Cancel'].toString().toLowerCase().includes(q)) ||
+                    (row['HPP'] && row['HPP'].toString().toLowerCase().includes(q)) ||
+                    (row['PENCAIRAN'] && row['PENCAIRAN'].toString().toLowerCase().includes(q)) ||
+                    (row['LABA'] && row['LABA'].toString().toLowerCase().includes(q));
+                if (!match) return false;
             }
-            const hasCustomFilter = pdfChecked.retur || pdfChecked.gagal_kirim || pdfChecked.cancel;
             if (hasCustomFilter) {
                 const status = (row['STATUS ORDER'] || '').toLowerCase();
                 let matched = false;
                 if (pdfChecked.retur && status === 'return') matched = true;
-                if (pdfChecked.gagal_kirim && status === 'gagal kirim') matched = true;
-                if (pdfChecked.cancel && ['canceled', 'cancelled'].includes(status)) matched = true;
+                else if (pdfChecked.gagal_kirim && status === 'gagal kirim') matched = true;
+                else if (pdfChecked.cancel && (status === 'canceled' || status === 'cancelled')) matched = true;
                 if (!matched) return false;
             }
-            for (const [col, filterSet] of Object.entries(columnFilters)) {
-                if (filterSet && filterSet.size > 0) {
-                    let val = row[col];
-                    if (col === 'Verifikasi Paket') {
-                        if (typeof val === 'object' && val !== null && 'text' in val) val = val.text;
-                        else if (typeof val !== 'string') val = '';
-                    } else { if (val == null) val = ''; val = val.toString(); }
-                    const monthsIndo = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-                    const dayNamesIndo = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-                    const isDateTime = dayNamesIndo.some(day => val.includes(day)) && monthsIndo.some(month => val.includes(month));
-                    if (isDateTime) { const parts = val.split(' '); if (parts.length >= 3) { const monthName = parts[2]; if (monthsIndo.includes(monthName)) val = monthName; } }
-                    if (!filterSet.has(val)) return false;
+            for (let i = 0; i < activeColFilters.length; i++) {
+                const [col, filterSet] = activeColFilters[i];
+                let val = row[col];
+                if (col === 'Verifikasi Paket') {
+                    val = (typeof val === 'object' && val !== null && 'text' in val) ? val.text : (typeof val === 'string' ? val : '');
+                } else {
+                    val = val == null ? '' : val.toString();
                 }
+                if (col === 'WAKTU PESANAN DIBUAT' || col === 'WAKTU PENGIRIMAN' || col === 'Waktu Pengembalian') {
+                    const parts = val.split(' ');
+                    if (parts.length >= 3 && monthsIndoSet.has(parts[2])) val = parts[2];
+                }
+                if (!filterSet.has(val)) return false;
             }
             return true;
         });

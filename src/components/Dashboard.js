@@ -92,7 +92,7 @@ function Dashboard() {
             if (!dateObj) return;
 
             // Date filter
-            const dk = formatDateKey(dateObj);
+            const dk = row._dateKey || formatDateKey(dateObj);
             if (filterStartDate && dk < filterStartDate) return;
             if (filterEndDate && dk > filterEndDate) return;
 

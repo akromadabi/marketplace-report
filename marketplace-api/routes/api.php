@@ -78,7 +78,6 @@ Route::post('/settings/logo', function (Illuminate\Http\Request $request) {
 
 // ─── Upload ─────────────────────────────────────────────────────────
 Route::prefix('upload')->group(function () {
-    Route::post('/', [UploadController::class, 'upload']);
     Route::post('/parsed', [UploadController::class, 'uploadParsed']);
     Route::get('/history', [UploadController::class, 'history']);
     Route::delete('/{id}', [UploadController::class, 'destroy']);
@@ -106,6 +105,7 @@ Route::prefix('fee-profiles')->group(function () {
 // ─── Modal (HPP) ────────────────────────────────────────────────────
 Route::prefix('modal')->group(function () {
     Route::get('/', [ModalController::class, 'index']);
+    Route::get('/catalog', [ModalController::class, 'catalog']);
     Route::put('/', [ModalController::class, 'saveAll']);
     Route::put('/single', [ModalController::class, 'saveSingle']);
 });

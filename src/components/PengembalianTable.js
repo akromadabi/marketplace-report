@@ -2,13 +2,17 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import * as XLSX from 'xlsx';
 import { Search, PackageCheck, Undo2, Package, AlertTriangle, Calendar, Download, ChevronLeft, ChevronRight, Camera, Trash2, Loader, XCircle, ArrowUpDown, ArrowUp, ArrowDown, X, ExternalLink } from 'lucide-react';
 import { useApiData } from '../hooks/useApiData';
+import { useDataCache } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useStore } from '../contexts/StoreContext';
 import BarcodeScanner from './BarcodeScanner';
 
 function PengembalianTable() {
-  const { data: pengembalianData, loading } = useApiData('pengembalian');
-  const { data: returnData } = useApiData('returns');
-  const { data: ordersData } = useApiData('orders');
+  const { activeStoreId } = useStore();
+  const { data: pengembalianData, loading } = useApiData('pengembalian', activeStoreId);
+  const { data: returnData } = useApiData('returns', activeStoreId);
+  const { data: ordersData } = useApiData('orders', activeStoreId);
+  const { invalidateType } = useDataCache();
   const { user } = useAuth();
   const [search, setSearch] = useState('');
   const [filterStartDate, setFilterStartDate] = useState('');
@@ -74,7 +78,8 @@ function PengembalianTable() {
       throw err;
     }
     setScanData(prev => [{ id: json.id, resi: json.resi, scanned_at: new Date().toISOString(), scanned_by_name: user?.name || '-', store_id: null, notes: null }, ...prev]);
-  }, [user]);
+    invalidateType('scan');
+  }, [user, invalidateType]);
 
   const handleDeleteScan = useCallback(async (id, resi) => {
     if (!window.confirm(`Hapus resi "${resi}"?`)) return;
@@ -82,9 +87,10 @@ function PengembalianTable() {
     try {
       await fetch(`/api/scan/${id}`, { method: 'DELETE', headers: { 'Accept': 'application/json' } });
       setScanData(prev => prev.filter(s => s.id !== id));
+      invalidateType('scan');
     } catch (err) { console.error('Delete scan error:', err); }
     setScanDeleting(null);
-  }, []);
+  }, [invalidateType]);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -104,61 +110,45 @@ function PengembalianTable() {
 
   const [removeDuplicateResi, setRemoveDuplicateResi] = useState(false);
 
-  const returnResiSet = useMemo(() => {
+  const { returnResiSet, returnByTrackingId } = useMemo(() => {
     const set = new Set();
-    for (const row of returnData) {
-      const key = Object.keys(row).find(k => k.toLowerCase().includes('return logistics tracking id'));
-      if (key) { const val = row[key]; if (val && val.toString().trim() !== '') set.add(val.toString().trim()); }
-    }
-    return set;
-  }, [returnData]);
-
-  // ─── Group orders by Tracking ID for detail popup ─────────────
-  const ordersByTrackingId = useMemo(() => {
     const map = new Map();
-    for (const row of ordersData) {
-      const trackingKey = Object.keys(row).find(k => k.toLowerCase() === 'tracking id');
-      if (!trackingKey) continue;
-      const trackingVal = (row[trackingKey] || '').toString().trim();
-      if (!trackingVal) continue;
-      if (!map.has(trackingVal)) map.set(trackingVal, []);
-      map.get(trackingVal).push(row);
-    }
-    return map;
-  }, [ordersData]);
-
-  // ─── Group return data by Return Logistics Tracking ID ────────
-  const returnByTrackingId = useMemo(() => {
-    const map = new Map();
-    for (const row of returnData) {
-      const key = Object.keys(row).find(k => k.toLowerCase().includes('return logistics tracking id'));
-      if (!key) continue;
-      const val = (row[key] || '').toString().trim();
+    for (let i = 0; i < returnData.length; i++) {
+      const row = returnData[i];
+      const rawVal = row['Return Logistics Tracking ID'] ?? row['return logistics tracking id'];
+      const val = rawVal ? rawVal.toString().trim() : '';
       if (!val) continue;
-      if (!map.has(val)) map.set(val, []);
-      map.get(val).push(row);
+      set.add(val);
+      let arr = map.get(val);
+      if (!arr) { arr = []; map.set(val, arr); }
+      arr.push(row);
     }
-    return map;
+    return { returnResiSet: set, returnByTrackingId: map };
   }, [returnData]);
 
-  const { cancelTrackingSet, returnRefundTrackingSet, normalTrackingSet } = useMemo(() => {
+  // ─── Single-pass over ordersData for Tracking ID maps & sets ────────
+  const { ordersByTrackingId, cancelTrackingSet, returnRefundTrackingSet, normalTrackingSet } = useMemo(() => {
+    const map = new Map();
     const cancelSet = new Set();
     const returnSet = new Set();
     const normalSet = new Set();
-    for (const row of ordersData) {
-      const trackingKey = Object.keys(row).find(k => k.toLowerCase() === 'tracking id');
-      if (!trackingKey) continue;
-      const trackingVal = (row[trackingKey] || '').toString().trim();
+    for (let i = 0; i < ordersData.length; i++) {
+      const row = ordersData[i];
+      const rawTracking = row['Tracking ID'] ?? row['tracking id'];
+      const trackingVal = rawTracking ? rawTracking.toString().trim() : '';
       if (!trackingVal) continue;
-      const sKey = Object.keys(row).find(k => k.toLowerCase() === 'order status');
-      const crtKey = Object.keys(row).find(k => k.toLowerCase() === 'cancelation/return type');
-      const orderStatus = sKey ? (row[sKey] || '').toString().toLowerCase() : '';
-      const crt = crtKey ? (row[crtKey] || '').toString().toLowerCase() : '';
+
+      let arr = map.get(trackingVal);
+      if (!arr) { arr = []; map.set(trackingVal, arr); }
+      arr.push(row);
+
+      const orderStatus = (row['Order Status'] ?? row['order status'] ?? '').toString().toLowerCase();
+      const crt = (row['Cancelation/Return Type'] ?? row['cancelation/return type'] ?? '').toString().toLowerCase();
       if (orderStatus.includes('batal') || crt === 'cancel') cancelSet.add(trackingVal);
       else if (crt.includes('return') || crt.includes('refund')) returnSet.add(trackingVal);
       else normalSet.add(trackingVal);
     }
-    return { cancelTrackingSet: cancelSet, returnRefundTrackingSet: returnSet, normalTrackingSet: normalSet };
+    return { ordersByTrackingId: map, cancelTrackingSet: cancelSet, returnRefundTrackingSet: returnSet, normalTrackingSet: normalSet };
   }, [ordersData]);
 
   const resiKey = columns.find(col => col.toLowerCase().includes('resi'));

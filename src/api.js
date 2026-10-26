@@ -170,26 +170,8 @@ export async function apiUpdateProfile(userId, { name, currentPassword, newPassw
 }
 
 // ─── Upload ──────────────────────────────────────────────────────
-export async function apiUploadFiles(files, userId, storeId) {
-    const formData = new FormData();
-    files.forEach((f) => formData.append('files', f));
-    if (userId) formData.append('user_id', userId);
-    if (storeId) formData.append('store_id', storeId);
-
-    const res = await fetch(`${API_BASE}/upload`, {
-        method: 'POST',
-        body: formData,
-        // Don't set Content-Type — browser sets it with boundary for multipart
-    });
-    if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: 'Upload gagal' }));
-        throw new Error(err.error || `HTTP ${res.status}`);
-    }
-    return res.json();
-}
-
 export async function apiUploadParsedFiles(filesData, userId, storeId, onProgress) {
-    const CHUNK_SIZE = 100;
+    const CHUNK_SIZE = 1000;
     const aggregatedResults = { orders: 0, payments: 0, returns: 0, pengembalian: 0 };
     const aggregatedSkipped = { orders: 0, payments: 0, returns: 0, pengembalian: 0 };
     let totalSkipped = 0;
@@ -249,7 +231,7 @@ export async function apiUploadParsedFiles(filesData, userId, storeId, onProgres
             const pct = Math.round(((chunkIdx + 1) / totalChunks) * 100);
             if (onProgress) onProgress({ fileIdx, fileName: fileData.filename, pct, done: pct >= 100 });
 
-            if (totalChunks > 1) await new Promise(r => setTimeout(r, 200));
+            if (totalChunks > 1) await new Promise(r => setTimeout(r, 20));
         }
     }
 
@@ -309,6 +291,15 @@ export async function apiGetStats(storeId, userId) {
     return apiFetch(`/data/stats${dataQuery(storeId, userId)}`);
 }
 
+export async function apiGetScans() {
+    try {
+        const data = await apiFetch('/scan');
+        return Array.isArray(data) ? data : [];
+    } catch {
+        return [];
+    }
+}
+
 export async function apiClearData(storeId) {
     return apiFetch(`/data/clear${dataQuery(storeId)}`, { method: 'DELETE' });
 }
@@ -316,6 +307,10 @@ export async function apiClearData(storeId) {
 // ─── Modal Values ────────────────────────────────────────────────
 export async function apiGetModalValues(storeId) {
     return apiFetch(`/modal${dataQuery(storeId)}`);
+}
+
+export async function apiGetSkuCatalog(storeId, userId) {
+    return apiFetch(`/modal/catalog${dataQuery(storeId, userId)}`);
 }
 
 export async function apiSaveModalValues(values, storeId) {

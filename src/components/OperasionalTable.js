@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Receipt, Plus, Pencil, Trash2, Save, X, Search, DollarSign, Calendar, Tag, ChevronDown, Check } from 'lucide-react';
 
-const API = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const API = process.env.REACT_APP_API_URL || '';
 
 /* ─── Kategori Dropdown (creatable + editable + deletable) ─────── */
 function KategoriDropdown({ value, onChange, allKategori, onDeleteKategori, onRenameKategori }) {

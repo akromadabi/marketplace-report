@@ -8,7 +8,7 @@ import { useStore } from '../contexts/StoreContext';
 
 function InputModal() {
   const { activeStoreId } = useStore();
-  const { data: ordersData, loading: loadingOrders } = useApiData('orders', activeStoreId);
+  const { data: ordersData, loading: loadingOrders } = useApiData('skuCatalog', activeStoreId);
   const { modalValues, setModalValues, loading: loadingModal, saveAll, saveSingle } = useModalValues(activeStoreId);
   // ─── Data Processing (unchanged logic) ─────────────────────────────
   const skuIdToChannel = useMemo(() => {

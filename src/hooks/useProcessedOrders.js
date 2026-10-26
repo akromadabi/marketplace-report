@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useMemo, useCallback } from 'react';
 import { useApiData, useModalValues } from './useApiData';
 import { useStore } from '../contexts/StoreContext';
 import { useDataCache } from '../contexts/DataContext';
@@ -141,156 +141,25 @@ export function useProcessedOrders(overrideStoreId) {
     const { data: paymentsData, loading: loadingPayments } = useApiData('payments', storeId);
     const { data: returnData, loading: loadingReturns } = useApiData('returns', storeId);
     const { data: pengembalianData, loading: loadingPengembalian } = useApiData('pengembalian', storeId);
+    const { data: scanData } = useApiData('scan', storeId);
     const { modalValues, setModalValues, loading: loadingModal, saveAll, saveSingle } = useModalValues(storeId);
-
-    console.log(`[useProcessedOrders] storeId=${storeId} loadingOrders=${loadingOrders} loadingPayments=${loadingPayments} ordersCount=${ordersData?.length} paymentsCount=${paymentsData?.length}`);
-    const [scanData, setScanData] = useState([]);
-    useEffect(() => {
-        fetch('/api/scan', { headers: { Accept: 'application/json' } })
-            .then(r => r.ok ? r.json() : [])
-            .then(d => setScanData(Array.isArray(d) ? d : []))
-            .catch(() => { });
-    }, []);
 
     const loading = loadingOrders || loadingPayments || loadingReturns || loadingPengembalian || loadingModal;
 
-    const dataFingerprint = `${ordersData.length}::${paymentsData.length}::${returnData.length}::${pengembalianData.length}::${Object.keys(modalValues).length}::${scanData.length}::${storeId || 'all'}`;
-
-    // ─── Payments normalization ───────────────────────────────────────────
-    const normalizedPayments = useMemo(() => paymentsData.map(row => {
-        const newRow = {};
-        Object.entries(row).forEach(([k, v]) => {
-            const lower = k.trim().toLowerCase();
-            const standardKeys = {
-                'order/adjustment id': 'Order/adjustment ID',
-                'no. pesanan': 'Order/adjustment ID',
-                'total settlement amount': 'Total settlement amount',
-                'total penghasilan': 'Total settlement amount',
-                'affiliate commission': 'Affiliate commission',
-                'komisi affiliate': 'Affiliate commission',
-                'customer payment': 'Customer payment',
-                'total pembayaran pembeli': 'Customer payment',
-                'return shipping costs (passed on to the customer)': 'Return shipping costs (passed on to the customer)',
-            };
-            newRow[standardKeys[lower] || k.trim()] = v;
-        });
-        return newRow;
-    }), [paymentsData]);
-
-    const paymentsByOrderId = useMemo(() => {
+    // Pre-parse modal values into numeric map once
+    const { numericModalMap, modalHash } = useMemo(() => {
         const map = new Map();
-        normalizedPayments.forEach(p => {
-            const key = Object.keys(p).find(k => k.toLowerCase() === 'order/adjustment id');
-            const id = key && p[key] != null ? p[key].toString().trim() : '';
-            if (!id) return;
-            if (!map.has(id)) map.set(id, []);
-            map.get(id).push(p);
-        });
-        return map;
-    }, [normalizedPayments]);
-
-    const ordersGroupedById = useMemo(() => {
-        const map = new Map();
-        ordersData.forEach(order => {
-            const id = order['Order ID'] != null ? order['Order ID'].toString().trim() : '';
-            if (!id) return;
-            if (!map.has(id)) map.set(id, []);
-            map.get(id).push(order);
-        });
-        return map;
-    }, [ordersData]);
-
-    const returnStatusByOrderId = useMemo(() => {
-        const map = new Map();
-        returnData.forEach(r => {
-            const orderId = r['Order ID'] != null ? r['Order ID'].toString().trim() : '';
-            const returnStatus = (r['Return Status'] || '').toString().toLowerCase();
-            if (!orderId) return;
-            if (!map.has(orderId)) map.set(orderId, []);
-            map.get(orderId).push(returnStatus);
-        });
-        return map;
-    }, [returnData]);
-
-    // ─── Pengembalian sets & maps ─────────────────────────────────────────
-    const pengembalianResiSet = useMemo(() => {
-        const set = new Set();
-        for (const row of pengembalianData) {
-            const resiKey = Object.keys(row).find(k => k.toLowerCase().includes('resi'));
-            if (resiKey && row[resiKey]) set.add(row[resiKey].toString().trim());
-        }
-        for (const s of scanData) {
-            if (s.resi) set.add(s.resi.toString().trim());
-        }
-        return set;
-    }, [pengembalianData, scanData]);
-
-    const pengembalianDateByResi = useMemo(() => {
-        const map = new Map();
-        for (const s of scanData) {
-            if (s.resi && s.scan_date) map.set(s.resi.toString().trim(), s.scan_date);
-        }
-        for (const row of pengembalianData) {
-            const resiKey = Object.keys(row).find(k => k.toLowerCase().includes('resi'));
-            if (resiKey) {
-                const resi = row[resiKey];
-                const waktuKey = Object.keys(row).find(k => k.toLowerCase().includes('waktu pengembalian'));
-                if (resi && waktuKey && row[waktuKey]) map.set(resi.toString().trim(), row[waktuKey].toString());
+        let sum = 0;
+        if (!modalValues) return { numericModalMap: map, modalHash: '0_0' };
+        for (const [k, v] of Object.entries(modalValues)) {
+            const n = parseInt(String(v).replace(/[^0-9]/g, ''), 10);
+            if (n > 0) {
+                map.set(k, n);
+                sum += n;
             }
         }
-        return map;
-    }, [pengembalianData, scanData]);
-
-    const returnStatusBarangByOrderId = useMemo(() => {
-        const map = new Map();
-        for (const row of returnData) {
-            const orderId = (row['Order ID'] || '').toString().trim();
-            if (!orderId) continue;
-            const rs = (row['Return Status'] || '').toString().trim().toLowerCase();
-            if (['rejected', 'refund rejected', 'cancelled', 'canceled', 'dibatalkan'].includes(rs)) continue;
-            const trackingId = (row['Return Logistics Tracking ID'] || '').toString().trim();
-            if (!trackingId) {
-                if (!map.has(orderId)) map.set(orderId, '-');
-            } else {
-                map.set(orderId, pengembalianResiSet.has(trackingId) ? 'Diterima' : 'Belum Diterima');
-            }
-        }
-        return map;
-    }, [returnData, pengembalianResiSet]);
-
-    const returnResiByOrderId = useMemo(() => {
-        const map = new Map();
-        for (const row of returnData) {
-            const orderId = (row['Order ID'] || '').toString().trim();
-            if (!orderId) continue;
-            const rs = (row['Return Status'] || '').toString().trim().toLowerCase();
-            if (['rejected', 'refund rejected', 'cancelled', 'canceled', 'dibatalkan'].includes(rs)) continue;
-            const trackingId = (row['Return Logistics Tracking ID'] || '').toString().trim();
-            if (trackingId) map.set(orderId, trackingId);
-        }
-        return map;
-    }, [returnData]);
-
-    const returnTimeByOrderId = useMemo(() => {
-        const map = new Map();
-        for (const row of returnData) {
-            const orderId = (row['Order ID'] || '').toString().trim();
-            const trackingId = (row['Return Logistics Tracking ID'] || '').toString().trim();
-            if (!orderId) continue;
-            const rs = (row['Return Status'] || '').toString().trim().toLowerCase();
-            if (['rejected', 'refund rejected', 'cancelled', 'canceled', 'dibatalkan'].includes(rs)) continue;
-            if (trackingId && pengembalianResiSet.has(trackingId)) {
-                const dateStr = pengembalianDateByResi.get(trackingId);
-                if (dateStr) {
-                    const dateObj = parseIndonesianDateTime(dateStr);
-                    map.set(orderId, dateObj ? formatIndonesianDateTime(dateObj) : dateStr);
-                    continue;
-                }
-            }
-            map.set(orderId, '-');
-        }
-        return map;
-    }, [returnData, pengembalianResiSet, pengembalianDateByResi]);
+        return { numericModalMap: map, modalHash: `${map.size}_${sum}` };
+    }, [modalValues]);
 
     // ─── Modal helper ─────────────────────────────────────────────────────
     const getModalForItem = useCallback((order) => {
@@ -298,23 +167,154 @@ export function useProcessedOrders(overrideStoreId) {
         const skuId = (order['SKU ID'] || '').toString().trim();
         const variation = (order['Variation'] || '').toString().trim();
         const fullKey = `${sellerSku}||${skuId}||${variation}`;
-        if (modalValues[fullKey]) return parseInt(String(modalValues[fullKey]).replace(/[^0-9]/g, ''), 10) || 0;
-        if (sellerSku && modalValues[sellerSku]) return parseInt(String(modalValues[sellerSku]).replace(/[^0-9]/g, ''), 10) || 0;
+        if (numericModalMap.has(fullKey)) return numericModalMap.get(fullKey);
+        if (sellerSku && numericModalMap.has(sellerSku)) return numericModalMap.get(sellerSku);
         if (!sellerSku) {
             const pName = (order['Product Name'] || '').toString().trim();
             if (pName) {
                 const noSkuKey = '__NSKU__' + pName;
                 const noSkuVarKey = `${noSkuKey}||${skuId}||${variation}`;
-                if (modalValues[noSkuVarKey]) return parseInt(String(modalValues[noSkuVarKey]).replace(/[^0-9]/g, ''), 10) || 0;
-                if (modalValues[noSkuKey]) return parseInt(String(modalValues[noSkuKey]).replace(/[^0-9]/g, ''), 10) || 0;
+                if (numericModalMap.has(noSkuVarKey)) return numericModalMap.get(noSkuVarKey);
+                if (numericModalMap.has(noSkuKey)) return numericModalMap.get(noSkuKey);
             }
         }
         return 0;
-    }, [modalValues]);
+    }, [numericModalMap]);
 
-    // ─── Core processing — runs once per data-change ──────────────────────
-    const rangkumanData = useMemo(() => {
-        const rows = [];
+    const dataFingerprint = `${ordersData.length}::${paymentsData.length}::${returnData.length}::${pengembalianData.length}::${modalHash}::${scanData.length}::${storeId || 'all'}`;
+    const cacheKey = `processedOrders::${dataFingerprint}`;
+
+    const computedBundle = useMemo(() => {
+        const existing = getComputed(cacheKey);
+        if (existing && existing.rangkumanData && existing.rangkumanData.length > 0) {
+            return existing;
+        }
+
+        const standardPaymentKeys = {
+            'order/adjustment id': 'Order/adjustment ID',
+            'no. pesanan': 'Order/adjustment ID',
+            'total settlement amount': 'Total settlement amount',
+            'total penghasilan': 'Total settlement amount',
+            'affiliate commission': 'Affiliate commission',
+            'komisi affiliate': 'Affiliate commission',
+            'customer payment': 'Customer payment',
+            'total pembayaran pembeli': 'Customer payment',
+            'return shipping costs (passed on to the customer)': 'Return shipping costs (passed on to the customer)',
+        };
+
+        const normalizedPayments = [];
+        const paymentsByOrderId = new Map();
+        for (let i = 0; i < paymentsData.length; i++) {
+            const row = paymentsData[i];
+            const newRow = {};
+            for (const [k, v] of Object.entries(row)) {
+                const trimmed = k.trim();
+                const lower = trimmed.toLowerCase();
+                newRow[standardPaymentKeys[lower] || trimmed] = v;
+            }
+            normalizedPayments.push(newRow);
+            const rawId = newRow['Order/adjustment ID'];
+            const id = rawId != null ? rawId.toString().trim() : '';
+            if (id) {
+                let arr = paymentsByOrderId.get(id);
+                if (!arr) {
+                    arr = [];
+                    paymentsByOrderId.set(id, arr);
+                }
+                arr.push(newRow);
+            }
+        }
+
+        const ordersGroupedById = new Map();
+        for (let i = 0; i < ordersData.length; i++) {
+            const order = ordersData[i];
+            const id = order['Order ID'] != null ? order['Order ID'].toString().trim() : '';
+            if (!id) continue;
+            let arr = ordersGroupedById.get(id);
+            if (!arr) {
+                arr = [];
+                ordersGroupedById.set(id, arr);
+            }
+            arr.push(order);
+        }
+
+        const returnStatusByOrderId = new Map();
+        for (let i = 0; i < returnData.length; i++) {
+            const r = returnData[i];
+            const orderId = r['Order ID'] != null ? r['Order ID'].toString().trim() : '';
+            if (!orderId) continue;
+            const returnStatus = (r['Return Status'] || '').toString().toLowerCase();
+            let arr = returnStatusByOrderId.get(orderId);
+            if (!arr) {
+                arr = [];
+                returnStatusByOrderId.set(orderId, arr);
+            }
+            arr.push(returnStatus);
+        }
+
+        const pengembalianResiSet = new Set();
+        const pengembalianDateByResi = new Map();
+        for (let i = 0; i < scanData.length; i++) {
+            const s = scanData[i];
+            if (s.resi) {
+                const rStr = s.resi.toString().trim();
+                pengembalianResiSet.add(rStr);
+                if (s.scan_date) pengembalianDateByResi.set(rStr, s.scan_date);
+            }
+        }
+        for (let i = 0; i < pengembalianData.length; i++) {
+            const row = pengembalianData[i];
+            let resiVal = null;
+            let waktuVal = null;
+            for (const [k, v] of Object.entries(row)) {
+                const lk = k.toLowerCase();
+                if (!resiVal && lk.includes('resi') && v) resiVal = v.toString().trim();
+                if (!waktuVal && lk.includes('waktu pengembalian') && v) waktuVal = v.toString();
+            }
+            if (resiVal) {
+                pengembalianResiSet.add(resiVal);
+                if (waktuVal) pengembalianDateByResi.set(resiVal, waktuVal);
+            }
+        }
+
+        const returnStatusBarangByOrderId = new Map();
+        const returnResiByOrderId = new Map();
+        const returnTimeByOrderId = new Map();
+        const ignoredReturnStatuses = new Set(['rejected', 'refund rejected', 'cancelled', 'canceled', 'dibatalkan']);
+
+        for (let i = 0; i < returnData.length; i++) {
+            const row = returnData[i];
+            const orderId = (row['Order ID'] || '').toString().trim();
+            if (!orderId) continue;
+            const rs = (row['Return Status'] || '').toString().trim().toLowerCase();
+            if (ignoredReturnStatuses.has(rs)) continue;
+            const trackingId = (row['Return Logistics Tracking ID'] || '').toString().trim();
+
+            if (!trackingId) {
+                if (!returnStatusBarangByOrderId.has(orderId)) returnStatusBarangByOrderId.set(orderId, '-');
+            } else {
+                const hasResi = pengembalianResiSet.has(trackingId);
+                returnStatusBarangByOrderId.set(orderId, hasResi ? 'Diterima' : 'Belum Diterima');
+                returnResiByOrderId.set(orderId, trackingId);
+                if (hasResi) {
+                    const dateStr = pengembalianDateByResi.get(trackingId);
+                    if (dateStr) {
+                        const dateObj = parseIndonesianDateTime(dateStr);
+                        returnTimeByOrderId.set(orderId, dateObj ? formatIndonesianDateTime(dateObj) : dateStr);
+                        continue;
+                    }
+                }
+            }
+            if (!returnTimeByOrderId.has(orderId)) returnTimeByOrderId.set(orderId, '-');
+        }
+
+        const parseAmount = (val) => {
+            if (typeof val === 'number') return val;
+            if (!val) return NaN;
+            return parseFloat(val.toString().replace(/,/g, ''));
+        };
+
+        const rangkumanData = [];
         for (const [orderId, orders] of ordersGroupedById.entries()) {
             const order = orders[0];
             const createdDateObj = parseIndonesianDateTime(order['Created Time']);
@@ -323,31 +323,26 @@ export function useProcessedOrders(overrideStoreId) {
             // ── Quantity & Modal ──
             let totalQuantity = 0;
             let totalModal = 0;
-            orders.forEach(o => {
+            let modalValid = true;
+            for (let i = 0; i < orders.length; i++) {
+                const o = orders[i];
                 const qRaw = o['Quantity'];
                 const q = typeof qRaw === 'string' ? parseInt(qRaw.replace(/\D/g, ''), 10) : Number(qRaw);
-                if (!isNaN(q)) totalQuantity += q;
-                totalModal += getModalForItem(o) * (isNaN(q) ? 0 : q);
-            });
-
-            // Modal valid if every item has an HPP entry
-            const modalValid = orders.every(o => {
-                const sellerSku = (o['Seller SKU'] || '').toString().trim();
-                const skuId = (o['SKU ID'] || '').toString().trim();
-                const variation = (o['Variation'] || '').toString().trim();
-                const fullKey = `${sellerSku}||${skuId}||${variation}`;
-                const pName = (o['Product Name'] || '').toString().trim();
-                const noSkuKey = '__NSKU__' + pName;
-                const noSkuVarKey = `${noSkuKey}||${skuId}||${variation}`;
-                return !!(modalValues[fullKey] || modalValues[sellerSku] ||
-                    (!sellerSku && pName && (modalValues[noSkuVarKey] || modalValues[noSkuKey])));
-            });
+                const qty = isNaN(q) ? 0 : q;
+                totalQuantity += qty;
+                const itemModal = getModalForItem(o);
+                totalModal += itemModal * qty;
+                if (modalValid && itemModal <= 0) {
+                    modalValid = false;
+                }
+            }
 
             // ── Status ──
             let statusOrder = normalizeStatus(order['Order Status']);
-            const returnStatuses = returnStatusByOrderId.get(orderId) || [];
-            const hasReturnStatus = returnStatuses.some(rs => rs && !['rejected', 'refund rejected', 'cancelled', 'canceled', 'dibatalkan'].includes(rs));
-            if (hasReturnStatus) statusOrder = 'Return';
+            const returnStatuses = returnStatusByOrderId.get(orderId);
+            if (returnStatuses && returnStatuses.some(rs => rs && !ignoredReturnStatuses.has(rs))) {
+                statusOrder = 'Return';
+            }
             const cancelReasonRaw = order['Cancel Reason'];
             const paketGagalKirimRaw = cancelReasonRaw && cancelReasonRaw.toString().trim() !== '' ? cancelReasonRaw.toString() : '-';
             const paketGagalKirim = translatePaketGagalKirim(paketGagalKirimRaw);
@@ -355,27 +350,27 @@ export function useProcessedOrders(overrideStoreId) {
             const statusLower = statusOrder.toLowerCase();
 
             // ── Payments ──
-            const paymentsForOrder = paymentsByOrderId.get(orderId) || [];
-            const parseAmount = (val) => {
-                if (typeof val === 'number') return val;
-                if (!val) return NaN;
-                return parseFloat(val.toString().replace(/,/g, ''));
-            };
+            const paymentsForOrder = paymentsByOrderId.get(orderId);
             let totalSettlementAmount = 0, totalAffiliateCommission = 0, totalCustomerPayment = 0, menanggungOngkirTotal = 0;
-            paymentsForOrder.forEach(p => {
-                const tsa = parseAmount(p['Total settlement amount']); if (!isNaN(tsa)) totalSettlementAmount += tsa;
-                const aff = parseAmount(p['Affiliate commission']); if (!isNaN(aff)) totalAffiliateCommission += aff;
-                const custPay = parseAmount(p['Customer payment']); if (!isNaN(custPay)) totalCustomerPayment += custPay;
-                const ongkirRaw = p['Return shipping costs (passed on to the customer)'];
-                const ongkir = typeof ongkirRaw === 'string' ? parseFloat(ongkirRaw.replace(/[^0-9.-]+/g, '')) : parseFloat(ongkirRaw);
-                if (!isNaN(ongkir)) menanggungOngkirTotal += ongkir;
-            });
+            if (paymentsForOrder) {
+                for (let i = 0; i < paymentsForOrder.length; i++) {
+                    const p = paymentsForOrder[i];
+                    const tsa = parseAmount(p['Total settlement amount']); if (!isNaN(tsa)) totalSettlementAmount += tsa;
+                    const aff = parseAmount(p['Affiliate commission']); if (!isNaN(aff)) totalAffiliateCommission += aff;
+                    const custPay = parseAmount(p['Customer payment']); if (!isNaN(custPay)) totalCustomerPayment += custPay;
+                    const ongkirRaw = p['Return shipping costs (passed on to the customer)'];
+                    if (ongkirRaw) {
+                        const ongkir = typeof ongkirRaw === 'string' ? parseFloat(ongkirRaw.replace(/[^0-9.-]+/g, '')) : parseFloat(ongkirRaw);
+                        if (!isNaN(ongkir)) menanggungOngkirTotal += ongkir;
+                    }
+                }
+            }
 
             // ── Verifikasi Paket ──
             let verifikasiPaket = '-';
             if (statusLower === 'completed') {
                 verifikasiPaket = '✓';
-            } else if (['canceled', 'cancelled', 'gagal kirim'].includes(statusLower)) {
+            } else if (statusLower === 'canceled' || statusLower === 'cancelled' || statusLower === 'gagal kirim') {
                 const resi = (order['Tracking ID'] || '').toString().trim();
                 if (!resi || resi === '-') verifikasiPaket = '✓';
                 else if (pengembalianResiSet.has(resi)) verifikasiPaket = 'Diterima';
@@ -393,7 +388,7 @@ export function useProcessedOrders(overrideStoreId) {
             if (paketGagalKirim === 'Paket Ditolak' || paketGagalKirim === 'Gagal Kirim Paket') {
                 const cancelledDateObj = parseIndonesianDateTime(order['Cancelled Time']);
                 waktuPengembalian = cancelledDateObj ? formatIndonesianDateTime(cancelledDateObj) : 'Dalam Proses';
-            } else if (['canceled', 'cancelled'].includes(statusLower)) {
+            } else if (statusLower === 'canceled' || statusLower === 'cancelled') {
                 waktuPengembalian = 'Cancel';
             }
 
@@ -406,7 +401,7 @@ export function useProcessedOrders(overrideStoreId) {
 
             // ── Terkirim ──
             let terkirim = '';
-            if (['canceled', 'cancelled'].includes(statusLower)) terkirim = 'Cancel';
+            if (statusLower === 'canceled' || statusLower === 'cancelled') terkirim = 'Cancel';
             else if (statusLower === 'return') terkirim = 'Return';
             else if (statusLower === 'gagal kirim') terkirim = 'Gagal Kirim';
             else terkirim = order['Delivered Time'] && order['Delivered Time'].toString().trim() !== '' ? 'Terkirim' : 'Proses';
@@ -414,13 +409,13 @@ export function useProcessedOrders(overrideStoreId) {
             // ── Effective modal & profit ──
             let effectiveModal = totalModal;
             let effectiveModalValid = modalValid;
-            if (['canceled', 'cancelled'].includes(statusLower)) {
+            if (statusLower === 'canceled' || statusLower === 'cancelled') {
                 effectiveModal = 0; effectiveModalValid = true;
-            } else if (['return', 'gagal kirim'].includes(statusLower) && verifikasiPaket === 'Diterima') {
+            } else if ((statusLower === 'return' || statusLower === 'gagal kirim') && verifikasiPaket === 'Diterima') {
                 effectiveModal = 0; effectiveModalValid = true;
             }
             let profitDisplay = '';
-            if (['canceled', 'cancelled'].includes(statusLower)) profitDisplay = 'CANCEL';
+            if (statusLower === 'canceled' || statusLower === 'cancelled') profitDisplay = 'CANCEL';
             else if (statusLower === 'gagal kirim') profitDisplay = 'Gagal Kirim';
             else if (totalSettlementAmount === 0) profitDisplay = 'Belum Cair';
             else profitDisplay = effectiveModalValid ? formatRupiah(totalSettlementAmount - effectiveModal) : 'HPP Belum Diinput';
@@ -430,11 +425,11 @@ export function useProcessedOrders(overrideStoreId) {
                 ? returnResiByOrderId.get(orderId)
                 : (order['Tracking ID'] || '-');
 
-            rows.push({
+            rangkumanData.push({
                 orderId,
-                // Date objects (for filtering / charting)
                 waktuPesananDibuatObj: createdDateObj,
-                // Formatted strings (for table display in RangkumanTransaksi)
+                _dateKey: formatDateKey(createdDateObj),
+                _timestamp: createdDateObj.getTime(),
                 waktuPesananDibuat,
                 waktuPengiriman,
                 waktuPengembalian,
@@ -451,23 +446,19 @@ export function useProcessedOrders(overrideStoreId) {
                 effectiveModalValid,
                 metode: order['Payment Method'] || '',
                 ketAffiliasi: totalAffiliateCommission > 0 ? 'YA' : (totalAffiliateCommission < 0 ? 'Affiliasi' : 'Tidak'),
-                // Location
                 regencyAndCity: regencyCity,
                 district: (order['Districts'] || '').toString().trim(),
                 detailAddress: (order['Detail Address'] || '').toString().trim(),
                 province,
                 alamat,
-                // Identity & tracking
                 trackingId: (order['Tracking ID'] || '').toString().trim(),
                 resi: resiDisplay,
                 buyerUsername: (order['Buyer Username'] || '').toString().trim(),
                 customerName,
-                // Product
                 productName: (order['Product Name'] || '').toString().trim(),
                 sellerSku: (order['Seller SKU'] || '').toString().trim(),
                 variation: (order['Variation'] || '').toString().trim(),
-                orders, // keep line items for product-level aggregation
-                // Ready-to-display values
+                orders,
                 verifikasiPaket,
                 terkirim,
                 profitDisplay,
@@ -477,58 +468,39 @@ export function useProcessedOrders(overrideStoreId) {
                 _hppRaw: modalValid ? totalModal : 0,
             });
         }
-        return rows;
-    }, [ordersGroupedById, paymentsByOrderId, getModalForItem, returnStatusByOrderId,
-        pengembalianResiSet, returnStatusBarangByOrderId, returnResiByOrderId, modalValues]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Cache the computed result for instant access on remount
-    const cacheKey = `processedOrders::${dataFingerprint}`;
-    useEffect(() => {
-        if (rangkumanData.length > 0) {
-            setComputed(cacheKey, {
-                rangkumanData, ordersData, paymentsData, returnData,
-                modalValues, paymentsByOrderId, ordersGroupedById,
-                returnStatusByOrderId, normalizedPayments,
-                pengembalianResiSet, returnStatusBarangByOrderId,
-                returnResiByOrderId, pengembalianDateByResi, returnTimeByOrderId,
-                scanData,
-            });
-        }
-    }, [rangkumanData]); // eslint-disable-line react-hooks/exhaustive-deps
-
-    // On first render, return cached result if available and data hasn't loaded yet
-    const cachedResult = getComputed(cacheKey);
-    if (loading && cachedResult && cachedResult.rangkumanData.length > 0) {
-        return {
-            ...cachedResult,
-            loading: false,
-            setModalValues,
-            saveAll,
-            saveSingle,
-            getModalForItem,
+        const result = {
+            rangkumanData,
+            ordersData,
+            paymentsData,
+            returnData,
+            modalValues,
+            paymentsByOrderId,
+            ordersGroupedById,
+            returnStatusByOrderId,
+            normalizedPayments,
+            pengembalianResiSet,
+            returnStatusBarangByOrderId,
+            returnResiByOrderId,
+            pengembalianDateByResi,
+            returnTimeByOrderId,
+            scanData,
         };
-    }
+
+        if (rangkumanData.length > 0) {
+            setComputed(cacheKey, result);
+        }
+        return result;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [cacheKey, loading]);
 
     return {
-        rangkumanData,
+        ...computedBundle,
         loading,
-        ordersData,
-        paymentsData,
-        returnData,
         modalValues,
         setModalValues,
         saveAll,
         saveSingle,
-        paymentsByOrderId,
-        ordersGroupedById,
-        returnStatusByOrderId,
         getModalForItem,
-        normalizedPayments,
-        pengembalianResiSet,
-        returnStatusBarangByOrderId,
-        returnResiByOrderId,
-        pengembalianDateByResi,
-        returnTimeByOrderId,
-        scanData,
     };
 }

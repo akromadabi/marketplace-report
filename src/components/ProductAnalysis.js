@@ -72,22 +72,22 @@ function ProductAnalysis() {
         const itemSettlement = (settlement / totalQtyInOrder) * quantity;
 
         if (!map.has(sku)) {
-          map.set(sku, { sku, productName: order['Product Name'] || '', totalQuantity: 0, totalReturn: 0, totalGagalKirim: 0, totalNilaiJual: 0, totalNilaiJualAFF: 0, countNilaiJual: 0, countNilaiJualAFF: 0, returnOrders: [], gagalKirimOrders: [], variations: new Map() });
+          map.set(sku, { sku, productName: order['Product Name'] || '', totalQuantity: 0, totalReturn: 0, totalGagalKirim: 0, totalNilaiJual: 0, totalNilaiJualAFF: 0, countNilaiJual: 0, countNilaiJualAFF: 0, returnOrders: [], gagalKirimOrders: [], _retSet: new Set(), _gagSet: new Set(), variations: new Map() });
         }
         const skuData = map.get(sku);
         skuData.totalQuantity += quantity;
-        if (isReturn) { skuData.totalReturn += quantity; if (!skuData.returnOrders.find(o => o.orderId === row.orderId)) skuData.returnOrders.push({ orderId: row.orderId, statusOrder: row.statusOrder, city: row.regencyAndCity, province: row.province, verifikasiPaket: row.verifikasiPaket }); }
-        if (isGagalKirim) { skuData.totalGagalKirim += quantity; if (!skuData.gagalKirimOrders.find(o => o.orderId === row.orderId)) skuData.gagalKirimOrders.push({ orderId: row.orderId, statusOrder: row.statusOrder, city: row.regencyAndCity, province: row.province, verifikasiPaket: row.verifikasiPaket }); }
+        if (isReturn) { skuData.totalReturn += quantity; if (!skuData._retSet.has(row.orderId)) { skuData._retSet.add(row.orderId); skuData.returnOrders.push({ orderId: row.orderId, statusOrder: row.statusOrder, city: row.regencyAndCity, province: row.province, verifikasiPaket: row.verifikasiPaket }); } }
+        if (isGagalKirim) { skuData.totalGagalKirim += quantity; if (!skuData._gagSet.has(row.orderId)) { skuData._gagSet.add(row.orderId); skuData.gagalKirimOrders.push({ orderId: row.orderId, statusOrder: row.statusOrder, city: row.regencyAndCity, province: row.province, verifikasiPaket: row.verifikasiPaket }); } }
         if (settlement > 0 && !isAffiliated && !isReturn && !isGagalKirim) { skuData.totalNilaiJual += itemSettlement; skuData.countNilaiJual += quantity; }
         if (settlement > 0 && isAffiliated && !isReturn && !isGagalKirim) { skuData.totalNilaiJualAFF += itemSettlement; skuData.countNilaiJualAFF += quantity; }
 
         if (!skuData.variations.has(variation)) {
-          skuData.variations.set(variation, { variation, productName: order['Product Name'] || '', totalQuantity: 0, totalReturn: 0, totalGagalKirim: 0, skuId, totalNilaiJual: 0, totalNilaiJualAFF: 0, countNilaiJual: 0, countNilaiJualAFF: 0, returnOrders: [], gagalKirimOrders: [] });
+          skuData.variations.set(variation, { variation, productName: order['Product Name'] || '', totalQuantity: 0, totalReturn: 0, totalGagalKirim: 0, skuId, totalNilaiJual: 0, totalNilaiJualAFF: 0, countNilaiJual: 0, countNilaiJualAFF: 0, returnOrders: [], gagalKirimOrders: [], _retSet: new Set(), _gagSet: new Set() });
         }
         const varData = skuData.variations.get(variation);
         varData.totalQuantity += quantity;
-        if (isReturn) { varData.totalReturn += quantity; if (!varData.returnOrders.find(o => o.orderId === row.orderId)) varData.returnOrders.push({ orderId: row.orderId, statusOrder: row.statusOrder, city: row.regencyAndCity, province: row.province, verifikasiPaket: row.verifikasiPaket }); }
-        if (isGagalKirim) { varData.totalGagalKirim += quantity; if (!varData.gagalKirimOrders.find(o => o.orderId === row.orderId)) varData.gagalKirimOrders.push({ orderId: row.orderId, statusOrder: row.statusOrder, city: row.regencyAndCity, province: row.province, verifikasiPaket: row.verifikasiPaket }); }
+        if (isReturn) { varData.totalReturn += quantity; if (!varData._retSet.has(row.orderId)) { varData._retSet.add(row.orderId); varData.returnOrders.push({ orderId: row.orderId, statusOrder: row.statusOrder, city: row.regencyAndCity, province: row.province, verifikasiPaket: row.verifikasiPaket }); } }
+        if (isGagalKirim) { varData.totalGagalKirim += quantity; if (!varData._gagSet.has(row.orderId)) { varData._gagSet.add(row.orderId); varData.gagalKirimOrders.push({ orderId: row.orderId, statusOrder: row.statusOrder, city: row.regencyAndCity, province: row.province, verifikasiPaket: row.verifikasiPaket }); } }
         if (settlement > 0 && !isAffiliated && !isReturn && !isGagalKirim) { varData.totalNilaiJual += itemSettlement; varData.countNilaiJual += quantity; }
         if (settlement > 0 && isAffiliated && !isReturn && !isGagalKirim) { varData.totalNilaiJualAFF += itemSettlement; varData.countNilaiJualAFF += quantity; }
       });
@@ -118,20 +118,20 @@ function ProductAnalysis() {
       const city = getCity(row);
 
       if (!provinceMap.has(province)) {
-        provinceMap.set(province, { province, totalOrders: 0, totalReturn: 0, totalGagalKirim: 0, returnOrders: [], gagalKirimOrders: [], cities: new Map() });
+        provinceMap.set(province, { province, totalOrders: 0, totalReturn: 0, totalGagalKirim: 0, returnOrders: [], gagalKirimOrders: [], _retSet: new Set(), _gagSet: new Set(), cities: new Map() });
       }
       const provData = provinceMap.get(province);
       provData.totalOrders++;
-      if (isReturn) { provData.totalReturn++; if (!provData.returnOrders.find(o => o.orderId === row.orderId)) provData.returnOrders.push({ orderId: row.orderId, statusOrder: row.statusOrder, city: row.regencyAndCity, province: row.province, verifikasiPaket: row.verifikasiPaket }); }
-      if (isGagalKirim) { provData.totalGagalKirim++; if (!provData.gagalKirimOrders.find(o => o.orderId === row.orderId)) provData.gagalKirimOrders.push({ orderId: row.orderId, statusOrder: row.statusOrder, city: row.regencyAndCity, province: row.province, verifikasiPaket: row.verifikasiPaket }); }
+      if (isReturn) { provData.totalReturn++; if (!provData._retSet.has(row.orderId)) { provData._retSet.add(row.orderId); provData.returnOrders.push({ orderId: row.orderId, statusOrder: row.statusOrder, city: row.regencyAndCity, province: row.province, verifikasiPaket: row.verifikasiPaket }); } }
+      if (isGagalKirim) { provData.totalGagalKirim++; if (!provData._gagSet.has(row.orderId)) { provData._gagSet.add(row.orderId); provData.gagalKirimOrders.push({ orderId: row.orderId, statusOrder: row.statusOrder, city: row.regencyAndCity, province: row.province, verifikasiPaket: row.verifikasiPaket }); } }
 
       if (!provData.cities.has(city)) {
-        provData.cities.set(city, { city, totalOrders: 0, totalReturn: 0, totalGagalKirim: 0, returnOrders: [], gagalKirimOrders: [] });
+        provData.cities.set(city, { city, totalOrders: 0, totalReturn: 0, totalGagalKirim: 0, returnOrders: [], gagalKirimOrders: [], _retSet: new Set(), _gagSet: new Set() });
       }
       const cityData = provData.cities.get(city);
       cityData.totalOrders++;
-      if (isReturn) { cityData.totalReturn++; if (!cityData.returnOrders.find(o => o.orderId === row.orderId)) cityData.returnOrders.push({ orderId: row.orderId, statusOrder: row.statusOrder, city: row.regencyAndCity, province: row.province, verifikasiPaket: row.verifikasiPaket }); }
-      if (isGagalKirim) { cityData.totalGagalKirim++; if (!cityData.gagalKirimOrders.find(o => o.orderId === row.orderId)) cityData.gagalKirimOrders.push({ orderId: row.orderId, statusOrder: row.statusOrder, city: row.regencyAndCity, province: row.province, verifikasiPaket: row.verifikasiPaket }); }
+      if (isReturn) { cityData.totalReturn++; if (!cityData._retSet.has(row.orderId)) { cityData._retSet.add(row.orderId); cityData.returnOrders.push({ orderId: row.orderId, statusOrder: row.statusOrder, city: row.regencyAndCity, province: row.province, verifikasiPaket: row.verifikasiPaket }); } }
+      if (isGagalKirim) { cityData.totalGagalKirim++; if (!cityData._gagSet.has(row.orderId)) { cityData._gagSet.add(row.orderId); cityData.gagalKirimOrders.push({ orderId: row.orderId, statusOrder: row.statusOrder, city: row.regencyAndCity, province: row.province, verifikasiPaket: row.verifikasiPaket }); } }
     });
 
     return Array.from(provinceMap.values()).sort((a, b) => (b.totalReturn + b.totalGagalKirim) - (a.totalReturn + a.totalGagalKirim));

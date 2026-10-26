@@ -4,13 +4,15 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Search, RotateCcw, ArrowUp, ArrowDown, ArrowUpDown, CheckCircle, XCircle, Calendar, Download, ChevronLeft, ChevronRight, X, Copy, Check, Package, MapPin, Truck, AlertCircle, FileText } from 'lucide-react';
 import { useApiData, useModalValues } from '../hooks/useApiData';
+import { useStore } from '../contexts/StoreContext';
 
 function ReturnTable() {
-    const { data: returnData, loading } = useApiData('returns');
-    const { data: pengembalianData } = useApiData('pengembalian');
-    const { data: ordersData } = useApiData('orders');
-    const { modalValues } = useModalValues();
-    const [scanData, setScanData] = useState([]);
+    const { activeStoreId } = useStore();
+    const { data: returnData, loading } = useApiData('returns', activeStoreId);
+    const { data: pengembalianData } = useApiData('pengembalian', activeStoreId);
+    const { data: ordersData } = useApiData('orders', activeStoreId);
+    const { data: scanData } = useApiData('scan', activeStoreId);
+    const { modalValues } = useModalValues(activeStoreId);
     const [search, setSearch] = useState('');
     const [filterStartDate, setFilterStartDate] = useState('');
     const [filterEndDate, setFilterEndDate] = useState('');
@@ -42,19 +44,6 @@ function ReturnTable() {
             setTrackingError(err.message || 'Gagal menghubungi layanan tracking');
         }
         setTrackingLoading(false);
-    }, []);
-
-    // ─── Fetch scanned resi data ────────────────────────────────────
-    useEffect(() => {
-        (async () => {
-            try {
-                const res = await fetch('/api/scan', { headers: { 'Accept': 'application/json' } });
-                if (res.ok) {
-                    const ct = res.headers.get('content-type');
-                    if (ct && ct.includes('application/json')) setScanData(await res.json());
-                }
-            } catch (_) { /* ignore */ }
-        })();
     }, []);
 
     useEffect(() => {

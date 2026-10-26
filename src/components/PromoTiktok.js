@@ -224,7 +224,9 @@ function PromoTiktok() {
 
   // ─── Stok Masal State ────────────
   const [showStokMasalModal, setShowStokMasalModal] = useState(false);
-  const [stokMasalMode, setStokMasalMode] = useState('samakan'); // samakan, kurangi, tambah
+  const [stokMasalMode, setStokMasalMode] = useState('samakan'); // samakan, tetap, kurangi, tambah
+  const [stokMasalRule, setStokMasalRule] = useState('aman'); // aman, rata, maksimal
+  const [cardBulkStockConfirm, setCardBulkStockConfirm] = useState(null); // samakan, kurangi, tambah
   const [stokMasalValue, setStokMasalValue] = useState('');
 
   // ─── Kalkulator Harga State ──────
@@ -555,19 +557,81 @@ function PromoTiktok() {
       return true;
     });
 
-    targets.forEach(p => {
-      setLocalValues(prev => {
-        const cur = prev[p.id] || {};
+    if (bulk.stok !== '') {
+      const targetNum = Number(bulk.stok);
+      if (!isNaN(targetNum) && targetNum > 0) {
+        const unsafeRows = targets.filter(p => Number(p.stok_saat_ini || 0) < targetNum);
+        if (unsafeRows.length > 0) {
+          setCardBulkStockConfirm({
+            sellerSku,
+            targetNum,
+            targets,
+            unsafeCount: unsafeRows.length,
+            safeCount: targets.length - unsafeRows.length,
+            harga: bulk.harga,
+            stok: bulk.stok,
+            selections
+          });
+          return;
+        }
+      }
+    }
+
+    executeApplyCardBulk(sellerSku, targets, bulk.harga, bulk.stok, 'rata', selections);
+  }
+
+  function executeApplyCardBulk(sellerSku, targets, harga, stok, stockMode = 'rata', selections = []) {
+    let filledCount = 0;
+    let skippedCount = 0;
+    const targetNum = stok !== '' ? Number(stok) : null;
+
+    setLocalValues(prev => {
+      const nextMap = { ...prev };
+      targets.forEach(p => {
+        const cur = nextMap[p.id] || {};
         const next = { ...cur };
-        if (bulk.harga) next.harga_promo = bulk.harga;
-        if (bulk.stok !== '') next.stok_promo = bulk.stok;
-        return { ...prev, [p.id]: next };
+        if (harga) next.harga_promo = harga;
+
+        if (stok !== '') {
+          const curStok = Number(p.stok_saat_ini || 0);
+          if (stockMode === 'aman') {
+            if (curStok >= targetNum) {
+              next.stok_promo = String(targetNum);
+              filledCount++;
+            } else {
+              next.stok_promo = '';
+              skippedCount++;
+            }
+          } else if (stockMode === 'maksimal') {
+            if (curStok >= targetNum) {
+              next.stok_promo = String(targetNum);
+              filledCount++;
+            } else if (curStok > 0) {
+              next.stok_promo = String(curStok);
+              filledCount++;
+            } else {
+              next.stok_promo = '';
+              skippedCount++;
+            }
+          } else {
+            next.stok_promo = String(stok);
+            filledCount++;
+          }
+        }
+        nextMap[p.id] = next;
       });
+      return nextMap;
     });
+
     setIsDirty(true);
     setCardBulk(prev => ({ ...prev, [sellerSku]: { selections, harga: '', stok: '' } }));
     setFlashSku(sellerSku);
     setTimeout(() => setFlashSku(null), 1500);
+    setCardBulkStockConfirm(null);
+
+    if (stok !== '' && skippedCount > 0) {
+      alert(`Stok promo untuk SKU "${sellerSku}" berhasil diterapkan:\n\n✓ ${filledCount} variasi diisi stok ${stok}\n✗ ${skippedCount} variasi dilewati/kosong karena stok real < ${stok}`);
+    }
   }
 
   function setCardBulkField(sellerSku, field, value) {
@@ -599,24 +663,52 @@ function PromoTiktok() {
     const val = Number(stokMasalValue) || 0;
     const newLocals = { ...localValues };
     let changed = false;
+    let filledCount = 0;
+    let skippedCount = 0;
 
     filteredGroups.forEach(({ rows }) => {
       rows.forEach(r => {
         const stokSaatIni = Number(r.stok_saat_ini || 0);
-        let newStok = stokSaatIni;
+        let newStok = null;
 
         if (stokMasalMode === 'samakan') {
           newStok = stokSaatIni;
+          filledCount++;
         } else if (stokMasalMode === 'kurangi') {
-          newStok = stokSaatIni - val;
+          newStok = Math.max(0, stokSaatIni - val);
+          filledCount++;
         } else if (stokMasalMode === 'tambah') {
           newStok = stokSaatIni + val;
+          filledCount++;
+        } else if (stokMasalMode === 'tetap') {
+          if (stokMasalRule === 'aman') {
+            if (stokSaatIni >= val) {
+              newStok = val;
+              filledCount++;
+            } else {
+              newStok = ''; // dilewati / tidak diikutkan
+              skippedCount++;
+            }
+          } else if (stokMasalRule === 'maksimal') {
+            if (stokSaatIni >= val) {
+              newStok = val;
+              filledCount++;
+            } else if (stokSaatIni > 0) {
+              newStok = stokSaatIni;
+              filledCount++;
+            } else {
+              newStok = '';
+              skippedCount++;
+            }
+          } else {
+            // 'rata'
+            newStok = val;
+            filledCount++;
+          }
         }
 
-        if (newStok < 0) newStok = 0;
-
         const cur = newLocals[r.id] || {};
-        newLocals[r.id] = { ...cur, stok_promo: String(newStok) };
+        newLocals[r.id] = { ...cur, stok_promo: newStok !== null ? String(newStok) : '' };
         changed = true;
       });
     });
@@ -626,6 +718,19 @@ function PromoTiktok() {
       setIsDirty(true);
     }
     setShowStokMasalModal(false);
+
+    // Notifikasi yang jelas & detail
+    if (stokMasalMode === 'tetap' && stokMasalRule === 'aman') {
+      alert(`Berhasil Input Stok Masal (Mode Stok Aman):\n\n✓ ${filledCount} variasi diisi stok promo ${val} (karena stok real >= ${val})\n✗ ${skippedCount} variasi dilewati/tidak diikutkan promo (karena stok real < ${val})`);
+    } else if (stokMasalMode === 'tetap' && stokMasalRule === 'maksimal') {
+      alert(`Berhasil Input Stok Masal (Mode Maksimal Sesuai Stok):\n\n✓ ${filledCount} variasi diisi stok promo (maksimal ${val})\n✗ ${skippedCount} variasi dilewati (karena stok 0)`);
+    } else if (stokMasalMode === 'tetap' && stokMasalRule === 'rata') {
+      alert(`Berhasil Input Stok Masal (Mode Rata ke Semua):\n\n✓ ${filledCount} variasi diisi stok promo ${val}`);
+    } else if (stokMasalMode === 'samakan') {
+      alert(`Berhasil Input Stok Masal:\n\n✓ ${filledCount} variasi disamakan persis dengan stok saat ini.`);
+    } else {
+      alert(`Berhasil Input Stok Masal:\n\n✓ ${filledCount} variasi berhasil diperbarui stok promonya.`);
+    }
   };
 
   // Apply saran harga from failMap to a list of rows
@@ -1185,29 +1290,78 @@ function PromoTiktok() {
       {/* ══ STOK MASAL MODAL ══ */}
       {showStokMasalModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div className="glass-card" style={{ padding: '1.5rem', maxWidth: '400px', width: '90%' }}>
-            <h3 style={{ fontWeight: 700, fontSize: '1rem', marginBottom: '0.375rem', color: 'var(--text-primary)' }}>Input Stok Masal</h3>
+          <div className="glass-card" style={{ padding: '1.5rem', maxWidth: '440px', width: '92%' }}>
+            <h3 style={{ fontWeight: 700, fontSize: '1.05rem', marginBottom: '0.375rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Zap size={18} color="#6c5ce7" /> Input Stok Masal
+            </h3>
             <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '1.25rem', lineHeight: 1.5 }}>
-              Terapkan aturan perhitungan stok ini ke <strong>semua produk yang sedang tampil</strong> (tidak difilter). Jika hasilnya kurang dari 0, stok akan disetel menjadi 0 (tidak ikut promo).
+              Terapkan aturan perhitungan stok ini ke <strong>semua produk yang sedang tampil</strong>.
             </p>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.5rem' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.8125rem' }}>
-                <input type="radio" value="samakan" checked={stokMasalMode === 'samakan'} onChange={() => setStokMasalMode('samakan')} style={{ accentColor: '#6c5ce7' }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.25rem' }}>
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', cursor: 'pointer', fontSize: '0.8125rem' }}>
+                <input type="radio" value="samakan" checked={stokMasalMode === 'samakan'} onChange={() => setStokMasalMode('samakan')} style={{ marginTop: '0.2rem', accentColor: '#6c5ce7' }} />
                 <span>Samakan persis dengan <strong>Stok Saat Ini</strong></span>
               </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.8125rem' }}>
-                <input type="radio" value="kurangi" checked={stokMasalMode === 'kurangi'} onChange={() => setStokMasalMode('kurangi')} style={{ accentColor: '#6c5ce7' }} />
+
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', cursor: 'pointer', fontSize: '0.8125rem' }}>
+                <input type="radio" value="tetap" checked={stokMasalMode === 'tetap'} onChange={() => setStokMasalMode('tetap')} style={{ marginTop: '0.2rem', accentColor: '#6c5ce7' }} />
+                <span><strong>Target Stok Tertentu</strong> (misal: isi 5 stok)</span>
+              </label>
+
+              {stokMasalMode === 'tetap' && (
+                <div style={{ marginLeft: '1.5rem', padding: '0.75rem', background: 'var(--bg-glass-hover)', border: '1px solid var(--border-medium)', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
+                  <div>
+                    <div style={{ fontSize: '0.6875rem', fontWeight: 600, color: 'var(--text-tertiary)', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Target Stok Promo:</div>
+                    <input 
+                      type="number" className="im-input" autoFocus
+                      placeholder="Contoh: 5"
+                      value={stokMasalValue} onChange={e => setStokMasalValue(e.target.value)}
+                      style={{ width: '100%', padding: '0.45rem 0.6rem', fontSize: '0.875rem', fontWeight: 700 }}
+                    />
+                  </div>
+
+                  <div style={{ fontSize: '0.6875rem', fontWeight: 600, color: 'var(--text-tertiary)', marginTop: '0.25rem', textTransform: 'uppercase' }}>Aturan Penanganan Stok Real:</div>
+
+                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.4rem', cursor: 'pointer', fontSize: '0.75rem' }}>
+                    <input type="radio" name="stokRule" value="aman" checked={stokMasalRule === 'aman'} onChange={() => setStokMasalRule('aman')} style={{ marginTop: '0.15rem', accentColor: '#10b981' }} />
+                    <div>
+                      <strong style={{ color: '#10b981' }}>🛡️ Sesuaikan Stok Aman (Rekomendasi)</strong>
+                      <div style={{ color: 'var(--text-tertiary)', fontSize: '0.6875rem' }}>Hanya variasi dengan stok real &ge; {stokMasalValue || 'target'} yang diisi {stokMasalValue || 'target'}. Variasi di bawahnya <strong>tidak ikut promo</strong> (aman dari penolakan Shopee).</div>
+                    </div>
+                  </label>
+
+                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.4rem', cursor: 'pointer', fontSize: '0.75rem' }}>
+                    <input type="radio" name="stokRule" value="rata" checked={stokMasalRule === 'rata'} onChange={() => setStokMasalRule('rata')} style={{ marginTop: '0.15rem', accentColor: '#6c5ce7' }} />
+                    <div>
+                      <strong>⚡ Rata ke Semua (Paksa)</strong>
+                      <div style={{ color: 'var(--text-tertiary)', fontSize: '0.6875rem' }}>Paksa isi {stokMasalValue || 'target'} ke semua variasi tanpa memandang stok saat ini.</div>
+                    </div>
+                  </label>
+
+                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.4rem', cursor: 'pointer', fontSize: '0.75rem' }}>
+                    <input type="radio" name="stokRule" value="maksimal" checked={stokMasalRule === 'maksimal'} onChange={() => setStokMasalRule('maksimal')} style={{ marginTop: '0.15rem', accentColor: '#3b82f6' }} />
+                    <div>
+                      <strong>📦 Maksimal Sesuai Stok</strong>
+                      <div style={{ color: 'var(--text-tertiary)', fontSize: '0.6875rem' }}>Jika stok &ge; {stokMasalValue || 'target'} isi {stokMasalValue || 'target'}. Jika stok &lt; {stokMasalValue || 'target'}, isi sejumlah sisa stok yang ada.</div>
+                    </div>
+                  </label>
+                </div>
+              )}
+
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', cursor: 'pointer', fontSize: '0.8125rem' }}>
+                <input type="radio" value="kurangi" checked={stokMasalMode === 'kurangi'} onChange={() => setStokMasalMode('kurangi')} style={{ marginTop: '0.2rem', accentColor: '#6c5ce7' }} />
                 <span><strong>Kurangi</strong> nilai Stok Saat Ini dengan:</span>
               </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.8125rem' }}>
-                <input type="radio" value="tambah" checked={stokMasalMode === 'tambah'} onChange={() => setStokMasalMode('tambah')} style={{ accentColor: '#6c5ce7' }} />
+
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', cursor: 'pointer', fontSize: '0.8125rem' }}>
+                <input type="radio" value="tambah" checked={stokMasalMode === 'tambah'} onChange={() => setStokMasalMode('tambah')} style={{ marginTop: '0.2rem', accentColor: '#6c5ce7' }} />
                 <span><strong>Tambahkan</strong> nilai ke Stok Saat Ini sebesar:</span>
               </label>
             </div>
 
-            {stokMasalMode !== 'samakan' && (
-              <div style={{ marginBottom: '1.5rem' }}>
+            {(stokMasalMode === 'kurangi' || stokMasalMode === 'tambah') && (
+              <div style={{ marginBottom: '1.25rem' }}>
                 <div style={{ fontSize: '0.6875rem', fontWeight: 600, color: 'var(--text-tertiary)', marginBottom: '0.375rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Besaran Angka</div>
                 <input 
                   type="number" className="im-input" autoFocus
@@ -1218,7 +1372,7 @@ function PromoTiktok() {
               </div>
             )}
 
-            <div style={{ display: 'flex', gap: '0.625rem', justifyContent: 'flex-end' }}>
+            <div style={{ display: 'flex', gap: '0.625rem', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
               <button className="btn-secondary" onClick={() => setShowStokMasalModal(false)} style={{ padding: '0.5rem 1.25rem', fontSize: '0.8125rem' }}>Batal</button>
               <button 
                 className="btn-primary" 
@@ -1227,6 +1381,95 @@ function PromoTiktok() {
                 style={{ padding: '0.5rem 1.25rem', fontSize: '0.8125rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.375rem' }}
               >
                 <Zap size={14} /> Eksekusi Masal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ POPUP KONFIRMASI STOK AMAN PER-CARD ══ */}
+      {cardBulkStockConfirm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', zIndex: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="glass-card" style={{ padding: '1.5rem', maxWidth: '420px', width: '92%' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#f59e0b', marginBottom: '0.5rem' }}>
+              <AlertTriangle size={20} />
+              <h3 style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-primary)' }}>Peringatan Stok Real</h3>
+            </div>
+            
+            <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginBottom: '1rem', lineHeight: 1.5 }}>
+              Anda ingin menerapkan stok promo <strong>{cardBulkStockConfirm.stok}</strong> untuk SKU <strong>{cardBulkStockConfirm.sellerSku}</strong>.
+              <br /><br />
+              Ditemukan <span style={{ color: '#ef4444', fontWeight: 700 }}>{cardBulkStockConfirm.unsafeCount} variasi</span> dengan stok real kurang dari {cardBulkStockConfirm.stok}.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem', marginBottom: '1.25rem' }}>
+              <button
+                onClick={() => {
+                  executeApplyCardBulk(
+                    cardBulkStockConfirm.sellerSku,
+                    cardBulkStockConfirm.targets,
+                    cardBulkStockConfirm.harga,
+                    cardBulkStockConfirm.stok,
+                    'aman',
+                    cardBulkStockConfirm.selections
+                  );
+                }}
+                style={{ padding: '0.75rem', background: 'rgba(16,185,129,0.1)', border: '1px solid #10b981', borderRadius: 'var(--radius-md)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s' }}
+              >
+                <div style={{ fontWeight: 700, color: '#10b981', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <CheckCircle2 size={15} /> 🛡️ Sesuaikan Stok Aman (Rekomendasi)
+                </div>
+                <div style={{ fontSize: '0.6875rem', color: 'var(--text-tertiary)', marginTop: '0.2rem' }}>
+                  Hanya {cardBulkStockConfirm.safeCount} variasi aman (&ge; {cardBulkStockConfirm.stok}) yang diisi. Variasi yang kurang dikosongkan agar tidak ditolak marketplace.
+                </div>
+              </button>
+
+              <button
+                onClick={() => {
+                  executeApplyCardBulk(
+                    cardBulkStockConfirm.sellerSku,
+                    cardBulkStockConfirm.targets,
+                    cardBulkStockConfirm.harga,
+                    cardBulkStockConfirm.stok,
+                    'maksimal',
+                    cardBulkStockConfirm.selections
+                  );
+                }}
+                style={{ padding: '0.75rem', background: 'rgba(59,130,246,0.1)', border: '1px solid #3b82f6', borderRadius: 'var(--radius-md)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s' }}
+              >
+                <div style={{ fontWeight: 700, color: '#3b82f6', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  📦 Maksimal Sisa Stok
+                </div>
+                <div style={{ fontSize: '0.6875rem', color: 'var(--text-tertiary)', marginTop: '0.2rem' }}>
+                  Variasi yang kurang diisi sesuai sisa stoknya (misal ada 2 diisi 2).
+                </div>
+              </button>
+
+              <button
+                onClick={() => {
+                  executeApplyCardBulk(
+                    cardBulkStockConfirm.sellerSku,
+                    cardBulkStockConfirm.targets,
+                    cardBulkStockConfirm.harga,
+                    cardBulkStockConfirm.stok,
+                    'rata',
+                    cardBulkStockConfirm.selections
+                  );
+                }}
+                style={{ padding: '0.75rem', background: 'var(--bg-glass)', border: '1px solid var(--border-medium)', borderRadius: 'var(--radius-md)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s' }}
+              >
+                <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.8125rem' }}>
+                  ⚡ Rata ke Semua (Paksa)
+                </div>
+                <div style={{ fontSize: '0.6875rem', color: 'var(--text-tertiary)', marginTop: '0.2rem' }}>
+                  Tetap isi {cardBulkStockConfirm.stok} ke seluruh variasi tanpa memandang stok real.
+                </div>
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button className="btn-secondary" onClick={() => setCardBulkStockConfirm(null)} style={{ padding: '0.45rem 1.25rem', fontSize: '0.8125rem' }}>
+                Batal
               </button>
             </div>
           </div>

@@ -24,7 +24,7 @@ function PricingCalculator() {
   // Fetch from DB on mount
   useEffect(() => {
     if (!user?.id) return;
-    fetch(`http://localhost:8000/api/pricing-simulations?user_id=${user.id}`)
+    fetch(`/api/pricing-simulations?user_id=${user.id}`)
       .then(res => res.json())
       .then(data => {
         if (data && data.length > 0) {
@@ -72,7 +72,7 @@ function PricingCalculator() {
     setIsSaving(true);
     setSaveSuccess(false);
     try {
-      await fetch('http://localhost:8000/api/pricing-simulations/sync', {
+      await fetch('/api/pricing-simulations/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
         body: JSON.stringify({ user_id: user.id, rows })

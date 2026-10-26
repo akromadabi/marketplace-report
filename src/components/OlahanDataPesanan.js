@@ -9,54 +9,77 @@ const formatRupiah = (number) => {
 };
 
 
-// Helper: aggregate an array of rangkuman rows into metric columns
+// Helper: aggregate an array of rangkuman rows into metric columns in a single pass
 function aggregateRows(rowsForGroup) {
     const pesananOrder = rowsForGroup.length;
-    const pesananPCS = rowsForGroup.reduce((acc, cur) => acc + (cur.totalQuantity || 0), 0);
-    const cancelOrder = rowsForGroup.filter(r => ['canceled', 'cancelled'].includes(r.statusOrder.toLowerCase())).length;
-    const cancelPCS = rowsForGroup.filter(r => ['canceled', 'cancelled'].includes(r.statusOrder.toLowerCase())).reduce((acc, cur) => acc + (cur.totalQuantity || 0), 0);
-    const fixTerbeliOrder = rowsForGroup.filter(r => ['completed', 'shipped', 'to ship'].includes(r.statusOrder.toLowerCase())).length;
-    const fixTerbeliPCS = rowsForGroup.filter(r => ['completed', 'shipped', 'to ship'].includes(r.statusOrder.toLowerCase())).reduce((acc, cur) => acc + (cur.totalQuantity || 0), 0);
-    const terkirimOrder = rowsForGroup.filter(r => r.statusOrder.toLowerCase() === 'shipped').length;
-    const terkirimPCS = rowsForGroup.filter(r => r.statusOrder.toLowerCase() === 'shipped').reduce((acc, cur) => acc + (cur.totalQuantity || 0), 0);
-    const akanDikirimOrder = rowsForGroup.filter(r => r.statusOrder.toLowerCase() === 'to ship').length;
-    const akanDikirimPCS = rowsForGroup.filter(r => r.statusOrder.toLowerCase() === 'to ship').reduce((acc, cur) => acc + (cur.totalQuantity || 0), 0);
-    const sudahCairOrder = rowsForGroup.filter(r => (r.totalSettlementAmount) > 0).length;
-    const sudahCairPCS = rowsForGroup.filter(r => (r.totalSettlementAmount) > 0).reduce((acc, cur) => acc + (cur.totalQuantity || 0), 0);
-    const belumCairFilter = r => {
-        const st = r.statusOrder.toLowerCase();
-        return ['completed', 'shipped', 'to ship'].includes(st) && (r.totalSettlementAmount) <= 0;
-    };
-    const belumCairOrder = rowsForGroup.filter(belumCairFilter).length;
-    const belumCairPCS = rowsForGroup.filter(belumCairFilter).reduce((acc, cur) => acc + (cur.totalQuantity || 0), 0);
-    const labaKotor = rowsForGroup.reduce((acc, cur) => {
-        const st = cur.statusOrder.toLowerCase();
-        if (['canceled', 'cancelled', 'return', 'pengembalian'].includes(st)) return acc;
-        if ((cur.totalSettlementAmount || 0) <= 0) return acc;
-        return acc + (cur.totalSettlementAmount || 0);
-    }, 0);
-    const labaBersih = rowsForGroup.reduce((acc, cur) => {
-        const st = cur.statusOrder.toLowerCase();
-        if (['canceled', 'cancelled', 'return', 'pengembalian'].includes(st)) return acc;
-        if (cur.totalSettlementAmount <= 0) return acc;
-        return acc + (cur.totalSettlementAmount - (cur.totalModal || 0));
-    }, 0);
-    const pengembalianOrder = rowsForGroup.filter(r => r.statusOrder.toLowerCase() === 'pengembalian').length;
-    const pengembalianPCS = rowsForGroup.filter(r => r.statusOrder.toLowerCase() === 'pengembalian').reduce((acc, cur) => acc + (cur.totalQuantity || 0), 0);
-    const returnOrder = rowsForGroup.filter(r => r.statusOrder.toLowerCase() === 'return').length;
+    let pesananPCS = 0;
+    let cancelOrder = 0, cancelPCS = 0;
+    let fixTerbeliOrder = 0, fixTerbeliPCS = 0;
+    let terkirimOrder = 0, terkirimPCS = 0;
+    let akanDikirimOrder = 0, akanDikirimPCS = 0;
+    let sudahCairOrder = 0, sudahCairPCS = 0;
+    let belumCairOrder = 0, belumCairPCS = 0;
+    let labaKotor = 0, labaBersih = 0;
+    let pengembalianOrder = 0, pengembalianPCS = 0;
+    let returnOrder = 0;
+    let affiliasiNominal = 0, affiliasiAffiliasiCount = 0;
+    let codJumlah = 0;
+    let estimasi = 0;
+
+    for (let i = 0; i < pesananOrder; i++) {
+        const r = rowsForGroup[i];
+        const qty = r.totalQuantity || 0;
+        const st = (r.statusOrder || '').toLowerCase();
+        const settlement = r.totalSettlementAmount || 0;
+        const modal = r.totalModal || 0;
+
+        pesananPCS += qty;
+
+        if (st === 'canceled' || st === 'cancelled') {
+            cancelOrder++;
+            cancelPCS += qty;
+        } else if (st === 'completed' || st === 'shipped' || st === 'to ship') {
+            fixTerbeliOrder++;
+            fixTerbeliPCS += qty;
+            if (st === 'shipped') {
+                terkirimOrder++;
+                terkirimPCS += qty;
+            } else if (st === 'to ship') {
+                akanDikirimOrder++;
+                akanDikirimPCS += qty;
+            }
+            if (settlement <= 0) {
+                belumCairOrder++;
+                belumCairPCS += qty;
+                if (st === 'shipped' || st === 'to ship') {
+                    estimasi += modal;
+                }
+            }
+        } else if (st === 'pengembalian') {
+            pengembalianOrder++;
+            pengembalianPCS += qty;
+        } else if (st === 'return') {
+            returnOrder++;
+        }
+
+        if (settlement > 0) {
+            sudahCairOrder++;
+            sudahCairPCS += qty;
+            if (st !== 'canceled' && st !== 'cancelled' && st !== 'return' && st !== 'pengembalian') {
+                labaKotor += settlement;
+                labaBersih += (settlement - modal);
+            }
+        }
+
+        affiliasiNominal += (r.totalAffiliateCommission || 0);
+        if ((r.ketAffiliasi || '').toLowerCase() === 'affiliasi') affiliasiAffiliasiCount++;
+        if ((r.metode || '').toLowerCase() === 'bayar di tempat') codJumlah++;
+    }
+
     const returnPresentase = pesananOrder > 0 ? (returnOrder / pesananOrder) * 100 : 0;
-    const affiliasiNominal = rowsForGroup.reduce((acc, cur) => acc + (cur.totalAffiliateCommission || 0), 0);
-    const affiliasiCount = rowsForGroup.length;
-    const affiliasiAffiliasiCount = rowsForGroup.filter(r => (r.ketAffiliasi || '').toLowerCase() === 'affiliasi').length;
-    const affiliasiPresentase = affiliasiCount > 0 ? (affiliasiAffiliasiCount / affiliasiCount) * 100 : 0;
-    const codJumlah = rowsForGroup.filter(r => (r.metode || '').toLowerCase() === 'bayar di tempat').length;
-    const codPresentase = affiliasiCount > 0 ? (codJumlah / affiliasiCount) * 100 : 0;
-    const estimasi = rowsForGroup.reduce((acc, cur) => {
-        const st = cur.statusOrder.toLowerCase();
-        if (!['shipped', 'to ship'].includes(st)) return acc;
-        if (cur.totalSettlementAmount > 0) return acc;
-        return acc + (cur.totalModal || 0);
-    }, 0);
+    const affiliasiPresentase = pesananOrder > 0 ? (affiliasiAffiliasiCount / pesananOrder) * 100 : 0;
+    const codPresentase = pesananOrder > 0 ? (codJumlah / pesananOrder) * 100 : 0;
+
     return {
         'PESANAN.Order': pesananOrder, 'PESANAN.PCS': pesananPCS,
         'CANCEL.Order': cancelOrder, 'CANCEL.PCS': cancelPCS,
@@ -102,10 +125,14 @@ function OlahanDataPesanan() {
 
     // Date-filtered base data
     const filteredData = useMemo(() => {
-        let data = rangkumanData;
-        if (filterStartDate) data = data.filter(r => r.waktuPesananDibuatObj && r.waktuPesananDibuatObj >= new Date(filterStartDate));
-        if (filterEndDate) data = data.filter(r => r.waktuPesananDibuatObj && r.waktuPesananDibuatObj <= new Date(filterEndDate));
-        return data;
+        if (!filterStartDate && !filterEndDate) return rangkumanData;
+        return rangkumanData.filter(r => {
+            const dk = r._dateKey || (r.waktuPesananDibuatObj ? formatDateKey(r.waktuPesananDibuatObj) : '');
+            if (!dk) return false;
+            if (filterStartDate && dk < filterStartDate) return false;
+            if (filterEndDate && dk > filterEndDate) return false;
+            return true;
+        });
     }, [rangkumanData, filterStartDate, filterEndDate]);
 
     // Dynamic column label based on analysis mode

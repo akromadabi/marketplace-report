@@ -93,40 +93,78 @@ function parseSalesInfoSheet(wb) {
     ws['!ref'] = XLSX.utils.encode_range(range);
   }
   const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false, blankrows: false });
-  const headers = rows[0] || [];
-  const namaIdx = headers.indexOf('Nama Produk');
-  const kodeIdx = headers.indexOf('Kode Produk');
-  const namaVarIdx = headers.indexOf('Nama Variasi');
-  const kodeVarIdx = headers.indexOf('Kode Variasi');
-  const stokIdx = headers.indexOf('Stok');
-  // Kadang ada Rekomendasi di Shopee:
-  const rekoIdx = headers.findIndex(h => String(h).includes('Rekomendasi'));
-  
+  if (!rows || rows.length === 0) return { rows: [], templateType: 'campaign' };
+
+  // Cari baris header secara dinamis (cek 5 baris pertama)
+  let headerIdx = 0;
+  for (let i = 0; i < Math.min(rows.length, 5); i++) {
+    if (Array.isArray(rows[i])) {
+      const line = rows[i].map(c => String(c).toLowerCase()).join(' ');
+      if (line.includes('kode produk') || line.includes('product id') || line.includes('kode variasi') || line.includes('sku id')) {
+        headerIdx = i;
+        break;
+      }
+    }
+  }
+
+  const rawHeaders = (rows[headerIdx] || []).map(h => String(h || '').trim());
+  const headersLower = rawHeaders.map(h => h.toLowerCase());
+
+  const namaIdx = headersLower.findIndex(h => h.includes('nama produk') || h.includes('product name') || h === 'produk');
+  const kodeIdx = headersLower.findIndex(h => h.includes('kode produk') || h.includes('product id') || h.includes('id produk') || h.includes('item id') || h === 'product_id');
+  const namaVarIdx = headersLower.findIndex(h => h.includes('nama variasi') || h.includes('variation name') || h === 'variasi');
+  const kodeVarIdx = headersLower.findIndex(h => h.includes('kode variasi') || h.includes('variation id') || h.includes('model id') || h.includes('sku id') || h.includes('sku_id') || h.includes('id variasi'));
+  const stokIdx = headersLower.findIndex(h => h === 'stok' || h.includes('stok saat ini') || h.includes('stok tersedia') || h === 'stock' || h.includes('available stock'));
+  const skuIdx = headersLower.findIndex(h => h.includes('referensi sku') || h.includes('sku induk') || h.includes('seller sku') || h.includes('parent sku') || h === 'sku');
+  const rekoIdx = headersLower.findIndex(h => h.includes('rekomendasi') || h.includes('saran'));
+
+  // Cek tipe template Shopee: Format Kampanye Sesi atau Format Promo Diskon Toko
+  const isCampaign = headersLower.some(h => h.includes('kategori shopee') || h.includes('harga awal') || h.includes('rekomendasi harga diskon'));
+  const templateType = isCampaign ? 'campaign' : 'promo_diskon';
+
+  // Lewati baris keterangan/instruksi Shopee (misal baris 'Wajib', 'Opsional', dsb)
+  let dataStart = headerIdx + 1;
+  while (dataStart < rows.length) {
+    const r = rows[dataStart];
+    const pid = String(r?.[kodeIdx] || '').trim();
+    const vid = String(r?.[kodeVarIdx] || '').trim();
+    if ((pid && /^\d+$/.test(pid)) || (vid && /^\d+$/.test(vid))) break;
+    dataStart++;
+  }
+
   const parsed = [];
-  // Shopee data starts exactly at row 4 (index 3)
-  for (let i = 3; i < rows.length; i++) {
+  for (let i = dataStart; i < rows.length; i++) {
     const row = rows[i];
     if (!row || row.length === 0) continue;
-    const kode = String(row[kodeIdx] || '').trim();
-    if (!kode || !/^\d+$/.test(kode)) continue;
-    
+    const kode = kodeIdx > -1 ? String(row[kodeIdx] || '').trim() : '';
+    const vid = kodeVarIdx > -1 ? String(row[kodeVarIdx] || '').trim() : '';
+    if (!kode && !vid) continue;
+
     let saran = null;
     if (rekoIdx > -1 && row[rekoIdx]) {
       const num = Number(String(row[rekoIdx]).replace(/[^0-9]/g, ''));
       if (num > 0) saran = num;
     }
-    
+
+    let stokVal = null;
+    if (stokIdx > -1 && row[stokIdx] !== undefined && row[stokIdx] !== null && String(row[stokIdx]).trim() !== '') {
+      const rawStok = String(row[stokIdx]).replace(/[^0-9]/g, '');
+      if (rawStok !== '') stokVal = Number(rawStok);
+    }
+
+    const sellerSku = skuIdx > -1 ? String(row[skuIdx] || '').trim() : '';
+
     parsed.push({
       product_id: kode,
-      sku_id: String(row[kodeVarIdx] || '').trim(),
-      product_name: String(row[namaIdx] || '').trim(),
-      seller_sku: '', // not commonly used in shopee template line
-      variation_value: String(row[namaVarIdx] || '').trim(),
-      stok_saat_ini: row[stokIdx] ? Number(String(row[stokIdx]).replace(/[^0-9]/g, '')) : null,
+      sku_id: vid,
+      product_name: namaIdx > -1 ? String(row[namaIdx] || '').trim() : '',
+      seller_sku: sellerSku,
+      variation_value: namaVarIdx > -1 ? String(row[namaVarIdx] || '').trim() : '',
+      stok_saat_ini: stokVal,
       saran_harga: saran
     });
   }
-  return parsed;
+  return { rows: parsed, templateType };
 }
 
 // ─── Replace Fail map ───
@@ -181,25 +219,50 @@ function parseFailReport(wb) {
 }
 
 
+// Format 1: Kampanye Shopee (Sesi Kampanye / Flash Sale Shopee)
+const SHOPEE_CAMPAIGN_ROW0 = ['Nama Produk','Kode Produk','Nama Variasi','Kode Variasi','Kategori Shopee L1','Kategori Shopee L2','Kategori Shopee L3','Penjualan','Harga Awal','Harga Saat Ini','Harga Diskon','Rekomendasi Harga Diskon','Stok','Stok Promo','Batas Pembelian'];
+const SHOPEE_CAMPAIGN_ROW1 = ['Opsional','Wajib','Opsional','Wajib','Opsional','Opsional','Opsional','Opsional','Opsional','Optional','Wajib','Opsional','Opsional','Wajib','Wajib'];
+const SHOPEE_CAMPAIGN_ROW2 = ['Nama Produk tersedia yang memenuhi kriteria pada sesi ini','Mohon masukkan Kode Produk yang memenuhi kriteria pada sesi ini','Nama Variasi tersedia yang memenuhi kriteria pada sesi ini','Mohon masukkan Kode Kriteria yang memenuhi kriteria pada sesi ini','Nama kategori L1 dari Daftar Kategori di Seller Centre','Nama kategori L2 dari Daftar Kategori di Seller Centre','Nama kategori L3 dari Daftar Kategori di Seller Centre','Penjualan dari variasi produk ini','Harga awal dari variasi ini sebelum diskon','Harga promosi yang ditunjukkan ke Pembeli saat ini setelah penambahan pajak.','Mohon masukkan harga diskon yang kamu tentukan. Semakin murah harga diskon, semakin tinggi kesempatan produk disetujui dan meningkatkan penjualan.','Harga diskon untuk variasi ini, direkomendasikan oleh sistem.','Stok ini merupakan jumlah yang akan ditampilkan ke Pembeli','Mohon masukkan stok promo yang ingin kamu kunci untuk sesi ini. Untuk memastikan kamu telah mengunci stok yang cukup, jumlah akan dikurangi dari total stok produk yang tersedia sampai sesi ini berakhir.','Mohon masukkan jumlah maks. variasi per produk yang boleh dibeli dengan harga diskon untuk setiap Pembeli'];
+
+// Format 2: Promo Diskon Toko Shopee
 const SHOPEE_HEADER_ROW0 = ['Nama Produk','Kode Produk','Nama Variasi','Kode Variasi','Harga Diskon (Tidak Wajib)','Stok Promo (Tidak Wajib)','Harga Diskon (Wajib)','Periode Mulai','Periode Selesai','Nama Promo','Harga Diskon','Diskon (%)','Stok Saat Ini','Stok Promo','Batas Pembelian'];
 const SHOPEE_HEADER_ROW1 = ['Tidak Wajib','Tidak Wajib','Tidak Wajib','Tidak Wajib','Tidak Wajib','Tidak Wajib','Tidak Wajib','Tidak Wajib','Tidak Wajib','Tidak Wajib','Wajib','Tidak Wajib','Referensi','Wajib','Wajib'];
 const SHOPEE_HEADER_ROW2 = ['','','','','','','','','','','Masukkan harga diskon produk','','','Aktifkan promo dengan mengisi stok promo','Batas pembelian per pembeli per hari, min 1'];
 
-function exportCampaign(rows, withStock, filename) {
-  const aoa = [SHOPEE_HEADER_ROW0, SHOPEE_HEADER_ROW1, SHOPEE_HEADER_ROW2];
+function exportCampaign(rows, withStock, filename, templateType = 'campaign') {
+  const isCampaign = templateType === 'campaign';
+  const aoa = isCampaign 
+    ? [SHOPEE_CAMPAIGN_ROW0, SHOPEE_CAMPAIGN_ROW1, SHOPEE_CAMPAIGN_ROW2]
+    : [SHOPEE_HEADER_ROW0, SHOPEE_HEADER_ROW1, SHOPEE_HEADER_ROW2];
+
   rows.forEach(r => {
-    aoa.push([
-      r.product_name || '',
-      r.product_id,
-      r.variation_value || '',
-      r.sku_id,
-      '','','','','','',
-      r.harga_promo,
-      '',
-      r.stok_saat_ini || '',
-      withStock && r.stok_promo != null ? r.stok_promo : '',
-      r.batas_pembelian != null ? r.batas_pembelian : ''
-    ]);
+    if (isCampaign) {
+      aoa.push([
+        r.product_name || '',
+        r.product_id,
+        r.variation_value || '',
+        r.sku_id,
+        '','','','','','',
+        r.harga_promo,
+        r.saran_harga || '',
+        r.stok_saat_ini != null ? r.stok_saat_ini : '',
+        withStock && r.stok_promo != null ? r.stok_promo : '',
+        r.batas_pembelian != null ? r.batas_pembelian : ''
+      ]);
+    } else {
+      aoa.push([
+        r.product_name || '',
+        r.product_id,
+        r.variation_value || '',
+        r.sku_id,
+        '','','','','','',
+        r.harga_promo,
+        '',
+        r.stok_saat_ini != null ? r.stok_saat_ini : '',
+        withStock && r.stok_promo != null ? r.stok_promo : '',
+        r.batas_pembelian != null ? r.batas_pembelian : ''
+      ]);
+    }
   });
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   const wb2 = XLSX.utils.book_new();
@@ -216,6 +279,7 @@ function PromoShopee() {
   const downloadRef = useRef(null);
 
   const [products, setProducts] = useState([]);
+  const [shopeeTemplateType, setShopeeTemplateType] = useState('campaign');
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [failMap, setFailMap] = useState(new Map());
@@ -256,7 +320,9 @@ function PromoShopee() {
 
   // ─── Stok Masal State ────────────
   const [showStokMasalModal, setShowStokMasalModal] = useState(false);
-  const [stokMasalMode, setStokMasalMode] = useState('samakan'); // samakan, kurangi, tambah
+  const [stokMasalMode, setStokMasalMode] = useState('samakan'); // samakan, tetap, kurangi, tambah
+  const [stokMasalRule, setStokMasalRule] = useState('aman'); // aman, rata, maksimal
+  const [cardBulkStockConfirm, setCardBulkStockConfirm] = useState(null); // samakan, kurangi, tambah
   const [stokMasalValue, setStokMasalValue] = useState('');
 
   // ─── Kalkulator Harga State ──────
@@ -594,20 +660,83 @@ function PromoShopee() {
       return true;
     });
 
-    targets.forEach(p => {
-      setLocalValues(prev => {
-        const cur = prev[p.id] || {};
+    if (bulk.stok !== '') {
+      const targetNum = Number(bulk.stok);
+      if (!isNaN(targetNum) && targetNum > 0) {
+        const unsafeRows = targets.filter(p => Number(p.stok_saat_ini || 0) < targetNum);
+        if (unsafeRows.length > 0) {
+          setCardBulkStockConfirm({
+            sellerSku,
+            targetNum,
+            targets,
+            unsafeCount: unsafeRows.length,
+            safeCount: targets.length - unsafeRows.length,
+            harga: bulk.harga,
+            stok: bulk.stok,
+            batas: bulk.batas,
+            selections
+          });
+          return;
+        }
+      }
+    }
+
+    executeApplyCardBulk(sellerSku, targets, bulk.harga, bulk.stok, bulk.batas, 'rata', selections);
+  }
+
+  function executeApplyCardBulk(sellerSku, targets, harga, stok, batas, stockMode = 'rata', selections = []) {
+    let filledCount = 0;
+    let skippedCount = 0;
+    const targetNum = stok !== '' ? Number(stok) : null;
+
+    setLocalValues(prev => {
+      const nextMap = { ...prev };
+      targets.forEach(p => {
+        const cur = nextMap[p.id] || {};
         const next = { ...cur };
-        if (bulk.harga) next.harga_promo = bulk.harga;
-        if (bulk.stok !== '') next.stok_promo = bulk.stok;
-        if (bulk.batas !== '') next.batas_pembelian = bulk.batas;
-        return { ...prev, [p.id]: next };
+        if (harga) next.harga_promo = harga;
+        if (batas !== '' && batas !== undefined) next.batas_pembelian = batas;
+
+        if (stok !== '') {
+          const curStok = Number(p.stok_saat_ini || 0);
+          if (stockMode === 'aman') {
+            if (curStok >= targetNum) {
+              next.stok_promo = String(targetNum);
+              filledCount++;
+            } else {
+              next.stok_promo = '';
+              skippedCount++;
+            }
+          } else if (stockMode === 'maksimal') {
+            if (curStok >= targetNum) {
+              next.stok_promo = String(targetNum);
+              filledCount++;
+            } else if (curStok > 0) {
+              next.stok_promo = String(curStok);
+              filledCount++;
+            } else {
+              next.stok_promo = '';
+              skippedCount++;
+            }
+          } else {
+            next.stok_promo = String(stok);
+            filledCount++;
+          }
+        }
+        nextMap[p.id] = next;
       });
+      return nextMap;
     });
+
     setIsDirty(true);
     setCardBulk(prev => ({ ...prev, [sellerSku]: { selections, harga: '', stok: '', batas: '' } }));
     setFlashSku(sellerSku);
     setTimeout(() => setFlashSku(null), 1500);
+    setCardBulkStockConfirm(null);
+
+    if (stok !== '' && skippedCount > 0) {
+      alert(`Stok promo untuk SKU "${sellerSku}" berhasil diterapkan:\n\n✓ ${filledCount} variasi diisi stok ${stok}\n✗ ${skippedCount} variasi dilewati/kosong karena stok real < ${stok}`);
+    }
   }
 
   function setCardBulkField(sellerSku, field, value) {
@@ -631,24 +760,52 @@ function PromoShopee() {
     const val = Number(stokMasalValue) || 0;
     const newLocals = { ...localValues };
     let changed = false;
+    let filledCount = 0;
+    let skippedCount = 0;
 
     filteredGroups.forEach(({ rows }) => {
       rows.forEach(r => {
         const stokSaatIni = Number(r.stok_saat_ini || 0);
-        let newStok = stokSaatIni;
+        let newStok = null;
 
         if (stokMasalMode === 'samakan') {
           newStok = stokSaatIni;
+          filledCount++;
         } else if (stokMasalMode === 'kurangi') {
-          newStok = stokSaatIni - val;
+          newStok = Math.max(0, stokSaatIni - val);
+          filledCount++;
         } else if (stokMasalMode === 'tambah') {
           newStok = stokSaatIni + val;
+          filledCount++;
+        } else if (stokMasalMode === 'tetap') {
+          if (stokMasalRule === 'aman') {
+            if (stokSaatIni >= val) {
+              newStok = val;
+              filledCount++;
+            } else {
+              newStok = ''; // dilewati / tidak diikutkan
+              skippedCount++;
+            }
+          } else if (stokMasalRule === 'maksimal') {
+            if (stokSaatIni >= val) {
+              newStok = val;
+              filledCount++;
+            } else if (stokSaatIni > 0) {
+              newStok = stokSaatIni;
+              filledCount++;
+            } else {
+              newStok = '';
+              skippedCount++;
+            }
+          } else {
+            // 'rata'
+            newStok = val;
+            filledCount++;
+          }
         }
 
-        if (newStok < 0) newStok = 0;
-
         const cur = newLocals[r.id] || {};
-        newLocals[r.id] = { ...cur, stok_promo: String(newStok) };
+        newLocals[r.id] = { ...cur, stok_promo: newStok !== null ? String(newStok) : '' };
         changed = true;
       });
     });
@@ -658,6 +815,19 @@ function PromoShopee() {
       setIsDirty(true);
     }
     setShowStokMasalModal(false);
+
+    // Notifikasi yang jelas & detail
+    if (stokMasalMode === 'tetap' && stokMasalRule === 'aman') {
+      alert(`Berhasil Input Stok Masal (Mode Stok Aman):\n\n✓ ${filledCount} variasi diisi stok promo ${val} (karena stok real >= ${val})\n✗ ${skippedCount} variasi dilewati/tidak diikutkan promo (karena stok real < ${val})`);
+    } else if (stokMasalMode === 'tetap' && stokMasalRule === 'maksimal') {
+      alert(`Berhasil Input Stok Masal (Mode Maksimal Sesuai Stok):\n\n✓ ${filledCount} variasi diisi stok promo (maksimal ${val})\n✗ ${skippedCount} variasi dilewati (karena stok 0)`);
+    } else if (stokMasalMode === 'tetap' && stokMasalRule === 'rata') {
+      alert(`Berhasil Input Stok Masal (Mode Rata ke Semua):\n\n✓ ${filledCount} variasi diisi stok promo ${val}`);
+    } else if (stokMasalMode === 'samakan') {
+      alert(`Berhasil Input Stok Masal:\n\n✓ ${filledCount} variasi disamakan persis dengan stok saat ini.`);
+    } else {
+      alert(`Berhasil Input Stok Masal:\n\n✓ ${filledCount} variasi berhasil diperbarui stok promonya.`);
+    }
   };
 
   // Direct-set a single localValues field (used by saran harga)
@@ -684,25 +854,26 @@ function PromoShopee() {
     try {
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: 'array' });
-      const rows = parseSalesInfoSheet(wb);
+      const { rows, templateType } = parseSalesInfoSheet(wb);
+      if (templateType) setShopeeTemplateType(templateType);
 
-      if (rows.length === 0) {
+      if (!rows || rows.length === 0) {
         alert(
           'File tidak mengandung data produk.\n\n' +
-          'Pastikan file yang diupload adalah hasil export Batch Edit dari TikTok Seller Center yang sudah berisi produk (bukan template kosong).\n\n' +
+          'Pastikan file yang diupload adalah hasil download dari Shopee Seller Centre (Nominasi Kampanye atau Promo Toko) yang sudah berisi produk.\n\n' +
           'Cara mendapatkan file:\n' +
-          'TikTok Seller Center → Produkku → Batch Edit → Pilih produk → Download Template'
+          'Shopee Seller Centre → Promosi Saya → Kampanye / Promo Toko → Nominasi Masal → Download Template'
         );
         setUploading(false);
         return;
       }
 
       const mapped = rows.map(r => ({
-        product_id: String(r['product_id'] || '').trim(),
-        sku_id: String(r['sku_id'] || '').trim(),
-        product_name: String(r['product_name'] || r['title'] || '').trim(),
-        seller_sku: String(r['seller_sku'] || r['seller sku'] || '').trim(),
-        variation_value: String(r['variation_value'] || r['variation name'] || r['sku_name'] || '').trim(),
+        product_id: String(r.product_id || '').trim(),
+        sku_id: String(r.sku_id || '').trim(),
+        product_name: String(r.product_name || '').trim(),
+        seller_sku: String(r.seller_sku || '').trim(),
+        variation_value: String(r.variation_value || '').trim(),
         stok_saat_ini: r.stok_saat_ini !== undefined ? r.stok_saat_ini : null,
         saran_harga: r.saran_harga || null,
       })).filter(r => r.product_id || r.sku_id);
@@ -832,7 +1003,7 @@ function PromoShopee() {
     if (skipped > 0) {
       setDownloadConfirm({ rows, skipped, withStock, filename });
     } else {
-      exportCampaign(rows, withStock, filename);
+      exportCampaign(rows, withStock, filename, shopeeTemplateType);
     }
   }
 
@@ -1224,29 +1395,78 @@ function PromoShopee() {
       {/* ══ STOK MASAL MODAL ══ */}
       {showStokMasalModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div className="glass-card" style={{ padding: '1.5rem', maxWidth: '400px', width: '90%' }}>
-            <h3 style={{ fontWeight: 700, fontSize: '1rem', marginBottom: '0.375rem', color: 'var(--text-primary)' }}>Input Stok Masal</h3>
+          <div className="glass-card" style={{ padding: '1.5rem', maxWidth: '440px', width: '92%' }}>
+            <h3 style={{ fontWeight: 700, fontSize: '1.05rem', marginBottom: '0.375rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Zap size={18} color="#6c5ce7" /> Input Stok Masal
+            </h3>
             <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '1.25rem', lineHeight: 1.5 }}>
-              Terapkan aturan perhitungan stok ini ke <strong>semua produk yang sedang tampil</strong> (tidak difilter). Jika hasilnya kurang dari 0, stok akan disetel menjadi 0 (tidak ikut promo).
+              Terapkan aturan perhitungan stok ini ke <strong>semua produk yang sedang tampil</strong>.
             </p>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.5rem' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.8125rem' }}>
-                <input type="radio" value="samakan" checked={stokMasalMode === 'samakan'} onChange={() => setStokMasalMode('samakan')} style={{ accentColor: '#6c5ce7' }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.25rem' }}>
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', cursor: 'pointer', fontSize: '0.8125rem' }}>
+                <input type="radio" value="samakan" checked={stokMasalMode === 'samakan'} onChange={() => setStokMasalMode('samakan')} style={{ marginTop: '0.2rem', accentColor: '#6c5ce7' }} />
                 <span>Samakan persis dengan <strong>Stok Saat Ini</strong></span>
               </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.8125rem' }}>
-                <input type="radio" value="kurangi" checked={stokMasalMode === 'kurangi'} onChange={() => setStokMasalMode('kurangi')} style={{ accentColor: '#6c5ce7' }} />
+
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', cursor: 'pointer', fontSize: '0.8125rem' }}>
+                <input type="radio" value="tetap" checked={stokMasalMode === 'tetap'} onChange={() => setStokMasalMode('tetap')} style={{ marginTop: '0.2rem', accentColor: '#6c5ce7' }} />
+                <span><strong>Target Stok Tertentu</strong> (misal: isi 5 stok)</span>
+              </label>
+
+              {stokMasalMode === 'tetap' && (
+                <div style={{ marginLeft: '1.5rem', padding: '0.75rem', background: 'var(--bg-glass-hover)', border: '1px solid var(--border-medium)', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
+                  <div>
+                    <div style={{ fontSize: '0.6875rem', fontWeight: 600, color: 'var(--text-tertiary)', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Target Stok Promo:</div>
+                    <input 
+                      type="number" className="im-input" autoFocus
+                      placeholder="Contoh: 5"
+                      value={stokMasalValue} onChange={e => setStokMasalValue(e.target.value)}
+                      style={{ width: '100%', padding: '0.45rem 0.6rem', fontSize: '0.875rem', fontWeight: 700 }}
+                    />
+                  </div>
+
+                  <div style={{ fontSize: '0.6875rem', fontWeight: 600, color: 'var(--text-tertiary)', marginTop: '0.25rem', textTransform: 'uppercase' }}>Aturan Penanganan Stok Real:</div>
+
+                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.4rem', cursor: 'pointer', fontSize: '0.75rem' }}>
+                    <input type="radio" name="stokRule" value="aman" checked={stokMasalRule === 'aman'} onChange={() => setStokMasalRule('aman')} style={{ marginTop: '0.15rem', accentColor: '#10b981' }} />
+                    <div>
+                      <strong style={{ color: '#10b981' }}>🛡️ Sesuaikan Stok Aman (Rekomendasi)</strong>
+                      <div style={{ color: 'var(--text-tertiary)', fontSize: '0.6875rem' }}>Hanya variasi dengan stok real &ge; {stokMasalValue || 'target'} yang diisi {stokMasalValue || 'target'}. Variasi di bawahnya <strong>tidak ikut promo</strong> (aman dari penolakan Shopee).</div>
+                    </div>
+                  </label>
+
+                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.4rem', cursor: 'pointer', fontSize: '0.75rem' }}>
+                    <input type="radio" name="stokRule" value="rata" checked={stokMasalRule === 'rata'} onChange={() => setStokMasalRule('rata')} style={{ marginTop: '0.15rem', accentColor: '#6c5ce7' }} />
+                    <div>
+                      <strong>⚡ Rata ke Semua (Paksa)</strong>
+                      <div style={{ color: 'var(--text-tertiary)', fontSize: '0.6875rem' }}>Paksa isi {stokMasalValue || 'target'} ke semua variasi tanpa memandang stok saat ini.</div>
+                    </div>
+                  </label>
+
+                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.4rem', cursor: 'pointer', fontSize: '0.75rem' }}>
+                    <input type="radio" name="stokRule" value="maksimal" checked={stokMasalRule === 'maksimal'} onChange={() => setStokMasalRule('maksimal')} style={{ marginTop: '0.15rem', accentColor: '#3b82f6' }} />
+                    <div>
+                      <strong>📦 Maksimal Sesuai Stok</strong>
+                      <div style={{ color: 'var(--text-tertiary)', fontSize: '0.6875rem' }}>Jika stok &ge; {stokMasalValue || 'target'} isi {stokMasalValue || 'target'}. Jika stok &lt; {stokMasalValue || 'target'}, isi sejumlah sisa stok yang ada.</div>
+                    </div>
+                  </label>
+                </div>
+              )}
+
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', cursor: 'pointer', fontSize: '0.8125rem' }}>
+                <input type="radio" value="kurangi" checked={stokMasalMode === 'kurangi'} onChange={() => setStokMasalMode('kurangi')} style={{ marginTop: '0.2rem', accentColor: '#6c5ce7' }} />
                 <span><strong>Kurangi</strong> nilai Stok Saat Ini dengan:</span>
               </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.8125rem' }}>
-                <input type="radio" value="tambah" checked={stokMasalMode === 'tambah'} onChange={() => setStokMasalMode('tambah')} style={{ accentColor: '#6c5ce7' }} />
+
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', cursor: 'pointer', fontSize: '0.8125rem' }}>
+                <input type="radio" value="tambah" checked={stokMasalMode === 'tambah'} onChange={() => setStokMasalMode('tambah')} style={{ marginTop: '0.2rem', accentColor: '#6c5ce7' }} />
                 <span><strong>Tambahkan</strong> nilai ke Stok Saat Ini sebesar:</span>
               </label>
             </div>
 
-            {stokMasalMode !== 'samakan' && (
-              <div style={{ marginBottom: '1.5rem' }}>
+            {(stokMasalMode === 'kurangi' || stokMasalMode === 'tambah') && (
+              <div style={{ marginBottom: '1.25rem' }}>
                 <div style={{ fontSize: '0.6875rem', fontWeight: 600, color: 'var(--text-tertiary)', marginBottom: '0.375rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Besaran Angka</div>
                 <input 
                   type="number" className="im-input" autoFocus
@@ -1257,7 +1477,7 @@ function PromoShopee() {
               </div>
             )}
 
-            <div style={{ display: 'flex', gap: '0.625rem', justifyContent: 'flex-end' }}>
+            <div style={{ display: 'flex', gap: '0.625rem', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
               <button className="btn-secondary" onClick={() => setShowStokMasalModal(false)} style={{ padding: '0.5rem 1.25rem', fontSize: '0.8125rem' }}>Batal</button>
               <button 
                 className="btn-primary" 
@@ -1266,6 +1486,98 @@ function PromoShopee() {
                 style={{ padding: '0.5rem 1.25rem', fontSize: '0.8125rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.375rem' }}
               >
                 <Zap size={14} /> Eksekusi Masal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ POPUP KONFIRMASI STOK AMAN PER-CARD ══ */}
+      {cardBulkStockConfirm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', zIndex: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="glass-card" style={{ padding: '1.5rem', maxWidth: '420px', width: '92%' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#f59e0b', marginBottom: '0.5rem' }}>
+              <AlertTriangle size={20} />
+              <h3 style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-primary)' }}>Peringatan Stok Real</h3>
+            </div>
+            
+            <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginBottom: '1rem', lineHeight: 1.5 }}>
+              Anda ingin menerapkan stok promo <strong>{cardBulkStockConfirm.stok}</strong> untuk SKU <strong>{cardBulkStockConfirm.sellerSku}</strong>.
+              <br /><br />
+              Ditemukan <span style={{ color: '#ef4444', fontWeight: 700 }}>{cardBulkStockConfirm.unsafeCount} variasi</span> dengan stok real kurang dari {cardBulkStockConfirm.stok}.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem', marginBottom: '1.25rem' }}>
+              <button
+                onClick={() => {
+                  executeApplyCardBulk(
+                    cardBulkStockConfirm.sellerSku,
+                    cardBulkStockConfirm.targets,
+                    cardBulkStockConfirm.harga,
+                    cardBulkStockConfirm.stok,
+                    cardBulkStockConfirm.batas,
+                    'aman',
+                    cardBulkStockConfirm.selections
+                  );
+                }}
+                style={{ padding: '0.75rem', background: 'rgba(16,185,129,0.1)', border: '1px solid #10b981', borderRadius: 'var(--radius-md)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s' }}
+              >
+                <div style={{ fontWeight: 700, color: '#10b981', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <CheckCircle2 size={15} /> 🛡️ Sesuaikan Stok Aman (Rekomendasi)
+                </div>
+                <div style={{ fontSize: '0.6875rem', color: 'var(--text-tertiary)', marginTop: '0.2rem' }}>
+                  Hanya {cardBulkStockConfirm.safeCount} variasi aman (&ge; {cardBulkStockConfirm.stok}) yang diisi. Variasi yang kurang dikosongkan agar tidak ditolak marketplace.
+                </div>
+              </button>
+
+              <button
+                onClick={() => {
+                  executeApplyCardBulk(
+                    cardBulkStockConfirm.sellerSku,
+                    cardBulkStockConfirm.targets,
+                    cardBulkStockConfirm.harga,
+                    cardBulkStockConfirm.stok,
+                    cardBulkStockConfirm.batas,
+                    'maksimal',
+                    cardBulkStockConfirm.selections
+                  );
+                }}
+                style={{ padding: '0.75rem', background: 'rgba(59,130,246,0.1)', border: '1px solid #3b82f6', borderRadius: 'var(--radius-md)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s' }}
+              >
+                <div style={{ fontWeight: 700, color: '#3b82f6', fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  📦 Maksimal Sisa Stok
+                </div>
+                <div style={{ fontSize: '0.6875rem', color: 'var(--text-tertiary)', marginTop: '0.2rem' }}>
+                  Variasi yang kurang diisi sesuai sisa stoknya (misal ada 2 diisi 2).
+                </div>
+              </button>
+
+              <button
+                onClick={() => {
+                  executeApplyCardBulk(
+                    cardBulkStockConfirm.sellerSku,
+                    cardBulkStockConfirm.targets,
+                    cardBulkStockConfirm.harga,
+                    cardBulkStockConfirm.stok,
+                    cardBulkStockConfirm.batas,
+                    'rata',
+                    cardBulkStockConfirm.selections
+                  );
+                }}
+                style={{ padding: '0.75rem', background: 'var(--bg-glass)', border: '1px solid var(--border-medium)', borderRadius: 'var(--radius-md)', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s' }}
+              >
+                <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.8125rem' }}>
+                  ⚡ Rata ke Semua (Paksa)
+                </div>
+                <div style={{ fontSize: '0.6875rem', color: 'var(--text-tertiary)', marginTop: '0.2rem' }}>
+                  Tetap isi {cardBulkStockConfirm.stok} ke seluruh variasi tanpa memandang stok real.
+                </div>
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button className="btn-secondary" onClick={() => setCardBulkStockConfirm(null)} style={{ padding: '0.45rem 1.25rem', fontSize: '0.8125rem' }}>
+                Batal
               </button>
             </div>
           </div>
@@ -1342,7 +1654,7 @@ function PromoShopee() {
               </button>
               <button
                 onClick={() => {
-                  exportCampaign(downloadConfirm.rows, downloadConfirm.withStock, downloadConfirm.filename);
+                  exportCampaign(downloadConfirm.rows, downloadConfirm.withStock, downloadConfirm.filename, shopeeTemplateType);
                   setDownloadConfirm(null);
                 }}
                 style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.375rem', padding: '0.5rem', background: 'linear-gradient(135deg,#6c5ce7,#a29bfe)', border: 'none', borderRadius: 'var(--radius-md)', cursor: 'pointer', color: '#fff', fontSize: '0.8125rem', fontWeight: 600 }}

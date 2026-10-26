@@ -76,13 +76,36 @@ class DataController extends Controller
         $this->applyUploadScope($query, $request);
 
         return new StreamedResponse(function () use ($query) {
-            $query->chunkById(2000, function ($rows) {
+            $channelCache = [];
+            $query->chunkById(5000, function ($rows) use (&$channelCache) {
+                $buf = '';
                 foreach ($rows as $r) {
-                    $parsed = is_string($r->data) ? json_decode($r->data, true) : (array) $r->data;
+                    $ch = $r->channel ?? '';
+                    if (!isset($channelCache[$ch])) {
+                        $channelCache[$ch] = json_encode($ch);
+                    }
+                    $chJson = $channelCache[$ch];
+                    $d = $r->data;
+                    if (is_string($d)) {
+                        $trimmed = rtrim($d);
+                        $len = strlen($trimmed);
+                        if ($len >= 2 && $trimmed[0] === '{' && $trimmed[$len - 1] === '}') {
+                            if ($len === 2) {
+                                $buf .= '{"Channel Marketplace":' . $chJson . "}\n";
+                            } else {
+                                $buf .= substr($trimmed, 0, -1) . ',"Channel Marketplace":' . $chJson . "}\n";
+                            }
+                            continue;
+                        }
+                        $parsed = json_decode($d, true);
+                    } else {
+                        $parsed = (array) $d;
+                    }
                     if (!is_array($parsed)) $parsed = [];
-                    $parsed['Channel Marketplace'] = $r->channel;
-                    echo json_encode($parsed) . "\n";
+                    $parsed['Channel Marketplace'] = $ch;
+                    $buf .= json_encode($parsed) . "\n";
                 }
+                echo $buf;
                 if (ob_get_level() > 0) ob_flush();
                 flush();
             });
@@ -96,15 +119,17 @@ class DataController extends Controller
         $this->applyUploadScope($query, $request);
 
         return new StreamedResponse(function () use ($query) {
-            $query->chunkById(2000, function ($rows) {
+            $query->chunkById(5000, function ($rows) {
+                $buf = '';
                 foreach ($rows as $r) {
                     $d = $r->data;
                     if (is_array($d) || is_object($d)) {
-                        echo json_encode($d) . "\n";
+                        $buf .= json_encode($d) . "\n";
                     } else {
-                        echo $d . "\n";
+                        $buf .= $d . "\n";
                     }
                 }
+                echo $buf;
                 if (ob_get_level() > 0) ob_flush();
                 flush();
             });
@@ -118,15 +143,17 @@ class DataController extends Controller
         $this->applyUploadScope($query, $request);
 
         return new StreamedResponse(function () use ($query) {
-            $query->chunkById(2000, function ($rows) {
+            $query->chunkById(5000, function ($rows) {
+                $buf = '';
                 foreach ($rows as $r) {
                     $d = $r->data;
                     if (is_array($d) || is_object($d)) {
-                        echo json_encode($d) . "\n";
+                        $buf .= json_encode($d) . "\n";
                     } else {
-                        echo $d . "\n";
+                        $buf .= $d . "\n";
                     }
                 }
+                echo $buf;
                 if (ob_get_level() > 0) ob_flush();
                 flush();
             });
@@ -140,15 +167,17 @@ class DataController extends Controller
         $this->applyUploadScope($query, $request);
 
         return new StreamedResponse(function () use ($query) {
-            $query->chunkById(2000, function ($rows) {
+            $query->chunkById(5000, function ($rows) {
+                $buf = '';
                 foreach ($rows as $r) {
                     $d = $r->data;
                     if (is_array($d) || is_object($d)) {
-                        echo json_encode($d) . "\n";
+                        $buf .= json_encode($d) . "\n";
                     } else {
-                        echo $d . "\n";
+                        $buf .= $d . "\n";
                     }
                 }
+                echo $buf;
                 if (ob_get_level() > 0) ob_flush();
                 flush();
             });

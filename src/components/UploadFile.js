@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import * as XLSX from "xlsx";
 import FileInputList from "./FileInputList";
 import { Upload as UploadIcon, FileSpreadsheet, AlertCircle, Loader2, CheckCircle2, Trash2, Clock, Database, Store } from "lucide-react";
-import { apiUploadFiles, apiUploadParsedFiles, apiGetUploadHistory, apiDeleteUpload, apiAssignOrphanUploads } from '../api';
+import { apiUploadParsedFiles, apiGetUploadHistory, apiDeleteUpload, apiAssignOrphanUploads } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useStore } from '../contexts/StoreContext';
 import { useDataCache } from '../contexts/DataContext';
@@ -397,6 +397,97 @@ function UploadFile() {
     });
   }
 
+  function mapShopeeIncomeToStandard(data) {
+    return data.map((row) => ({
+      'Order/adjustment ID': row['No. Pesanan'] ?? '',
+      'Total settlement amount': Number(String(row['Total Penghasilan'] ?? 0).replace(/[^0-9.-]+/g, '')) || 0,
+      'Customer payment': Number(String(row['Harga Asli Produk'] ?? 0).replace(/[^0-9.-]+/g, '')) || 0,
+      'Affiliate commission': 0,
+      'Return shipping costs (passed on to the customer)': Number(String(row['Ongkos Kirim Pengembalian Barang'] ?? 0).replace(/[^0-9.-]+/g, '')) || 0,
+      'Tanggal Dana Dilepaskan': row['Tanggal Dana Dilepaskan'] ?? '',
+      'Waktu Pesanan Dibuat': row['Waktu Pesanan Dibuat'] ?? '',
+      'Metode pembayaran pembeli': row['Metode pembayaran pembeli'] ?? '',
+      'Biaya Layanan': Number(String(row['Biaya Layanan'] ?? 0).replace(/[^0-9.-]+/g, '')) || 0,
+      'Biaya Administrasi': Number(String(row['Biaya Administrasi'] ?? 0).replace(/[^0-9.-]+/g, '')) || 0,
+      'Biaya Proses Pesanan': Number(String(row['Biaya Proses Pesanan'] ?? 0).replace(/[^0-9.-]+/g, '')) || 0,
+      'Channel Marketplace': 'Shopee',
+    }));
+  }
+
+  function mapShopeeReturnToStandard(data) {
+    const statusMap = {
+      'dana dikembalikan ke pembeli': 'Completed',
+      'sedang diproses': 'In Process',
+      'ditolak': 'Rejected',
+      'selesai': 'Completed',
+    };
+    return data.map((row) => {
+      const statusRaw = (row['Status Pembatalan/ Pengembalian'] ?? '').toString().trim().toLowerCase();
+      return {
+        'Order ID': row['No. Pesanan'] ?? '',
+        'Return Order ID': row['No. Pengembalian'] ?? '',
+        'Return Status': statusMap[statusRaw] ?? (row['Status Pembatalan/ Pengembalian'] ?? ''),
+        'Return Logistics Tracking ID': row['No. Resi Pengembalian Barang'] ?? '',
+        'Product Name': row['Nama Produk'] ?? '',
+        'Return Type': row['Tipe Pengembalian'] ?? '',
+        'Return Reason': row['Alasan Pengembalian'] ?? '',
+        'Refund Amount': row['Total Pengembalian Dana'] ?? '',
+        'Channel Marketplace': 'Shopee',
+      };
+    });
+  }
+
+  const ORDER_WHITELIST = new Set([
+    'order id', 'order status', 'product name', 'seller sku', 'sku id',
+    'variation', 'quantity', 'cancel reason', 'tracking id', 'pembeli',
+    'nama penerima', 'recipient', 'username (buyer)', 'buyer username',
+    'phone #', 'city', 'kota / kabupaten', 'kota/kabupaten', 'regency and city',
+    'districts', 'province', 'provinsi', 'alamat', 'detail address',
+    'payment method', 'shipping provider name', 'opsi pengiriman',
+    'delivered time', 'cancelled time', 'waktu pesanan dibuat', 'created time',
+    'shipped time', 'channel marketplace', 'order amount', 'total pembayaran',
+    'harga asli produk'
+  ]);
+
+  const PAYMENT_WHITELIST = new Set([
+    'order/adjustment id', 'no. pesanan', 'total settlement amount',
+    'total penghasilan', 'customer payment', 'total pembayaran pembeli',
+    'affiliate commission', 'komisi affiliate',
+    'return shipping costs (passed on to the customer)',
+    'tanggal dana dilepaskan', 'waktu pesanan dibuat', 'order created time',
+    'order settled time', 'metode pembayaran pembeli', 'biaya layanan',
+    'biaya administrasi', 'biaya proses pesanan', 'channel marketplace'
+  ]);
+
+  const RETURN_WHITELIST = new Set([
+    'order id', 'return order id', 'return status', 'return sub status',
+    'return logistics tracking id', 'product name', 'sku id', 'seller sku',
+    'sku name', 'buyer username', 'return type', 'return reason',
+    'return quantity', 'return unit price', 'refund amount', 'order amount',
+    'order status', 'order substatus', 'payment method', 'time requested',
+    'refund time', 'dispute status', 'appeal status', 'compensation status',
+    'compensation amount', 'buyer note', 'channel marketplace'
+  ]);
+
+  function pruneClientData(rows, category) {
+    let whitelist = null;
+    if (category === 'orders') whitelist = ORDER_WHITELIST;
+    else if (category === 'payments') whitelist = PAYMENT_WHITELIST;
+    else if (category === 'return' || category === 'returns') whitelist = RETURN_WHITELIST;
+    if (!whitelist) return rows;
+
+    return rows.map((row) => {
+      const pruned = {};
+      for (const [k, v] of Object.entries(row)) {
+        const trimmed = k.trim();
+        if (whitelist.has(trimmed.toLowerCase())) {
+          pruned[trimmed] = v;
+        }
+      }
+      return pruned;
+    });
+  }
+
   function parseFile(file) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -514,7 +605,10 @@ function UploadFile() {
             });
           }
           if (platform === "shopee" && category === "orders") jsonData = mapShopeeHeadersToStandard(jsonData);
+          if (platform === "shopee" && category === "payments") jsonData = mapShopeeIncomeToStandard(jsonData);
+          if (platform === "shopee" && category === "return") jsonData = mapShopeeReturnToStandard(jsonData);
           if (platform === "tiktok") jsonData = mapTiktokHeadersToStandard(jsonData);
+          jsonData = pruneClientData(jsonData, category);
           resolve({ file, platform, category, data: jsonData });
         } catch {
           reject("Gagal membaca salah satu file. Pastikan file valid.");
@@ -559,30 +653,30 @@ function UploadFile() {
       const newCategoryMap = { ...fileCategoryMap };
       const newParsedDataMap = { ...fileParsedDataMap };
       const newRowCountMap = { ...fileRowCountMap };
+      let changed = false;
       for (const file of allFiles) {
         const key = file.name + file.size;
         if (!(key in newCache)) {
+          changed = true;
           try {
             const { platform, category, data } = await parseFile(file);
             newCache[key] = platform;
             newCategoryMap[key] = category;
             newParsedDataMap[key] = data;
             newRowCountMap[key] = data.length;
-            setFilePlatformCache({ ...newCache });
-            setFileCategoryMap({ ...newCategoryMap });
-            setFileParsedDataMap({ ...newParsedDataMap });
-            setFileRowCountMap({ ...newRowCountMap });
           } catch {
             newCache[key] = "unknown";
             newCategoryMap[key] = "unknown";
             newParsedDataMap[key] = [];
             newRowCountMap[key] = 0;
-            setFilePlatformCache({ ...newCache });
-            setFileCategoryMap({ ...newCategoryMap });
-            setFileParsedDataMap({ ...newParsedDataMap });
-            setFileRowCountMap({ ...newRowCountMap });
           }
         }
+      }
+      if (changed) {
+        setFilePlatformCache(newCache);
+        setFileCategoryMap(newCategoryMap);
+        setFileParsedDataMap(newParsedDataMap);
+        setFileRowCountMap(newRowCountMap);
       }
     }
     if (allFiles.length > 0) detectAll();

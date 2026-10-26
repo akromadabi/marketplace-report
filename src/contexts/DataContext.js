@@ -5,7 +5,9 @@ import {
     apiGetReturns,
     apiGetPengembalian,
     apiGetModalValues,
+    apiGetSkuCatalog,
     apiGetStats,
+    apiGetScans,
 } from '../api';
 import { useAuth } from './AuthContext';
 import { useStore } from './StoreContext';
@@ -36,11 +38,14 @@ export function DataProvider({ children }) {
         returns: apiGetReturns,
         pengembalian: apiGetPengembalian,
         stats: apiGetStats,
+        scan: () => apiGetScans(),
+        skuCatalog: apiGetSkuCatalog,
         // modal values — cached globally so every component reads from same source
         modal: (storeId, _userId) => apiGetModalValues(storeId),
     });
 
     const getCacheKey = useCallback((type, storeId) => {
+        if (type === 'scan') return 'scan::global';
         return `${type}::${storeId || 'all'}::${userId || 'none'}`;
     }, [userId]);
 
@@ -121,6 +126,7 @@ export function DataProvider({ children }) {
                 cacheRef.current.delete(key);
             }
         }
+        computedRef.current.clear();
         setVersion(v => v + 1);
     }, []);
 
