@@ -315,6 +315,35 @@ function PromoTiktok() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [localValues, products]);
 
+  // ─── Filter Counts (Harga, Stok) ─────────────────────────
+  const filterCounts = useMemo(() => {
+    let hargaEmpty = 0;
+    let stokEmpty = 0;
+    let incomplete = 0;
+    let complete = 0;
+
+    grouped.forEach(({ rows }) => {
+      const anyHargaEmpty = rows.some(r => !(toRawNum(getLocal(r.id, 'harga_promo')) > 0));
+      const anyStokEmpty = rows.some(r => {
+        const v = getLocal(r.id, 'stok_promo');
+        return v === null || v === '' || v === undefined;
+      });
+
+      if (anyHargaEmpty) hargaEmpty++;
+      if (anyStokEmpty) stokEmpty++;
+      if (anyHargaEmpty || anyStokEmpty) incomplete++;
+      else complete++;
+    });
+
+    return {
+      total: grouped.length,
+      hargaEmpty,
+      stokEmpty,
+      incomplete,
+      complete
+    };
+  }, [grouped, localValues, products]);
+
   const stats = useMemo(() => {
     let filled = 0, partial = 0, unfilled = 0;
     grouped.forEach(({ rows }) => {
@@ -335,12 +364,28 @@ function PromoTiktok() {
       );
     }
     if (filterMode !== 'all') {
-      items = items.filter(({ rows }) => {
-        const s = getFillStatus(rows);
-        if (filterMode === 'filled') return s === 'filled';
-        if (filterMode === 'unfilled') return s !== 'filled';
-        return true;
-      });
+      if (filterMode === 'harga_empty' || filterMode === 'unfilled') {
+        items = items.filter(({ rows }) => rows.some(r => !(toRawNum(getLocal(r.id, 'harga_promo')) > 0)));
+      } else if (filterMode === 'stok_empty') {
+        items = items.filter(({ rows }) => rows.some(r => {
+          const v = getLocal(r.id, 'stok_promo');
+          return v === null || v === '' || v === undefined;
+        }));
+      } else if (filterMode === 'incomplete') {
+        items = items.filter(({ rows }) => rows.some(r => {
+          const h = toRawNum(getLocal(r.id, 'harga_promo')) > 0;
+          const s = getLocal(r.id, 'stok_promo');
+          const sFilled = s !== null && s !== '' && s !== undefined;
+          return !h || !sFilled;
+        }));
+      } else if (filterMode === 'complete' || filterMode === 'filled') {
+        items = items.filter(({ rows }) => rows.every(r => {
+          const h = toRawNum(getLocal(r.id, 'harga_promo')) > 0;
+          const s = getLocal(r.id, 'stok_promo');
+          const sFilled = s !== null && s !== '' && s !== undefined;
+          return h && sFilled;
+        }));
+      }
     }
     // ─── Filter by fail reason ─────────────────────────────────
     if (failReasonFilters.size > 0) {
@@ -353,13 +398,12 @@ function PromoTiktok() {
     }
     // ─── Filter stok 0 ───────────────────────────────────────
     if (ignoreZeroStock) {
-      // Sembunyikan group jika SEMUA variasi stok <= 0 atau null
       items = items.filter(({ rows }) =>
         rows.some(r => Number(r.stok_saat_ini || 0) > 0)
       );
     }
     return items;
-  }, [grouped, searchQuery, filterMode, getFillStatus, failReasonFilters, failMap, ignoreZeroStock]);
+  }, [grouped, searchQuery, filterMode, getFillStatus, failReasonFilters, failMap, ignoreZeroStock, localValues, products]);
 
   // ─── Templates API ────────────────────────────────────────────────
   const loadTemplates = useCallback(async () => {
@@ -1187,10 +1231,13 @@ function PromoTiktok() {
               borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-lg)',
               minWidth: '185px', zIndex: 60, padding: '0.5rem 0'
             }}>
-              <div style={{ padding: '0.2rem 0.75rem 0.35rem', fontSize: '0.625rem', fontWeight: 700, color: 'var(--text-tertiary)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Tampilkan</div>
+              <div style={{ padding: '0.2rem 0.75rem 0.35rem', fontSize: '0.625rem', fontWeight: 700, color: 'var(--text-tertiary)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Filter Status</div>
               {[
-                { key: 'all',      label: 'Semua',       count: stats.total },
-                { key: 'unfilled', label: 'Belum terisi', count: stats.unfilled + stats.partial },
+                { key: 'all',          label: 'Semua Produk',          count: filterCounts.total },
+                { key: 'harga_empty',  label: 'Harga Belum Diisi',     count: filterCounts.hargaEmpty, color: '#f87171' },
+                { key: 'stok_empty',   label: 'Stok Promo Kosong',     count: filterCounts.stokEmpty, color: '#f59e0b' },
+                { key: 'incomplete',   label: 'Ada yang Belum Lengkap',count: filterCounts.incomplete, color: '#ec4899' },
+                { key: 'complete',     label: 'Lengkap Semua (Siap)',  count: filterCounts.complete, color: '#10b981' },
               ].map(opt => (
                 <label key={opt.key}
                   style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.375rem 0.875rem', cursor: 'pointer', transition: 'background 0.1s' }}
@@ -1203,8 +1250,8 @@ function PromoTiktok() {
                     onChange={() => setFilterMode(opt.key)}
                     style={{ accentColor: '#6c5ce7', flexShrink: 0 }}
                   />
-                  <span style={{ fontSize: '0.8125rem', color: 'var(--text-primary)', flex: 1 }}>{opt.label}</span>
-                  <span style={{ fontSize: '0.6875rem', color: 'var(--text-tertiary)' }}>{opt.count}</span>
+                  <span style={{ fontSize: '0.8125rem', color: 'var(--text-primary)', flex: 1, fontWeight: filterMode === opt.key ? 600 : 400 }}>{opt.label}</span>
+                  <span style={{ fontSize: '0.6875rem', fontWeight: 700, color: opt.color || 'var(--text-tertiary)' }}>{opt.count}</span>
                 </label>
               ))}
               <div style={{ height: '1px', background: 'var(--border-medium)', margin: '0.35rem 0' }} />

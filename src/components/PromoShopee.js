@@ -322,7 +322,11 @@ function PromoShopee() {
   const [showStokMasalModal, setShowStokMasalModal] = useState(false);
   const [stokMasalMode, setStokMasalMode] = useState('samakan'); // samakan, tetap, kurangi, tambah
   const [stokMasalRule, setStokMasalRule] = useState('aman'); // aman, rata, maksimal
-  const [cardBulkStockConfirm, setCardBulkStockConfirm] = useState(null); // samakan, kurangi, tambah
+  const [cardBulkStockConfirm, setCardBulkStockConfirm] = useState(null);
+  // ─── Batas Masal State ────────────
+  const [showBatasMasalModal, setShowBatasMasalModal] = useState(false);
+  const [batasMasalValue, setBatasMasalValue] = useState('5');
+  const [batasMasalTarget, setBatasMasalTarget] = useState('all'); // all, empty_only, clear // samakan, kurangi, tambah
   const [stokMasalValue, setStokMasalValue] = useState('');
 
   // ─── Kalkulator Harga State ──────
@@ -415,6 +419,42 @@ function PromoShopee() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [localValues, products]);
 
+  // ─── Filter Counts (Harga, Stok, Batas) ─────────────────────────
+  const filterCounts = useMemo(() => {
+    let hargaEmpty = 0;
+    let stokEmpty = 0;
+    let batasEmpty = 0;
+    let incomplete = 0;
+    let complete = 0;
+
+    grouped.forEach(({ rows }) => {
+      const anyHargaEmpty = rows.some(r => !(toRawNum(getLocal(r.id, 'harga_promo')) > 0));
+      const anyStokEmpty = rows.some(r => {
+        const v = getLocal(r.id, 'stok_promo');
+        return v === null || v === '' || v === undefined;
+      });
+      const anyBatasEmpty = rows.some(r => {
+        const v = getLocal(r.id, 'batas_pembelian');
+        return v === null || v === '' || v === undefined;
+      });
+
+      if (anyHargaEmpty) hargaEmpty++;
+      if (anyStokEmpty) stokEmpty++;
+      if (anyBatasEmpty) batasEmpty++;
+      if (anyHargaEmpty || anyStokEmpty || anyBatasEmpty) incomplete++;
+      else complete++;
+    });
+
+    return {
+      total: grouped.length,
+      hargaEmpty,
+      stokEmpty,
+      batasEmpty,
+      incomplete,
+      complete
+    };
+  }, [grouped, localValues, products]);
+
   const stats = useMemo(() => {
     let filled = 0, partial = 0, unfilled = 0;
     grouped.forEach(({ rows }) => {
@@ -435,12 +475,37 @@ function PromoShopee() {
       );
     }
     if (filterMode !== 'all') {
-      items = items.filter(({ rows }) => {
-        const s = getFillStatus(rows);
-        if (filterMode === 'filled') return s === 'filled';
-        if (filterMode === 'unfilled') return s !== 'filled';
-        return true;
-      });
+      if (filterMode === 'harga_empty' || filterMode === 'unfilled') {
+        items = items.filter(({ rows }) => rows.some(r => !(toRawNum(getLocal(r.id, 'harga_promo')) > 0)));
+      } else if (filterMode === 'stok_empty') {
+        items = items.filter(({ rows }) => rows.some(r => {
+          const v = getLocal(r.id, 'stok_promo');
+          return v === null || v === '' || v === undefined;
+        }));
+      } else if (filterMode === 'batas_empty') {
+        items = items.filter(({ rows }) => rows.some(r => {
+          const v = getLocal(r.id, 'batas_pembelian');
+          return v === null || v === '' || v === undefined;
+        }));
+      } else if (filterMode === 'incomplete') {
+        items = items.filter(({ rows }) => rows.some(r => {
+          const h = toRawNum(getLocal(r.id, 'harga_promo')) > 0;
+          const s = getLocal(r.id, 'stok_promo');
+          const sFilled = s !== null && s !== '' && s !== undefined;
+          const b = getLocal(r.id, 'batas_pembelian');
+          const bFilled = b !== null && b !== '' && b !== undefined;
+          return !h || !sFilled || !bFilled;
+        }));
+      } else if (filterMode === 'complete' || filterMode === 'filled') {
+        items = items.filter(({ rows }) => rows.every(r => {
+          const h = toRawNum(getLocal(r.id, 'harga_promo')) > 0;
+          const s = getLocal(r.id, 'stok_promo');
+          const sFilled = s !== null && s !== '' && s !== undefined;
+          const b = getLocal(r.id, 'batas_pembelian');
+          const bFilled = b !== null && b !== '' && b !== undefined;
+          return h && sFilled && bFilled;
+        }));
+      }
     }
     // ─── Filter by fail reason ─────────────────────────────────
     if (failReasonFilters.size > 0) {
@@ -459,7 +524,7 @@ function PromoShopee() {
       );
     }
     return items;
-  }, [grouped, searchQuery, filterMode, getFillStatus, failReasonFilters, failMap, ignoreZeroStock]);
+  }, [grouped, searchQuery, filterMode, getFillStatus, failReasonFilters, failMap, ignoreZeroStock, localValues, products]);
 
   // ─── Templates API ────────────────────────────────────────────────
   const loadTemplates = useCallback(async () => {
@@ -827,6 +892,53 @@ function PromoShopee() {
       alert(`Berhasil Input Stok Masal:\n\n✓ ${filledCount} variasi disamakan persis dengan stok saat ini.`);
     } else {
       alert(`Berhasil Input Stok Masal:\n\n✓ ${filledCount} variasi berhasil diperbarui stok promonya.`);
+    }
+  };
+
+  // ─── Batas Pembelian Masal (Global bulk) ───────────────────────
+  const handleApplyBatasMasal = () => {
+    const val = batasMasalValue.replace(/[^0-9]/g, '');
+    if (batasMasalTarget !== 'clear' && (!val || Number(val) <= 0)) {
+      alert('Masukkan batas pembelian minimal 1.');
+      return;
+    }
+
+    const newLocals = { ...localValues };
+    let filledCount = 0;
+    let skippedCount = 0;
+
+    filteredGroups.forEach(({ rows }) => {
+      rows.forEach(r => {
+        const curBatas = getLocal(r.id, 'batas_pembelian');
+        const isAlreadyFilled = curBatas !== null && curBatas !== '' && curBatas !== undefined;
+
+        if (batasMasalTarget === 'clear') {
+          newLocals[r.id] = { ...(newLocals[r.id] || {}), batas_pembelian: '' };
+          filledCount++;
+        } else if (batasMasalTarget === 'empty_only') {
+          if (!isAlreadyFilled) {
+            newLocals[r.id] = { ...(newLocals[r.id] || {}), batas_pembelian: String(val) };
+            filledCount++;
+          } else {
+            skippedCount++;
+          }
+        } else {
+          newLocals[r.id] = { ...(newLocals[r.id] || {}), batas_pembelian: String(val) };
+          filledCount++;
+        }
+      });
+    });
+
+    setLocalValues(newLocals);
+    setIsDirty(true);
+    setShowBatasMasalModal(false);
+
+    if (batasMasalTarget === 'clear') {
+      alert(`Berhasil menghapus batas pembelian pada ${filledCount} variasi.`);
+    } else if (batasMasalTarget === 'empty_only') {
+      alert(`Berhasil Input Batas Pembelian Masal:\n\n✓ ${filledCount} variasi diisi batas pembelian ${val}\n✗ ${skippedCount} variasi dilewati karena sudah memiliki batas pembelian.`);
+    } else {
+      alert(`Berhasil Input Batas Pembelian Masal:\n\n✓ ${filledCount} variasi berhasil diisi batas pembelian ${val}.`);
     }
   };
 
@@ -1287,11 +1399,15 @@ function PromoShopee() {
               borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-lg)',
               minWidth: '185px', zIndex: 60, padding: '0.5rem 0'
             }}>
-              {/* Section 1: Tampilkan */}
-              <div style={{ padding: '0.2rem 0.75rem 0.35rem', fontSize: '0.625rem', fontWeight: 700, color: 'var(--text-tertiary)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Tampilkan</div>
+              {/* Section 1: Filter Status */}
+              <div style={{ padding: '0.2rem 0.75rem 0.35rem', fontSize: '0.625rem', fontWeight: 700, color: 'var(--text-tertiary)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Filter Status</div>
               {[
-                { key: 'all',      label: 'Semua',       count: stats.total },
-                { key: 'unfilled', label: 'Belum terisi', count: stats.unfilled + stats.partial },
+                { key: 'all',          label: 'Semua Produk',          count: filterCounts.total },
+                { key: 'harga_empty',  label: 'Harga Belum Diisi',     count: filterCounts.hargaEmpty, color: '#f87171' },
+                { key: 'stok_empty',   label: 'Stok Promo Kosong',     count: filterCounts.stokEmpty, color: '#f59e0b' },
+                { key: 'batas_empty',  label: 'Batas Beli Kosong',     count: filterCounts.batasEmpty, color: '#3b82f6' },
+                { key: 'incomplete',   label: 'Ada yang Belum Lengkap',count: filterCounts.incomplete, color: '#ec4899' },
+                { key: 'complete',     label: 'Lengkap Semua (Siap)',  count: filterCounts.complete, color: '#10b981' },
               ].map(opt => (
                 <label key={opt.key}
                   style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.375rem 0.875rem', cursor: 'pointer', transition: 'background 0.1s' }}
@@ -1304,8 +1420,8 @@ function PromoShopee() {
                     onChange={() => setFilterMode(opt.key)}
                     style={{ accentColor: '#6c5ce7', flexShrink: 0 }}
                   />
-                  <span style={{ fontSize: '0.8125rem', color: 'var(--text-primary)', flex: 1 }}>{opt.label}</span>
-                  <span style={{ fontSize: '0.6875rem', color: 'var(--text-tertiary)' }}>{opt.count}</span>
+                  <span style={{ fontSize: '0.8125rem', color: 'var(--text-primary)', flex: 1, fontWeight: filterMode === opt.key ? 600 : 400 }}>{opt.label}</span>
+                  <span style={{ fontSize: '0.6875rem', fontWeight: 700, color: opt.color || 'var(--text-tertiary)' }}>{opt.count}</span>
                 </label>
               ))}
 
@@ -1346,6 +1462,22 @@ function PromoShopee() {
         >
           <Layers size={13} />
           Input Stok Masal
+        </button>
+
+        {/* ── Batas Pembelian Masal ── */}
+        <button
+          onClick={() => setShowBatasMasalModal(true)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '0.375rem',
+            padding: '0.4rem 0.75rem', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)',
+            borderRadius: 'var(--radius-md)', cursor: 'pointer',
+            fontSize: '0.75rem', fontWeight: 600, color: '#10b981',
+            transition: 'all 0.2s', flexShrink: 0
+          }}
+          title="Atur batas pembelian per pembeli secara masal"
+        >
+          <Tag size={13} />
+          Input Batas Masal
         </button>
       </div>
 
@@ -1578,6 +1710,76 @@ function PromoShopee() {
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
               <button className="btn-secondary" onClick={() => setCardBulkStockConfirm(null)} style={{ padding: '0.45rem 1.25rem', fontSize: '0.8125rem' }}>
                 Batal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ MODAL INPUT BATAS PEMBELIAN MASAL ══ */}
+      {showBatasMasalModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="glass-card" style={{ padding: '1.5rem', maxWidth: '420px', width: '92%' }}>
+            <h3 style={{ fontWeight: 700, fontSize: '1.05rem', marginBottom: '0.375rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Tag size={18} color="#10b981" /> Input Batas Pembelian Masal
+            </h3>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '1.25rem', lineHeight: 1.5 }}>
+              Tentukan batas maksimal pembelian produk diskon per pembeli per hari untuk <strong>semua produk yang sedang tampil</strong> ({filteredGroups.length} SKU).
+            </p>
+
+            <div style={{ marginBottom: '1.25rem' }}>
+              <div style={{ fontSize: '0.6875rem', fontWeight: 600, color: 'var(--text-tertiary)', marginBottom: '0.375rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Batas Pembelian per Akun (Wajib &ge; 1 di Shopee):
+              </div>
+              <input 
+                type="number" className="im-input" autoFocus min="1"
+                placeholder="Contoh: 5"
+                value={batasMasalValue} 
+                onChange={e => setBatasMasalValue(e.target.value)}
+                disabled={batasMasalTarget === 'clear'}
+                style={{ width: '100%', padding: '0.6rem', fontSize: '0.9375rem', fontWeight: 700 }}
+              />
+            </div>
+
+            <div style={{ fontSize: '0.6875rem', fontWeight: 600, color: 'var(--text-tertiary)', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Metode Penerapan:
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem', marginBottom: '1.5rem' }}>
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', cursor: 'pointer', fontSize: '0.8125rem' }}>
+                <input type="radio" name="batasTarget" value="all" checked={batasMasalTarget === 'all'} onChange={() => setBatasMasalTarget('all')} style={{ marginTop: '0.15rem', accentColor: '#10b981' }} />
+                <div>
+                  <strong>Terapkan ke Semua Produk</strong>
+                  <div style={{ color: 'var(--text-tertiary)', fontSize: '0.6875rem' }}>Mengisi/menimpa batas pembelian {batasMasalValue || '...'} ke seluruh variasi yang tampil.</div>
+                </div>
+              </label>
+
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', cursor: 'pointer', fontSize: '0.8125rem' }}>
+                <input type="radio" name="batasTarget" value="empty_only" checked={batasMasalTarget === 'empty_only'} onChange={() => setBatasMasalTarget('empty_only')} style={{ marginTop: '0.15rem', accentColor: '#10b981' }} />
+                <div>
+                  <strong>Hanya yang Masih Kosong</strong>
+                  <div style={{ color: 'var(--text-tertiary)', fontSize: '0.6875rem' }}>Hanya mengisi variasi yang belum memiliki batas pembelian (tidak menimpa yang sudah diatur).</div>
+                </div>
+              </label>
+
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', cursor: 'pointer', fontSize: '0.8125rem' }}>
+                <input type="radio" name="batasTarget" value="clear" checked={batasMasalTarget === 'clear'} onChange={() => setBatasMasalTarget('clear')} style={{ marginTop: '0.15rem', accentColor: '#ef4444' }} />
+                <div>
+                  <strong style={{ color: '#ef4444' }}>Kosongkan Batas Pembelian</strong>
+                  <div style={{ color: 'var(--text-tertiary)', fontSize: '0.6875rem' }}>Hapus batas pembelian pada semua variasi (tanpa batas limit pembelian).</div>
+                </div>
+              </label>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.625rem', justifyContent: 'flex-end' }}>
+              <button className="btn-secondary" onClick={() => setShowBatasMasalModal(false)} style={{ padding: '0.5rem 1.25rem', fontSize: '0.8125rem' }}>Batal</button>
+              <button 
+                className="btn-primary" 
+                onClick={handleApplyBatasMasal} 
+                disabled={batasMasalTarget !== 'clear' && (!batasMasalValue || Number(batasMasalValue) <= 0)}
+                style={{ padding: '0.5rem 1.25rem', fontSize: '0.8125rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.375rem', background: '#10b981' }}
+              >
+                <Tag size={14} /> Terapkan Batas Masal
               </button>
             </div>
           </div>
