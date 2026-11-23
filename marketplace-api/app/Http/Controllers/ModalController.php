@@ -107,25 +107,27 @@ class ModalController extends Controller
             return response()->json(['error' => 'Values harus berupa object'], 400);
         }
 
-        foreach ($values as $key => $val) {
-            $numericValue = (int) preg_replace('/[^0-9]/', '', (string) $val) ?: 0;
-            $parts = explode('||', $key);
-            $sellerSku = $parts[0] ?? '';
-            $skuId     = $parts[1] ?? '';
-            $variation = $parts[2] ?? '';
+        DB::transaction(function () use ($values, $storeId) {
+            foreach ($values as $key => $val) {
+                $numericValue = (int) preg_replace('/[^0-9]/', '', (string) $val) ?: 0;
+                $parts = explode('||', $key);
+                $sellerSku = $parts[0] ?? '';
+                $skuId     = $parts[1] ?? '';
+                $variation = $parts[2] ?? '';
 
-            if ($storeId) {
-                DB::statement("INSERT INTO modal_values (store_id, seller_sku, sku_id, variation, value)
-                    VALUES (?, ?, ?, ?, ?)
-                    ON DUPLICATE KEY UPDATE value = VALUES(value)",
-                    [$storeId, $sellerSku, $skuId, $variation, $numericValue]);
-            } else {
-                DB::statement("INSERT INTO modal_values (seller_sku, sku_id, variation, value)
-                    VALUES (?, ?, ?, ?)
-                    ON DUPLICATE KEY UPDATE value = VALUES(value)",
-                    [$sellerSku, $skuId, $variation, $numericValue]);
+                if ($storeId) {
+                    DB::statement("INSERT INTO modal_values (store_id, seller_sku, sku_id, variation, value)
+                        VALUES (?, ?, ?, ?, ?)
+                        ON DUPLICATE KEY UPDATE value = VALUES(value)",
+                        [$storeId, $sellerSku, $skuId, $variation, $numericValue]);
+                } else {
+                    DB::statement("INSERT INTO modal_values (seller_sku, sku_id, variation, value)
+                        VALUES (?, ?, ?, ?)
+                        ON DUPLICATE KEY UPDATE value = VALUES(value)",
+                        [$sellerSku, $skuId, $variation, $numericValue]);
+                }
             }
-        }
+        });
         return response()->json(['success' => true]);
     }
 

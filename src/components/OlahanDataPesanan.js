@@ -2,10 +2,13 @@ import React, { useMemo, useState, useRef, useEffect } from "react";
 import * as XLSX from "xlsx";
 import { Calendar, Download, ChevronLeft, ChevronRight, X, Copy, Check, MapPin, Package, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import { useProcessedOrders, formatDateKey, formatIndonesianDateFromDateObj } from '../hooks/useProcessedOrders';
+import { useDataCache } from '../contexts/DataContext';
 
 const formatRupiah = (number) => {
     if (typeof number !== 'number' || isNaN(number)) return '';
-    return 'Rp' + number.toLocaleString('id-ID', { maximumFractionDigits: 0 });
+    const rounded = Math.round(number);
+    if (rounded < 0) return 'Rp-' + (-rounded).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return 'Rp' + rounded.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 };
 
 
@@ -101,8 +104,26 @@ function aggregateRows(rowsForGroup) {
     };
 }
 
+// Label standar keuangan untuk header ekspor Excel (kunci data internal tidak diubah)
+const EXPORT_HEADER_LABELS = {
+    'PESANAN.Order': 'Pesanan (Order)', 'PESANAN.PCS': 'Pesanan (PCS)',
+    'CANCEL.Order': 'Dibatalkan (Order)', 'CANCEL.PCS': 'Dibatalkan (PCS)',
+    'FIX TERBELI.Order': 'Pesanan Valid (Order)', 'FIX TERBELI.PCS': 'Pesanan Valid (PCS)',
+    'TERKIRIM.Order': 'Dalam Pengiriman (Order)', 'TERKIRIM.PCS': 'Dalam Pengiriman (PCS)',
+    'AKAN DIKIRIM.Order': 'Perlu Dikirim (Order)', 'AKAN DIKIRIM.PCS': 'Perlu Dikirim (PCS)',
+    'SUDAH CAIR.Order': 'Dana Diterima (Order)', 'SUDAH CAIR.PCS': 'Dana Diterima (PCS)',
+    'BELUM CAIR.Order': 'Piutang Marketplace (Order)', 'BELUM CAIR.PCS': 'Piutang Marketplace (PCS)',
+    'LABA KOTOR': 'Penerimaan Bersih', 'LABA BERSIH': 'Margin Kontribusi',
+    'Pengembalian.Order': 'Pengembalian Paket (Order)', 'Pengembalian.PCS': 'Pengembalian Paket (PCS)',
+    'RETURN.Order': 'Retur Penjualan (Order)', 'RETURN.Presentase': 'Retur Penjualan (% Order)',
+    'ESTIMASI': 'Persediaan Dalam Pengiriman (HPP)',
+    'AFFILIASI.Nominal': 'Komisi Afiliasi (Rp)', 'AFFILIASI.Presentase': 'Afiliasi (% Order)',
+    'COD.Jumlah': 'COD (Order)', 'COD.Presentase': 'COD (% Order)',
+};
+
 function OlahanDataPesanan() {
-    const { rangkumanData, loading: isLoading, modalValues, getModalForItem } = useProcessedOrders();
+    const { rangkumanData, rangkumanVersion, loading: isLoading, modalValues, getModalForItem } = useProcessedOrders();
+    const { getComputed, setComputed } = useDataCache();
     const [filterStartDate, setFilterStartDate] = useState('');
     const [filterEndDate, setFilterEndDate] = useState('');
     const [showDateRangePicker, setShowDateRangePicker] = useState(false);
@@ -149,8 +170,12 @@ function OlahanDataPesanan() {
     // Whether the current mode has a secondary line
     const hasSecondary = analysisMode === 'provinsi_kota' || analysisMode === 'produk_var';
 
-    // Generic grouping + aggregation
+    // Generic grouping + aggregation (cached across page switches)
     const tableData = useMemo(() => {
+        const olahanCacheKey = `olahan_v3::${rangkumanVersion || rangkumanData.length}::${analysisMode}::${filterStartDate}::${filterEndDate}`;
+        const cached = getComputed(olahanCacheKey);
+        if (cached && filteredData.length > 0) return cached;
+
         const groupMap = new Map();
 
         filteredData.forEach(row => {
@@ -205,8 +230,12 @@ function OlahanDataPesanan() {
             rows.sort((a, b) => b['PESANAN.Order'] - a['PESANAN.Order']); // most orders first
         }
 
+        if (filteredData.length > 0) {
+            setComputed(olahanCacheKey, rows);
+        }
         return rows;
-    }, [filteredData, analysisMode]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [filteredData, analysisMode, rangkumanVersion]);
 
     const summarySums = useMemo(() => {
         if (tableData.length === 0) return null;
@@ -246,7 +275,7 @@ function OlahanDataPesanan() {
             'BELUM CAIR.Order', 'BELUM CAIR.PCS', 'LABA KOTOR', 'LABA BERSIH', 'Pengembalian.Order', 'Pengembalian.PCS',
             'RETURN.Order', 'RETURN.Presentase', 'ESTIMASI', 'AFFILIASI.Nominal', 'AFFILIASI.Presentase', 'COD.Jumlah', 'COD.Presentase'
         ];
-        const wsData = [headers];
+        const wsData = [headers.map(h => (h === primaryColLabel ? h : (EXPORT_HEADER_LABELS[h] || h)))];
         tableData.forEach(row => wsData.push(headers.map(h => h === primaryColLabel ? row._primaryCol : row[h])));
         if (summarySums) {
             wsData.push([
@@ -278,31 +307,31 @@ function OlahanDataPesanan() {
     const columnFilterMap = useMemo(() => ({
         'PESANAN.Order': { label: 'Pesanan', filter: () => true, cols: ['orderId', 'productName', 'totalQuantity', 'statusOrder'] },
         'PESANAN.PCS': { label: 'Pesanan (PCS)', filter: () => true, cols: ['orderId', 'productName', 'totalQuantity', 'statusOrder'] },
-        'CANCEL.Order': { label: 'Cancel', filter: r => ['canceled', 'cancelled'].includes(r.statusOrder.toLowerCase()), cols: ['orderId', 'productName', 'totalQuantity', 'statusOrder'] },
-        'CANCEL.PCS': { label: 'Cancel (PCS)', filter: r => ['canceled', 'cancelled'].includes(r.statusOrder.toLowerCase()), cols: ['orderId', 'productName', 'totalQuantity', 'statusOrder'] },
-        'FIX TERBELI.Order': { label: 'Terjual', filter: r => ['completed', 'shipped', 'to ship'].includes(r.statusOrder.toLowerCase()), cols: ['orderId', 'productName', 'totalQuantity', 'statusOrder'] },
-        'FIX TERBELI.PCS': { label: 'Terjual (PCS)', filter: r => ['completed', 'shipped', 'to ship'].includes(r.statusOrder.toLowerCase()), cols: ['orderId', 'productName', 'totalQuantity', 'statusOrder'] },
-        'TERKIRIM.Order': { label: 'Terkirim', filter: r => r.statusOrder.toLowerCase() === 'shipped', cols: ['orderId', 'productName', 'totalQuantity'] },
-        'TERKIRIM.PCS': { label: 'Terkirim (PCS)', filter: r => r.statusOrder.toLowerCase() === 'shipped', cols: ['orderId', 'productName', 'totalQuantity'] },
-        'AKAN DIKIRIM.Order': { label: 'Akan Dikirim', filter: r => r.statusOrder.toLowerCase() === 'to ship', cols: ['orderId', 'productName', 'totalQuantity'] },
-        'AKAN DIKIRIM.PCS': { label: 'Akan Dikirim (PCS)', filter: r => r.statusOrder.toLowerCase() === 'to ship', cols: ['orderId', 'productName', 'totalQuantity'] },
-        'SUDAH CAIR.Order': { label: 'Sudah Cair', filter: r => r.totalSettlementAmount > 0, cols: ['orderId', 'productName', 'totalQuantity', 'totalSettlementAmount'] },
-        'SUDAH CAIR.PCS': { label: 'Sudah Cair (PCS)', filter: r => r.totalSettlementAmount > 0, cols: ['orderId', 'productName', 'totalQuantity', 'totalSettlementAmount'] },
-        'BELUM CAIR.Order': { label: 'Belum Cair', filter: r => { const st = r.statusOrder.toLowerCase(); return ['completed', 'shipped', 'to ship'].includes(st) && r.totalSettlementAmount <= 0; }, cols: ['orderId', 'productName', 'totalQuantity', 'statusOrder'] },
-        'BELUM CAIR.PCS': { label: 'Belum Cair (PCS)', filter: r => { const st = r.statusOrder.toLowerCase(); return ['completed', 'shipped', 'to ship'].includes(st) && r.totalSettlementAmount <= 0; }, cols: ['orderId', 'productName', 'totalQuantity', 'statusOrder'] },
-        'LABA KOTOR': { label: 'Omzet', filter: r => r.totalSettlementAmount > 0, cols: ['orderId', 'productName', 'totalSettlementAmount'] },
-        'LABA BERSIH': { label: 'Laba Kotor', filter: r => { const st = r.statusOrder.toLowerCase(); return !['canceled', 'cancelled', 'return', 'pengembalian'].includes(st) && r.totalSettlementAmount > 0; }, cols: ['orderId', 'productName', 'totalSettlementAmount', 'totalModal', '_laba'] },
-        'Pengembalian.Order': { label: 'Pengembalian', filter: r => r.statusOrder.toLowerCase() === 'pengembalian', cols: ['orderId', 'productName', 'totalQuantity'] },
-        'Pengembalian.PCS': { label: 'Pengembalian (PCS)', filter: r => r.statusOrder.toLowerCase() === 'pengembalian', cols: ['orderId', 'productName', 'totalQuantity'] },
-        'RETURN.Order': { label: 'Return', filter: r => r.statusOrder.toLowerCase() === 'return', cols: ['orderId', 'productName', 'totalQuantity'] },
-        'ESTIMASI': { label: 'Estimasi', filter: r => { const st = r.statusOrder.toLowerCase(); return !['canceled', 'cancelled', 'return', 'pengembalian'].includes(st) && r.totalSettlementAmount <= 0; }, cols: ['orderId', 'productName', 'totalQuantity', 'totalModal'] },
-        'AFFILIASI.Nominal': { label: 'Affiliasi', filter: r => (r.ketAffiliasi || '').toLowerCase() === 'affiliasi', cols: ['orderId', 'productName', 'totalQuantity', 'totalAffiliateCommission'] },
+        'CANCEL.Order': { label: 'Dibatalkan', filter: r => ['canceled', 'cancelled'].includes(r.statusOrder.toLowerCase()), cols: ['orderId', 'productName', 'totalQuantity', 'statusOrder'] },
+        'CANCEL.PCS': { label: 'Dibatalkan (PCS)', filter: r => ['canceled', 'cancelled'].includes(r.statusOrder.toLowerCase()), cols: ['orderId', 'productName', 'totalQuantity', 'statusOrder'] },
+        'FIX TERBELI.Order': { label: 'Pesanan Valid', filter: r => ['completed', 'shipped', 'to ship'].includes(r.statusOrder.toLowerCase()), cols: ['orderId', 'productName', 'totalQuantity', 'statusOrder'] },
+        'FIX TERBELI.PCS': { label: 'Pesanan Valid (PCS)', filter: r => ['completed', 'shipped', 'to ship'].includes(r.statusOrder.toLowerCase()), cols: ['orderId', 'productName', 'totalQuantity', 'statusOrder'] },
+        'TERKIRIM.Order': { label: 'Dalam Pengiriman', filter: r => r.statusOrder.toLowerCase() === 'shipped', cols: ['orderId', 'productName', 'totalQuantity'] },
+        'TERKIRIM.PCS': { label: 'Dalam Pengiriman (PCS)', filter: r => r.statusOrder.toLowerCase() === 'shipped', cols: ['orderId', 'productName', 'totalQuantity'] },
+        'AKAN DIKIRIM.Order': { label: 'Perlu Dikirim', filter: r => r.statusOrder.toLowerCase() === 'to ship', cols: ['orderId', 'productName', 'totalQuantity'] },
+        'AKAN DIKIRIM.PCS': { label: 'Perlu Dikirim (PCS)', filter: r => r.statusOrder.toLowerCase() === 'to ship', cols: ['orderId', 'productName', 'totalQuantity'] },
+        'SUDAH CAIR.Order': { label: 'Dana Diterima', filter: r => r.totalSettlementAmount > 0, cols: ['orderId', 'productName', 'totalQuantity', 'totalSettlementAmount'] },
+        'SUDAH CAIR.PCS': { label: 'Dana Diterima (PCS)', filter: r => r.totalSettlementAmount > 0, cols: ['orderId', 'productName', 'totalQuantity', 'totalSettlementAmount'] },
+        'BELUM CAIR.Order': { label: 'Piutang Marketplace', filter: r => { const st = r.statusOrder.toLowerCase(); return ['completed', 'shipped', 'to ship'].includes(st) && r.totalSettlementAmount <= 0; }, cols: ['orderId', 'productName', 'totalQuantity', 'statusOrder'] },
+        'BELUM CAIR.PCS': { label: 'Piutang Marketplace (PCS)', filter: r => { const st = r.statusOrder.toLowerCase(); return ['completed', 'shipped', 'to ship'].includes(st) && r.totalSettlementAmount <= 0; }, cols: ['orderId', 'productName', 'totalQuantity', 'statusOrder'] },
+        'LABA KOTOR': { label: 'Penerimaan Bersih', filter: r => r.totalSettlementAmount > 0, cols: ['orderId', 'productName', 'totalSettlementAmount'] },
+        'LABA BERSIH': { label: 'Margin Kontribusi', filter: r => { const st = r.statusOrder.toLowerCase(); return !['canceled', 'cancelled', 'return', 'pengembalian'].includes(st) && r.totalSettlementAmount > 0; }, cols: ['orderId', 'productName', 'totalSettlementAmount', 'totalModal', '_laba'] },
+        'Pengembalian.Order': { label: 'Pengembalian Paket', filter: r => r.statusOrder.toLowerCase() === 'pengembalian', cols: ['orderId', 'productName', 'totalQuantity'] },
+        'Pengembalian.PCS': { label: 'Pengembalian Paket (PCS)', filter: r => r.statusOrder.toLowerCase() === 'pengembalian', cols: ['orderId', 'productName', 'totalQuantity'] },
+        'RETURN.Order': { label: 'Retur Penjualan', filter: r => r.statusOrder.toLowerCase() === 'return', cols: ['orderId', 'productName', 'totalQuantity'] },
+        'ESTIMASI': { label: 'Persediaan Dalam Pengiriman', filter: r => { const st = r.statusOrder.toLowerCase(); return !['canceled', 'cancelled', 'return', 'pengembalian'].includes(st) && r.totalSettlementAmount <= 0; }, cols: ['orderId', 'productName', 'totalQuantity', 'totalModal'] },
+        'AFFILIASI.Nominal': { label: 'Komisi Afiliasi', filter: r => (r.ketAffiliasi || '').toLowerCase() === 'affiliasi', cols: ['orderId', 'productName', 'totalQuantity', 'totalAffiliateCommission'] },
         'COD.Jumlah': { label: 'COD', filter: r => (r.metode || '').toLowerCase() === 'bayar di tempat', cols: ['orderId', 'productName', 'totalQuantity'] },
     }), []);
 
     const nonClickableCols = new Set(['AFFILIASI.Presentase', 'COD.Presentase', 'RETURN.Presentase']);
 
-    const colHeaderLabels = { orderId: 'Order ID', productName: 'Produk', totalQuantity: 'Qty', statusOrder: 'Status', totalSettlementAmount: 'Settlement', totalModal: 'Modal', totalAffiliateCommission: 'Komisi Affiliasi', _laba: 'Laba' };
+    const colHeaderLabels = { orderId: 'Order ID', productName: 'Produk', totalQuantity: 'Qty', statusOrder: 'Status', totalSettlementAmount: 'Penerimaan Bersih', totalModal: 'HPP', totalAffiliateCommission: 'Komisi Afiliasi', _laba: 'Margin Kontribusi' };
 
     const handleCellClick = (row, colKey) => {
         if (nonClickableCols.has(colKey)) return;
@@ -443,14 +472,22 @@ function OlahanDataPesanan() {
                                         {primaryColLabel} <SortIcon columnKey="_primaryCol" />
                                     </th>
                                     {[
-                                        { label: 'PESANAN', span: 2 }, { label: 'CANCEL', span: 2 }, { label: 'TERJUAL', span: 2 },
-                                        { label: 'TERKIRIM', span: 2 }, { label: 'AKAN DIKIRIM', span: 2 }, { label: 'SUDAH CAIR', span: 2 },
-                                        { label: 'BELUM CAIR', span: 2 }, { label: 'OMZET', span: 1, rowSpan: 2, sortKey: 'LABA KOTOR' },
-                                        { label: 'LABA KOTOR', span: 1, rowSpan: 2, sortKey: 'LABA BERSIH' }, { label: 'Pengembalian', span: 2 },
-                                        { label: 'RETUR', span: 2 }, { label: 'ESTIMASI', span: 1, rowSpan: 2, sortKey: 'ESTIMASI' },
-                                        { label: 'AFFILIASI', span: 2 }, { label: 'COD', span: 2 }
-                                    ].map(({ label, span, rowSpan, sortKey }) => (
-                                        <th key={label} colSpan={span} rowSpan={rowSpan} style={{ ...thStyle, cursor: sortKey ? 'pointer' : 'default' }}
+                                        { label: 'PESANAN', span: 2, tip: 'Seluruh pesanan yang masuk pada periode ini' },
+                                        { label: 'DIBATALKAN', span: 2, tip: 'Pesanan berstatus batal' },
+                                        { label: 'PESANAN VALID', span: 2, tip: 'Pesanan selesai, dalam pengiriman, atau perlu dikirim (tidak termasuk batal/retur)' },
+                                        { label: 'DALAM PENGIRIMAN', span: 2, tip: 'Pesanan berstatus dikirim (shipped), belum selesai' },
+                                        { label: 'PERLU DIKIRIM', span: 2, tip: 'Pesanan menunggu pengiriman dari penjual (to ship)' },
+                                        { label: 'DANA DITERIMA', span: 2, tip: 'Pesanan yang dana settlement-nya sudah masuk' },
+                                        { label: 'PIUTANG MARKETPLACE', span: 2, tip: 'Pesanan valid yang dana settlement-nya belum diterima' },
+                                        { label: 'PENERIMAAN BERSIH', span: 1, rowSpan: 2, sortKey: 'LABA KOTOR', tip: 'Net settlement: dana yang diterima dari marketplace setelah potongan komisi dan biaya platform' },
+                                        { label: 'MARGIN KONTRIBUSI', span: 1, rowSpan: 2, sortKey: 'LABA BERSIH', tip: 'Penerimaan Bersih - HPP (sebelum biaya operasional lain seperti iklan, packing, gaji, dan pajak)' },
+                                        { label: 'PENGEMBALIAN PAKET', span: 2, tip: 'Paket fisik yang dikembalikan ke penjual' },
+                                        { label: 'RETUR PENJUALAN', span: 2, tip: 'Pesanan yang diretur/direfund oleh pembeli' },
+                                        { label: 'PERSEDIAAN DALAM PENGIRIMAN', span: 1, rowSpan: 2, sortKey: 'ESTIMASI', tip: 'HPP barang pada pesanan yang masih dalam pengiriman dan dananya belum diterima' },
+                                        { label: 'AFILIASI', span: 2, tip: 'Komisi afiliasi dan persentase order yang berasal dari afiliasi' },
+                                        { label: 'COD', span: 2, tip: 'Cash on Delivery (bayar di tempat)' }
+                                    ].map(({ label, span, rowSpan, sortKey, tip }) => (
+                                        <th key={label} colSpan={span} rowSpan={rowSpan} title={tip} style={{ ...thStyle, cursor: sortKey ? 'pointer' : 'default' }}
                                             onClick={sortKey ? () => requestSort(sortKey) : undefined}>
                                             {label} {sortKey && <SortIcon columnKey={sortKey} />}
                                         </th>
@@ -472,15 +509,15 @@ function OlahanDataPesanan() {
                                             {label} <SortIcon columnKey={key} />
                                         </th>
                                     ))}
-                                    {/* RETUR: Order + Presentase */}
+                                    {/* RETUR PENJUALAN: Order + % Order */}
                                     <th style={{ ...thStyle, cursor: 'pointer' }} onClick={() => requestSort('RETURN.Order')}>Order <SortIcon columnKey="RETURN.Order" /></th>
-                                    <th style={{ ...thStyle, cursor: 'pointer' }} onClick={() => requestSort('RETURN.Presentase')}>Presentase <SortIcon columnKey="RETURN.Presentase" /></th>
-                                    {/* AFFILIASI: Nominal + Presentase */}
-                                    <th style={{ ...thStyle, cursor: 'pointer' }} onClick={() => requestSort('AFFILIASI.Nominal')}>Nominal <SortIcon columnKey="AFFILIASI.Nominal" /></th>
-                                    <th style={{ ...thStyle, cursor: 'pointer' }} onClick={() => requestSort('AFFILIASI.Presentase')}>Presentase <SortIcon columnKey="AFFILIASI.Presentase" /></th>
-                                    {/* COD: Jumlah + Presentase */}
-                                    <th style={{ ...thStyle, cursor: 'pointer' }} onClick={() => requestSort('COD.Jumlah')}>Jumlah <SortIcon columnKey="COD.Jumlah" /></th>
-                                    <th style={{ ...thStyle, cursor: 'pointer' }} onClick={() => requestSort('COD.Presentase')}>Presentase <SortIcon columnKey="COD.Presentase" /></th>
+                                    <th style={{ ...thStyle, cursor: 'pointer' }} onClick={() => requestSort('RETURN.Presentase')}>% Order <SortIcon columnKey="RETURN.Presentase" /></th>
+                                    {/* AFILIASI: Komisi + % Order */}
+                                    <th style={{ ...thStyle, cursor: 'pointer' }} onClick={() => requestSort('AFFILIASI.Nominal')}>Komisi <SortIcon columnKey="AFFILIASI.Nominal" /></th>
+                                    <th style={{ ...thStyle, cursor: 'pointer' }} onClick={() => requestSort('AFFILIASI.Presentase')}>% Order <SortIcon columnKey="AFFILIASI.Presentase" /></th>
+                                    {/* COD: Order + % Order */}
+                                    <th style={{ ...thStyle, cursor: 'pointer' }} onClick={() => requestSort('COD.Jumlah')}>Order <SortIcon columnKey="COD.Jumlah" /></th>
+                                    <th style={{ ...thStyle, cursor: 'pointer' }} onClick={() => requestSort('COD.Presentase')}>% Order <SortIcon columnKey="COD.Presentase" /></th>
                                 </tr>
                                 {/* Summary Row */}
                                 <tr style={{ background: 'var(--bg-card)' }}>
@@ -766,11 +803,11 @@ function OlahanDataPesanan() {
                 const infoItems = [
                     { label: 'Status Order', value: order.statusOrder, style: { color: getStatusColor(order.statusOrder), fontWeight: 700 } },
                     { label: 'Qty Total', value: order.totalQuantity },
-                    { label: 'Settlement', value: formatRupiah(order.totalSettlementAmount || 0) },
-                    { label: 'Modal', value: order.totalModal ? formatRupiah(order.totalModal) : '-' },
-                    { label: 'Laba', value: order.totalSettlementAmount > 0 && order.totalModal ? formatRupiah(order.totalSettlementAmount - order.totalModal) : '-' },
-                    { label: 'Affiliasi', value: order.totalAffiliateCommission ? formatRupiah(order.totalAffiliateCommission) : '-' },
-                    { label: 'Ket. Affiliasi', value: order.ketAffiliasi || '-' },
+                    { label: 'Penerimaan Bersih', value: formatRupiah(order.totalSettlementAmount || 0) },
+                    { label: 'HPP', value: order.totalModal ? formatRupiah(order.totalModal) : '-' },
+                    { label: 'Margin Kontribusi', value: order.totalSettlementAmount > 0 && order.totalModal ? formatRupiah(order.totalSettlementAmount - order.totalModal) : '-' },
+                    { label: 'Komisi Afiliasi', value: order.totalAffiliateCommission ? formatRupiah(order.totalAffiliateCommission) : '-' },
+                    { label: 'Ket. Afiliasi', value: order.ketAffiliasi || '-' },
                     { label: 'Metode', value: order.metode || '-' },
                     { label: 'Username Pembeli', value: order.buyerUsername || '-' },
                     { label: 'Alamat Tujuan', value: [order.regencyAndCity, order.province].filter(Boolean).join(', ') || '-' },

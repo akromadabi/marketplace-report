@@ -83,10 +83,10 @@ class AuthController extends Controller
             ->get();
 
         $allStores = DB::table('stores')->select('id', 'user_id', 'name')->get();
-        $orderCounts = DB::table('orders')
-            ->join('uploads', 'orders.upload_id', '=', 'uploads.id')
-            ->select('uploads.user_id', DB::raw('COUNT(*) as count'))
-            ->groupBy('uploads.user_id')
+        $orderCounts = DB::table('uploads')
+            ->where('category', 'orders')
+            ->select('user_id', DB::raw('COALESCE(SUM(row_count), 0) as count'))
+            ->groupBy('user_id')
             ->get()
             ->keyBy('user_id');
         $allLimits = DB::table('class_limits')->get()->keyBy('class_name');
@@ -247,9 +247,10 @@ class AuthController extends Controller
     public function getUsage($userId)
     {
         $storeCount = DB::table('stores')->where('user_id', $userId)->count();
-        $orderCount = DB::table('orders')
-            ->whereIn('upload_id', DB::table('uploads')->where('user_id', $userId)->pluck('id'))
-            ->count();
+        $orderCount = (int) DB::table('uploads')
+            ->where('user_id', $userId)
+            ->where('category', 'orders')
+            ->sum('row_count');
         return response()->json(['stores' => $storeCount, 'orders' => $orderCount]);
     }
 

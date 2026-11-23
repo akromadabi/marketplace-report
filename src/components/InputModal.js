@@ -188,18 +188,29 @@ function InputModal() {
     setIsDirty(true);
   }
 
+  const filledVariationCountBySku = useMemo(() => {
+    const counts = new Map();
+    for (const k of Object.keys(modalValues)) {
+      const sepIdx = k.indexOf('||');
+      if (sepIdx > 0 && modalValues[k]) {
+        const sku = k.slice(0, sepIdx);
+        counts.set(sku, (counts.get(sku) || 0) + 1);
+      }
+    }
+    return counts;
+  }, [modalValues]);
+
   const invalidSkus = useMemo(() => {
     const invalidSet = new Set();
     groupedBySellerSku.forEach(({ sellerSku, variations }) => {
-      const variationKeys = variations.map(({ skuId, variation }) => sellerSku + '||' + skuId + '||' + variation);
-      const filledCount = variationKeys.reduce((acc, key) => acc + (modalValues[key] ? 1 : 0), 0);
-      if (filledCount > 0 && filledCount < variationKeys.length) invalidSet.add(sellerSku);
+      const filledCount = filledVariationCountBySku.get(sellerSku) || 0;
+      if (filledCount > 0 && filledCount < variations.length) invalidSet.add(sellerSku);
     });
     return invalidSet;
-  }, [groupedBySellerSku, modalValues]);
+  }, [groupedBySellerSku, filledVariationCountBySku]);
 
   function hasAnyVariationFilled(sellerSku) {
-    return Object.keys(modalValues).some(k => k.startsWith(sellerSku + '||'));
+    return (filledVariationCountBySku.get(sellerSku) || 0) > 0;
   }
 
   function handleBulkDropdownChange(sellerSku, index, value) {
@@ -269,15 +280,12 @@ function InputModal() {
 
   // ─── Computed Stats & Filtering ────────────────────────────────────
   const getSkuFillStatus = useCallback((sellerSku, variations) => {
-    // Check main value first
     if (modalValues[sellerSku]) return 'filled';
-    // Check variation values
-    const variationKeys = variations.map(({ skuId, variation }) => sellerSku + '||' + skuId + '||' + variation);
-    const filledCount = variationKeys.reduce((acc, key) => acc + (modalValues[key] ? 1 : 0), 0);
-    if (filledCount === variationKeys.length && filledCount > 0) return 'filled';
+    const filledCount = filledVariationCountBySku.get(sellerSku) || 0;
+    if (filledCount >= variations.length && filledCount > 0) return 'filled';
     if (filledCount > 0) return 'partial';
     return 'unfilled';
-  }, [modalValues]);
+  }, [modalValues, filledVariationCountBySku]);
 
   const stats = useMemo(() => {
     let filled = 0, partial = 0, unfilled = 0;

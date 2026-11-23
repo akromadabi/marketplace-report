@@ -86,6 +86,8 @@ Route::prefix('upload')->group(function () {
 
 // ─── Data ───────────────────────────────────────────────────────────
 Route::prefix('data')->group(function () {
+    Route::get('/version', [DataController::class, 'version']);
+    Route::get('/payments-map', [DataController::class, 'paymentsMap']);
     Route::get('/orders', [DataController::class, 'orders']);
     Route::get('/payments', [DataController::class, 'payments']);
     Route::get('/returns', [DataController::class, 'returns']);

@@ -9,6 +9,7 @@ class UploadController extends Controller
 {
     private function pruneData(array $data, string $category): array
     {
+        // Whitelist permanen: hanya menyimpan kolom yang benar-benar digunakan oleh analitik & laporan
         $orderWhitelist = [
             'order id',
             'order status',
@@ -24,7 +25,6 @@ class UploadController extends Controller
             'recipient',
             'username (buyer)',
             'buyer username',
-            'phone #',
             'city',
             'kota / kabupaten',
             'kota/kabupaten',
@@ -32,11 +32,7 @@ class UploadController extends Controller
             'districts',
             'province',
             'provinsi',
-            'alamat',
-            'detail address',
             'payment method',
-            'shipping provider name',
-            'opsi pengiriman',
             'delivered time',
             'cancelled time',
             'waktu pesanan dibuat',
@@ -58,14 +54,6 @@ class UploadController extends Controller
             'affiliate commission',
             'komisi affiliate',
             'return shipping costs (passed on to the customer)',
-            'tanggal dana dilepaskan',
-            'waktu pesanan dibuat',
-            'order created time',
-            'order settled time',
-            'metode pembayaran pembeli',
-            'biaya layanan',
-            'biaya administrasi',
-            'biaya proses pesanan',
             'channel marketplace'
         ];
 
@@ -219,9 +207,10 @@ class UploadController extends Controller
                 if ($user && $user->class) {
                     $lim = DB::table('class_limits')->where('class_name', $user->class)->first();
                     if ($lim && $lim->max_orders != -1) {
-                        $existingCount = DB::table('orders')
-                            ->whereIn('upload_id', DB::table('uploads')->where('user_id', $userId)->pluck('id'))
-                            ->count();
+                        $existingCount = (int) DB::table('uploads')
+                            ->where('user_id', $userId)
+                            ->where('category', 'orders')
+                            ->sum('row_count');
                         if ($existingCount + $totalNewOrders > $lim->max_orders) {
                             return response()->json([
                                 'error' => "Batas pesanan kelas {$user->class} adalah {$lim->max_orders}. Anda sudah memiliki {$existingCount} pesanan."

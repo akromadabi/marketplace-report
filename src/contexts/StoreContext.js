@@ -5,12 +5,35 @@ import { useAuth } from './AuthContext';
 const StoreContext = createContext(null);
 
 const STORE_KEY = 'marketplace_active_store';
+const STORES_CACHE_PREFIX = 'marketplace_stores_list_';
+
+function getCachedStores(userId) {
+    if (!userId) return null;
+    try {
+        const raw = localStorage.getItem(STORES_CACHE_PREFIX + userId);
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) return parsed;
+        }
+    } catch { /* ignore */ }
+    return null;
+}
+
+function resolveActiveStore(storeList) {
+    if (!Array.isArray(storeList) || storeList.length === 0) return null;
+    const savedId = localStorage.getItem(STORE_KEY);
+    const savedStore = savedId ? storeList.find(s => s.id === parseInt(savedId, 10)) : null;
+    return savedStore || storeList[0];
+}
 
 export function StoreProvider({ children }) {
     const { user } = useAuth();
-    const [stores, setStores] = useState([]);
-    const [activeStore, setActiveStoreState] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const [stores, setStores] = useState(() => getCachedStores(user?.id) || []);
+    const [activeStore, setActiveStoreState] = useState(() => resolveActiveStore(getCachedStores(user?.id)));
+    const [loading, setLoading] = useState(() => {
+        if (!user || user.role === 'admin') return false;
+        return getCachedStores(user.id) === null;
+    });
 
     // Load stores when user changes
     const loadStores = useCallback(async () => {
@@ -20,19 +43,23 @@ export function StoreProvider({ children }) {
             setLoading(false);
             return;
         }
-        setLoading(true);
+        const cached = getCachedStores(user.id);
+        if (!cached) setLoading(true);
         try {
             const storeList = await apiGetStores(user.id);
             setStores(storeList);
+            try { localStorage.setItem(STORES_CACHE_PREFIX + user.id, JSON.stringify(storeList)); } catch { /* ignore */ }
 
             // Restore active store from localStorage
             const savedId = localStorage.getItem(STORE_KEY);
-            const savedStore = savedId ? storeList.find(s => s.id === parseInt(savedId)) : null;
+            const savedStore = savedId ? storeList.find(s => s.id === parseInt(savedId, 10)) : null;
             if (savedStore) {
-                setActiveStoreState(savedStore);
+                setActiveStoreState(prev => (prev && prev.id === savedStore.id && prev.name === savedStore.name ? prev : savedStore));
             } else if (storeList.length > 0) {
-                setActiveStoreState(storeList[0]);
+                setActiveStoreState(prev => (prev && prev.id === storeList[0].id ? prev : storeList[0]));
                 localStorage.setItem(STORE_KEY, storeList[0].id.toString());
+            } else {
+                setActiveStoreState(null);
             }
         } catch (err) {
             console.error('Failed to load stores:', err);
@@ -54,7 +81,7 @@ export function StoreProvider({ children }) {
         if (activeStore && activeStore.logo_url) {
             link.href = `/api/${activeStore.logo_url}`;
         } else {
-            link.href = `/api/logos/default_logo.png?v=${new Date().getTime()}`; // default or fallback
+            link.href = `/api/logos/default_logo.png`;
         }
     }, [activeStore]);
 

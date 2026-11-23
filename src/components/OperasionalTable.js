@@ -169,8 +169,15 @@ function KategoriDropdown({ value, onChange, allKategori, onDeleteKategori, onRe
 
 /* ─── Main Component ───────────────────────────────────────────── */
 function OperasionalTable() {
-    const [data, setData] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [data, setData] = useState(() => {
+        try {
+            const raw = localStorage.getItem('marketplace_operasional_cache');
+            return raw ? JSON.parse(raw) : [];
+        } catch { return []; }
+    });
+    const [loading, setLoading] = useState(() => {
+        try { return !localStorage.getItem('marketplace_operasional_cache'); } catch { return true; }
+    });
     const [search, setSearch] = useState('');
     const [editingId, setEditingId] = useState(null);
     const [editForm, setEditForm] = useState({ nama: '', kategori: '', tanggal: '', biaya: '' });
@@ -183,7 +190,10 @@ function OperasionalTable() {
         try {
             const res = await fetch(`${API}/api/operasional`);
             const rows = await res.json();
-            setData(rows);
+            if (Array.isArray(rows)) {
+                setData(rows);
+                try { localStorage.setItem('marketplace_operasional_cache', JSON.stringify(rows)); } catch { /* ignore */ }
+            }
         } catch (err) {
             console.error('Fetch operasional error:', err);
         }

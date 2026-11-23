@@ -72,18 +72,25 @@ function Sidebar({ currentPath, isOpen, onToggle }) {
     const sidebarRef = useRef(null);
     const [tooltip, setTooltip] = useState({ visible: false, text: "", top: 0, left: 0 });
     const [storeDropdownOpen, setStoreDropdownOpen] = useState(false);
-    const [usage, setUsage] = useState(null);
+    const [usage, setUsage] = useState(() => {
+        if (!user?.id) return null;
+        try {
+            const raw = localStorage.getItem('marketplace_usage_' + user.id);
+            return raw ? JSON.parse(raw) : null;
+        } catch { return null; }
+    });
 
     const classCfg = user ? (CLASS_CONFIG[user.class] || CLASS_CONFIG.silver) : CLASS_CONFIG.silver;
 
     // Fetch usage stats
     const fetchUsage = useCallback(async () => {
-        if (!user || user.role === 'admin') return;
+        if (!user?.id || user?.role === 'admin') return;
         try {
             const data = await apiGetUsage(user.id);
             setUsage(data);
+            try { localStorage.setItem('marketplace_usage_' + user.id, JSON.stringify(data)); } catch { /* ignore */ }
         } catch { /* ignore */ }
-    }, [user]);
+    }, [user?.id, user?.role]);
 
     useEffect(() => { fetchUsage(); }, [fetchUsage]);
 

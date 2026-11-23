@@ -1,19 +1,23 @@
-import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback, useDeferredValue } from 'react';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Search, RotateCcw, ArrowUp, ArrowDown, ArrowUpDown, CheckCircle, XCircle, Calendar, Download, ChevronLeft, ChevronRight, X, Copy, Check, Package, MapPin, Truck, AlertCircle, FileText } from 'lucide-react';
-import { useApiData, useModalValues } from '../hooks/useApiData';
+import { useProcessedOrders } from '../hooks/useProcessedOrders';
 import { useStore } from '../contexts/StoreContext';
 
 function ReturnTable() {
     const { activeStoreId } = useStore();
-    const { data: returnData, loading } = useApiData('returns', activeStoreId);
-    const { data: pengembalianData } = useApiData('pengembalian', activeStoreId);
-    const { data: ordersData } = useApiData('orders', activeStoreId);
-    const { data: scanData } = useApiData('scan', activeStoreId);
-    const { modalValues } = useModalValues(activeStoreId);
+    const {
+        rangkumanData,
+        returnData,
+        pengembalianData,
+        scanData,
+        modalValues,
+        loading,
+    } = useProcessedOrders(activeStoreId);
     const [search, setSearch] = useState('');
+    const deferredSearch = useDeferredValue(search);
     const [filterStartDate, setFilterStartDate] = useState('');
     const [filterEndDate, setFilterEndDate] = useState('');
     const [showDateRangePicker, setShowDateRangePicker] = useState(false);
@@ -60,10 +64,10 @@ function ReturnTable() {
         { key: 'Return Order ID', label: 'No Retur' },
         { key: 'Order ID', label: 'Order ID' },
         { key: 'STATUS BARANG', label: 'Status Barang' },
-        { key: 'TERKIRIM', label: 'Terkirim' },
+        { key: 'TERKIRIM', label: 'Status Pengiriman' },
         { key: 'ALAMAT', label: 'Alamat' },
         { key: 'KERUGIAN', label: 'Kerugian' },
-        { key: 'TANGGUNG ONGKIR', label: 'Tanggung Ongkir' },
+        { key: 'TANGGUNG ONGKIR', label: 'Penanggung Ongkir' },
         { key: 'Return Reason', label: 'Alasan' },
         { key: 'Return Logistics Tracking ID', label: 'Resi' },
         { key: 'Return Status', label: 'Status Retur' },
@@ -100,10 +104,10 @@ function ReturnTable() {
         { key: 'Compensation Amount', label: 'Kompensasi' },
         { key: 'Buyer Note', label: 'Catatan Pembeli' },
         { key: 'STATUS BARANG', label: 'Status Barang' },
-        { key: 'TERKIRIM', label: 'Terkirim' },
+        { key: 'TERKIRIM', label: 'Status Pengiriman' },
         { key: 'ALAMAT', label: 'Alamat' },
         { key: 'KERUGIAN', label: 'Kerugian' },
-        { key: 'TANGGUNG ONGKIR', label: 'Tanggung Ongkir' },
+        { key: 'TANGGUNG ONGKIR', label: 'Penanggung Ongkir' },
     ];
 
     const pengembalianResiSet = useMemo(() => {
@@ -149,19 +153,19 @@ function ReturnTable() {
         return map;
     }, [pengembalianData, scanData]);
 
-    // ─── Build address map from orders data (Order ID -> Districts, Province) ──
+    // ─── Build address map from pre-processed rangkumanData (no raw orders download!) ──
     const orderAddressMap = useMemo(() => {
         const map = new Map();
-        for (const row of ordersData) {
-            const oid = (row['Order ID'] || '').toString().trim();
-            if (!oid || map.has(oid)) continue;
-            const districts = (row['Districts'] || '').toString().trim();
-            const province = (row['Province'] || '').toString().trim();
+        for (let i = 0; i < rangkumanData.length; i++) {
+            const r = rangkumanData[i];
+            if (!r.orderId || map.has(r.orderId)) continue;
+            const districts = r.district || '';
+            const province = r.rawProvince || r.province || '';
             const parts = [districts, province].filter(Boolean);
-            map.set(oid, parts.length > 0 ? parts.join(', ') : '-');
+            map.set(r.orderId, parts.length > 0 ? parts.join(', ') : '-');
         }
         return map;
-    }, [ordersData]);
+    }, [rangkumanData]);
 
     const [sortConfig, setSortConfig] = useState({ key: 'Time Requested', direction: 'desc' });
 
@@ -302,8 +306,8 @@ function ReturnTable() {
                 return true;
             });
         }
-        if (search.trim()) {
-            const s = search.toLowerCase();
+        if (deferredSearch.trim()) {
+            const s = deferredSearch.toLowerCase();
             data = data.filter(row =>
                 displayColumns.some(col => {
                     const val = getCellValue(row, col.key);
@@ -312,7 +316,7 @@ function ReturnTable() {
             );
         }
         return data;
-    }, [activeReturnData, search, filterStartDate, filterEndDate, pengembalianResiSet]);
+    }, [activeReturnData, deferredSearch, filterStartDate, filterEndDate, pengembalianResiSet]);
 
     const sortedData = useMemo(() => {
         if (!sortConfig.key) return filteredData;
@@ -378,7 +382,7 @@ function ReturnTable() {
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(16);
         doc.setFont(undefined, 'bold');
-        doc.text('LAPORAN DATA RETURN', pageWidth / 2, 12, { align: 'center' });
+        doc.text('LAPORAN DATA RETUR PENJUALAN', pageWidth / 2, 12, { align: 'center' });
         doc.setFontSize(8);
         doc.setFont(undefined, 'normal');
         doc.text(mode === 'belum' ? 'Filter: Belum Diterima Saja' : 'Filter: Semua Barang', pageWidth / 2, 18, { align: 'center' });
@@ -457,7 +461,7 @@ function ReturnTable() {
             { key: '_no', label: 'No' },
             { key: 'Return Logistics Tracking ID', label: 'Resi' },
             { key: 'STATUS BARANG', label: 'Status' },
-            { key: 'TERKIRIM', label: 'Terkirim' },
+            { key: 'TERKIRIM', label: 'Status Pengiriman' },
             { key: 'Order ID', label: 'Order ID' },
             { key: 'ALAMAT', label: 'Alamat' },
             { key: 'KERUGIAN', label: 'Kerugian' },
@@ -545,13 +549,13 @@ function ReturnTable() {
                 <div>
                     <h2 className="gradient-text" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <RotateCcw size={24} style={{ color: '#7c3aed' }} />
-                        Return
+                        Retur Penjualan
                     </h2>
                     <p>{sortedData.length.toLocaleString('id-ID')} data return</p>
                 </div>
                 <div style={{ position: 'relative', maxWidth: '20rem', flex: '1' }}>
                     <Search size={16} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-tertiary)' }} />
-                    <input type="text" placeholder="Cari di Return..." value={search}
+                    <input type="text" placeholder="Cari di Retur..." value={search}
                         onChange={(e) => setSearch(e.target.value)} className="search-input" />
                 </div>
             </div>
@@ -835,7 +839,7 @@ function ReturnTable() {
                             }}>
                                 <div>
                                     <div style={{ fontSize: '0.6875rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: headerColor, fontWeight: 700, marginBottom: '0.25rem' }}>
-                                        Detail Return
+                                        Detail Retur Penjualan
                                     </div>
                                     <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                                         {row['Order ID'] || '-'}

@@ -83,6 +83,7 @@ export function AuthProvider({ children }) {
     const [currentUser, setCurrentUser] = useState(getStoredSession);
     const [permissionsLoading, setPermissionsLoading] = useState(() => {
         const s = getStoredSession();
+        if (s && Array.isArray(s.permissions)) return false;
         return !!(s && s.role === 'user' && s.class);
     });
 

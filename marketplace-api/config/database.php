@@ -17,7 +17,7 @@ return [
     |
     */
 
-    'default' => env('DB_CONNECTION', 'sqlite'),
+    'default' => in_array(env('DB_CONNECTION'), ['mysql', 'sqlite', 'pgsql', 'sqlsrv'], true) ? env('DB_CONNECTION') : 'mysql',
 
     /*
     |--------------------------------------------------------------------------

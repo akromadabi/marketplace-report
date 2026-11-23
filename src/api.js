@@ -271,8 +271,16 @@ function dataQuery(storeId, userId) {
     return params.length ? '?' + params.join('&') : '';
 }
 
+export async function apiGetDataVersion(storeId, userId) {
+    return apiFetch(`/data/version${dataQuery(storeId, userId)}`);
+}
+
+export async function apiGetPaymentsMap(storeId, userId) {
+    return apiFetch(`/data/payments-map${dataQuery(storeId, userId)}`);
+}
+
 export async function apiGetOrders(storeId, userId) {
-    return fetchNdjson(`/data/orders${dataQuery(storeId, userId)}`);
+    return apiFetch(`/data/orders${dataQuery(storeId, userId)}`);
 }
 
 export async function apiGetPayments(storeId, userId) {
@@ -280,11 +288,11 @@ export async function apiGetPayments(storeId, userId) {
 }
 
 export async function apiGetReturns(storeId, userId) {
-    return fetchNdjson(`/data/returns${dataQuery(storeId, userId)}`);
+    return apiFetch(`/data/returns${dataQuery(storeId, userId)}`);
 }
 
 export async function apiGetPengembalian(storeId, userId) {
-    return fetchNdjson(`/data/pengembalian${dataQuery(storeId, userId)}`);
+    return apiFetch(`/data/pengembalian${dataQuery(storeId, userId)}`);
 }
 
 export async function apiGetStats(storeId, userId) {

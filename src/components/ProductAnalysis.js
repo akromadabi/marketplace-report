@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useCallback } from 'react';
 import { BarChart3, ChevronUp, ChevronDown, ArrowUpDown, MapPin, Package, X, Copy, Check } from 'lucide-react';
 import { useProcessedOrders } from '../hooks/useProcessedOrders';
+import { useDataCache } from '../contexts/DataContext';
 
 
 // ─── helpers ───────────────────────────────────────────────────────────
@@ -12,7 +13,9 @@ function parseQuantity(q) {
 
 function formatRupiah(number) {
   if (typeof number !== 'number' || isNaN(number)) return '';
-  return 'Rp' + number.toLocaleString('id-ID', { maximumFractionDigits: 0 });
+  const rounded = Math.round(number);
+  if (rounded < 0) return 'Rp-' + (-rounded).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return 'Rp' + rounded.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 }
 
 function getProvince(row) {
@@ -26,8 +29,21 @@ function getCity(row) {
 }
 
 // ─── main component ────────────────────────────────────────────────────
+// Nama kolom tampilan sesuai istilah standar (kunci sort internal tidak diubah)
+const COL_TEXT = {
+    'Total Terjual': 'Unit Terjual',
+    'Presentase': 'Persentase',
+    'Total Return': 'Total Retur',
+    'Return': 'Retur',
+    '% Return': '% Retur',
+    'Nilai Jual': 'Penerimaan Bersih',
+    'Nilai Jual AFF': 'Penerimaan Bersih Afiliasi',
+};
+const colText = (c) => COL_TEXT[c] || c;
+
 function ProductAnalysis() {
-  const { rangkumanData, loading: isLoading } = useProcessedOrders();
+  const { rangkumanData, baseVersion, loading: isLoading } = useProcessedOrders();
+  const { getComputed, setComputed } = useDataCache();
 
   // View mode: 'sku' | 'regional'
   const [viewMode, setViewMode] = useState('sku');
@@ -50,8 +66,12 @@ function ProductAnalysis() {
   const openPopup = useCallback((title, orders) => setPopup({ title, orders }), []);
   const closePopup = useCallback(() => setPopup(null), []);
 
-  // ─── SKU aggregation ────────────────────────────────────────────────
+  // ─── SKU aggregation (cached by baseVersion — unaffected by Modal/HPP changes!) ──
   const skuAggregated = useMemo(() => {
+    const cacheKey = `wawasan_base::sku::${baseVersion || rangkumanData.length}`;
+    const cached = getComputed(cacheKey);
+    if (cached && rangkumanData.length > 0) return cached;
+
     const map = new Map();
     rangkumanData.forEach((row) => {
       const statusOrder = (row.statusOrder || '').toLowerCase();
@@ -103,11 +123,19 @@ function ProductAnalysis() {
       });
     });
     arr.sort((a, b) => b.totalQuantity - a.totalQuantity);
+    if (rangkumanData.length > 0) {
+      setComputed(cacheKey, arr);
+    }
     return arr;
-  }, [rangkumanData]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rangkumanData, baseVersion]);
 
-  // ─── Regional aggregation ────────────────────────────────────────────────────
+  // ─── Regional aggregation (cached by baseVersion — unaffected by Modal/HPP changes!) ──
   const regionalAggregated = useMemo(() => {
+    const cacheKey = `wawasan_base::reg::${baseVersion || rangkumanData.length}`;
+    const cached = getComputed(cacheKey);
+    if (cached && rangkumanData.length > 0) return cached;
+
     const provinceMap = new Map();
     rangkumanData.forEach((row) => {
       const statusOrder = (row.statusOrder || '').toLowerCase();
@@ -134,8 +162,13 @@ function ProductAnalysis() {
       if (isGagalKirim) { cityData.totalGagalKirim++; if (!cityData._gagSet.has(row.orderId)) { cityData._gagSet.add(row.orderId); cityData.gagalKirimOrders.push({ orderId: row.orderId, statusOrder: row.statusOrder, city: row.regencyAndCity, province: row.province, verifikasiPaket: row.verifikasiPaket }); } }
     });
 
-    return Array.from(provinceMap.values()).sort((a, b) => (b.totalReturn + b.totalGagalKirim) - (a.totalReturn + a.totalGagalKirim));
-  }, [rangkumanData]);
+    const res = Array.from(provinceMap.values()).sort((a, b) => (b.totalReturn + b.totalGagalKirim) - (a.totalReturn + a.totalGagalKirim));
+    if (rangkumanData.length > 0) {
+      setComputed(cacheKey, res);
+    }
+    return res;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rangkumanData, baseVersion]);
 
 
   // ─── Flat aggregations ────────────────────────────────────────────────────
@@ -452,7 +485,7 @@ function ProductAnalysis() {
                     {(isFlatView ? varColumnsFlat : skuColumns).map((col) => (
                       <th key={col} onClick={() => handleSkuSortClick(col)} style={{ cursor: 'pointer', textAlign: col === 'SKU Produk' || col === 'Variasi' ? 'left' : 'center' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: col === 'SKU Produk' || col === 'Variasi' ? 'flex-start' : 'center' }}>
-                          <span>{col}</span><SkuSortIcon column={col} />
+                          <span>{colText(col)}</span><SkuSortIcon column={col} />
                         </div>
                       </th>
                     ))}
@@ -477,7 +510,7 @@ function ProductAnalysis() {
                         <td style={{ textAlign: 'center', fontWeight: 600 }}>{varObj.totalQuantity}</td>
                         <td style={{ textAlign: 'center', fontWeight: 600 }}>{varPct.toFixed(2)}%</td>
                         {showReturn && <>
-                          <td style={{ textAlign: 'center' }}><ClickableCount count={varObj.totalReturn} color="#fbbf24" orders={varObj.returnOrders} label={'Return — ' + varObj.parentSku + ' / ' + varObj.variation} /></td>
+                          <td style={{ textAlign: 'center' }}><ClickableCount count={varObj.totalReturn} color="#fbbf24" orders={varObj.returnOrders} label={'Retur — ' + varObj.parentSku + ' / ' + varObj.variation} /></td>
                           <td style={{ textAlign: 'center', fontWeight: 600, color: varRetPct > 5 ? '#f87171' : 'var(--text-primary)' }}>{varRetPct.toFixed(2)}%</td>
                         </>}
                         {showGagalKirim && <>
@@ -513,7 +546,7 @@ function ProductAnalysis() {
                           <td style={{ textAlign: 'center', fontWeight: 600 }}>{skuObj.totalQuantity}</td>
                           <td style={{ textAlign: 'center', fontWeight: 600 }}>{pct.toFixed(2)}%</td>
                           {showReturn && <>
-                            <td style={{ textAlign: 'center' }}><ClickableCount count={skuObj.totalReturn} color="#fbbf24" orders={skuObj.returnOrders} label={`Return — ${skuObj.sku}`} /></td>
+                            <td style={{ textAlign: 'center' }}><ClickableCount count={skuObj.totalReturn} color="#fbbf24" orders={skuObj.returnOrders} label={`Retur — ${skuObj.sku}`} /></td>
                             <td style={{ textAlign: 'center', fontWeight: 600, color: retPct > 5 ? '#f87171' : 'var(--text-primary)' }}>{retPct.toFixed(2)}%</td>
                           </>}
                           {showGagalKirim && <>
@@ -534,7 +567,7 @@ function ProductAnalysis() {
                                       <th style={{ width: '3rem' }}>No</th>
                                       {varColumns.map((col) => (
                                         <th key={col} onClick={() => handleVariationSortClick(skuObj.sku, col)} style={{ cursor: 'pointer' }}>
-                                          <div style={{ display: 'flex', alignItems: 'center' }}><span>{col}</span><VarSortIcon sku={skuObj.sku} column={col} /></div>
+                                          <div style={{ display: 'flex', alignItems: 'center' }}><span>{colText(col)}</span><VarSortIcon sku={skuObj.sku} column={col} /></div>
                                         </th>
                                       ))}
                                     </tr>
@@ -556,7 +589,7 @@ function ProductAnalysis() {
                                             <td style={{ textAlign: 'center', fontWeight: 600, fontSize: '0.75rem' }}>{varObj.totalQuantity}</td>
                                             <td style={{ textAlign: 'center', fontWeight: 600, fontSize: '0.75rem' }}>{varPct.toFixed(2)}%</td>
                                             {showReturn && <>
-                                              <td style={{ textAlign: 'center', fontSize: '0.75rem' }}><ClickableCount count={varObj.totalReturn} color="#fbbf24" orders={varObj.returnOrders} label={`Return — ${skuObj.sku} / ${varObj.variation}`} /></td>
+                                              <td style={{ textAlign: 'center', fontSize: '0.75rem' }}><ClickableCount count={varObj.totalReturn} color="#fbbf24" orders={varObj.returnOrders} label={`Retur — ${skuObj.sku} / ${varObj.variation}`} /></td>
                                               <td style={{ textAlign: 'center', fontWeight: 600, fontSize: '0.75rem', color: varRetPct > 5 ? '#f87171' : 'var(--text-primary)' }}>{varRetPct.toFixed(2)}%</td>
                                             </>}
                                             {showGagalKirim && <>
@@ -597,7 +630,7 @@ function ProductAnalysis() {
                     {(isFlatView ? regionalColumnsFlat : ["Provinsi", "Total Pesanan", ...(showReturn ? ["Total Return", "% Return"] : []), ...(showGagalKirim ? ["Gagal Kirim", "% Gagal Kirim"] : [])]).map(col => (
                       <th key={col} onClick={() => handleRegionalSortClick(col)} style={{ cursor: 'pointer', textAlign: col === 'Provinsi' || col === 'Kota / Kabupaten' ? 'left' : 'center' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: col === 'Provinsi' || col === 'Kota / Kabupaten' ? 'flex-start' : 'center' }}>
-                          <span>{col}</span><RegSortIcon column={col} />
+                          <span>{colText(col)}</span><RegSortIcon column={col} />
                         </div>
                       </th>
                     ))}
@@ -618,7 +651,7 @@ function ProductAnalysis() {
                         <td style={{ fontWeight: 600 }}>{cityObj.city}</td>
                         <td style={{ textAlign: 'center', fontWeight: 600 }}>{cityObj.totalOrders}</td>
                         {showReturn && <>
-                          <td style={{ textAlign: 'center' }}><ClickableCount count={cityObj.totalReturn} color="#fbbf24" orders={cityObj.returnOrders} label={'Return — ' + cityObj.city} /></td>
+                          <td style={{ textAlign: 'center' }}><ClickableCount count={cityObj.totalReturn} color="#fbbf24" orders={cityObj.returnOrders} label={'Retur — ' + cityObj.city} /></td>
                           <td style={{ textAlign: 'center', fontWeight: 600, color: cRetPct > 5 ? '#f87171' : 'var(--text-secondary)' }}>{cRetPct.toFixed(1)}%</td>
                         </>}
                         {showGagalKirim && <>
@@ -669,7 +702,7 @@ function ProductAnalysis() {
                           </td>
                           <td style={{ textAlign: 'center', fontWeight: 600 }}>{provObj.totalOrders}</td>
                           {showReturn && <>
-                            <td style={{ textAlign: 'center' }}><ClickableCount count={provObj.totalReturn} color="#fbbf24" orders={provObj.returnOrders} label={`Return — ${provObj.province}`} /></td>
+                            <td style={{ textAlign: 'center' }}><ClickableCount count={provObj.totalReturn} color="#fbbf24" orders={provObj.returnOrders} label={`Retur — ${provObj.province}`} /></td>
                             <td style={{ textAlign: 'center', fontWeight: 600, color: retPct > 5 ? '#f87171' : 'var(--text-secondary)' }}>{retPct.toFixed(1)}%</td>
                           </>}
                           {showGagalKirim && <>
@@ -689,7 +722,7 @@ function ProductAnalysis() {
                                       {['Kota / Kabupaten', 'Total Pesanan', ...(showReturn ? ['Return', '% Return'] : []), ...(showGagalKirim ? ['Gagal Kirim', '% Gagal Kirim'] : [])].map(col => (
                                         <th key={col} onClick={() => handleCitySortClick(provObj.province, col)} style={{ cursor: 'pointer', textAlign: col === 'Kota / Kabupaten' ? 'left' : 'center' }}>
                                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: col === 'Kota / Kabupaten' ? 'flex-start' : 'center' }}>
-                                            <span>{col}</span><CitySortIcon province={provObj.province} column={col} />
+                                            <span>{colText(col)}</span><CitySortIcon province={provObj.province} column={col} />
                                           </div>
                                         </th>
                                       ))}
@@ -706,7 +739,7 @@ function ProductAnalysis() {
                                           <td style={{ fontSize: '0.8125rem', fontWeight: 600 }}>{cityObj.city}</td>
                                           <td style={{ textAlign: 'center', fontSize: '0.8125rem' }}>{cityObj.totalOrders}</td>
                                           {showReturn && <>
-                                            <td style={{ textAlign: 'center', fontSize: '0.8125rem' }}><ClickableCount count={cityObj.totalReturn} color="#fbbf24" orders={cityObj.returnOrders} label={`Return — ${provObj.province} / ${cityObj.city}`} /></td>
+                                            <td style={{ textAlign: 'center', fontSize: '0.8125rem' }}><ClickableCount count={cityObj.totalReturn} color="#fbbf24" orders={cityObj.returnOrders} label={`Retur — ${provObj.province} / ${cityObj.city}`} /></td>
                                             <td style={{ textAlign: 'center', fontSize: '0.8125rem', color: cRetPct > 5 ? '#f87171' : 'var(--text-tertiary)' }}>{cRetPct.toFixed(1)}%</td>
                                           </>}
                                           {showGagalKirim && <>

@@ -9,22 +9,55 @@ import MobileNav from './components/MobileNav';
 import LoginPage from './components/LoginPage';
 import AdminSidebar from './components/admin/AdminSidebar';
 import AdminMobileNav from './components/admin/AdminMobileNav';
+import { useProcessedOrders } from './hooks/useProcessedOrders';
 
-// ─── Lazy-loaded page components (code-split per page) ───────────
-const Dashboard = lazy(() => import('./components/Dashboard'));
-const UploadFile = lazy(() => import('./components/UploadFile'));
-const InputModal = lazy(() => import('./components/InputModal'));
-const ReturnTable = lazy(() => import('./components/ReturnTable'));
-const PengembalianTable = lazy(() => import('./components/PengembalianTable'));
-const ProductAnalysis = lazy(() => import('./components/ProductAnalysis'));
-const RangkumanTransaksi = lazy(() => import('./components/RangkumanTransaksi'));
-const OlahanDataPesanan = lazy(() => import('./components/OlahanDataPesanan'));
-const StoreManagement = lazy(() => import('./components/StoreManagement'));
-const AsetTable = lazy(() => import('./components/AsetTable'));
-const OperasionalTable = lazy(() => import('./components/OperasionalTable'));
-const UserProfile = lazy(() => import('./components/UserProfile'));
-const KampanyeMain = lazy(() => import('./components/KampanyeMain'));
-const PricingCalculator = lazy(() => import('./components/PricingCalculator'));
+// ─── Lazy-loaded page components (code-split per page + background preloaded) ───
+const pageLoaders = [
+    () => import('./components/Dashboard'),
+    () => import('./components/UploadFile'),
+    () => import('./components/InputModal'),
+    () => import('./components/ReturnTable'),
+    () => import('./components/PengembalianTable'),
+    () => import('./components/ProductAnalysis'),
+    () => import('./components/RangkumanTransaksi'),
+    () => import('./components/OlahanDataPesanan'),
+    () => import('./components/StoreManagement'),
+    () => import('./components/AsetTable'),
+    () => import('./components/OperasionalTable'),
+    () => import('./components/UserProfile'),
+    () => import('./components/KampanyeMain'),
+    () => import('./components/PricingCalculator'),
+];
+
+const Dashboard = lazy(pageLoaders[0]);
+const UploadFile = lazy(pageLoaders[1]);
+const InputModal = lazy(pageLoaders[2]);
+const ReturnTable = lazy(pageLoaders[3]);
+const PengembalianTable = lazy(pageLoaders[4]);
+const ProductAnalysis = lazy(pageLoaders[5]);
+const RangkumanTransaksi = lazy(pageLoaders[6]);
+const OlahanDataPesanan = lazy(pageLoaders[7]);
+const StoreManagement = lazy(pageLoaders[8]);
+const AsetTable = lazy(pageLoaders[9]);
+const OperasionalTable = lazy(pageLoaders[10]);
+const UserProfile = lazy(pageLoaders[11]);
+const KampanyeMain = lazy(pageLoaders[12]);
+const PricingCalculator = lazy(pageLoaders[13]);
+
+// Background prewarmer: warms IndexedDB snapshot into RAM & preloads all route JS chunks
+function BackgroundDataPrewarmer() {
+    useProcessedOrders();
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            const schedule = window.requestIdleCallback || ((cb) => setTimeout(cb, 50));
+            schedule(() => {
+                pageLoaders.forEach(load => { try { load(); } catch { /* ignore */ } });
+            });
+        }, 250);
+        return () => clearTimeout(timer);
+    }, []);
+    return null;
+}
 
 // Admin pages
 const AdminDashboard = lazy(() => import('./components/admin/AdminDashboard'));
@@ -100,6 +133,7 @@ function UserLayout() {
         <StoreProvider>
             <DataProvider>
                 <NotificationProvider>
+                    <BackgroundDataPrewarmer />
                     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-primary)' }}>
                         <Sidebar
                             currentPath={location.pathname}

@@ -110,8 +110,18 @@ function UploadFile() {
   const [fileParsedDataMap, setFileParsedDataMap] = useState({});
   const [fileRowCountMap, setFileRowCountMap] = useState({});
   const [dragActive, setDragActive] = useState(false);
-  const [uploadHistory, setUploadHistory] = useState([]);
-  const [historyLoading, setHistoryLoading] = useState(true);
+  const historyCacheKey = `marketplace_upload_history_${user?.id || '0'}_${activeStoreId || 'all'}`;
+  const [uploadHistory, setUploadHistory] = useState(() => {
+    try {
+      const raw = localStorage.getItem(historyCacheKey);
+      return raw ? JSON.parse(raw) : [];
+    } catch { return []; }
+  });
+  const [historyLoading, setHistoryLoading] = useState(() => {
+    try {
+      return !localStorage.getItem(historyCacheKey);
+    } catch { return true; }
+  });
   const [deletingId, setDeletingId] = useState(null);
   const [migratingOrphans, setMigratingOrphans] = useState(false);
   const [orphanMigrated, setOrphanMigrated] = useState(null);
@@ -121,14 +131,25 @@ function UploadFile() {
   const progressRef = useRef(null);
 
   const fetchHistory = useCallback(async () => {
-    setHistoryLoading(true);
-    setUploadHistory([]); // reset dulu agar tidak ada duplikat
+    let hasCached = false;
+    try {
+      const raw = localStorage.getItem(historyCacheKey);
+      if (raw) {
+        setUploadHistory(JSON.parse(raw));
+        hasCached = true;
+      }
+    } catch { /* ignore */ }
+    if (!hasCached) {
+      setHistoryLoading(true);
+      setUploadHistory([]);
+    }
     try {
       const data = await apiGetUploadHistory(user?.id, activeStoreId);
       setUploadHistory(data);
+      try { localStorage.setItem(historyCacheKey, JSON.stringify(data)); } catch { /* ignore */ }
     } catch { /* ignore */ }
     setHistoryLoading(false);
-  }, [user?.id, activeStoreId]);
+  }, [user?.id, activeStoreId, historyCacheKey]);
 
   useEffect(() => { fetchHistory(); }, [fetchHistory]);
 
@@ -156,7 +177,11 @@ function UploadFile() {
     setDeletingId(id);
     try {
       await apiDeleteUpload(id);
-      setUploadHistory(prev => prev.filter(u => u.id !== id));
+      setUploadHistory(prev => {
+        const next = prev.filter(u => u.id !== id);
+        try { localStorage.setItem(historyCacheKey, JSON.stringify(next)); } catch { /* ignore */ }
+        return next;
+      });
       invalidateAll(); // Clear data cache since data was removed
     } catch (err) {
       setError(err.message || 'Gagal menghapus');

@@ -16,10 +16,18 @@ function PricingCalculator() {
   const [targetMarginValue, setTargetMarginValue] = useState(() => Number(localStorage.getItem('sc_tval') || 15000));
 
   const { user } = useAuth();
-  const [isLoading, setIsLoading] = useState(true);
+  const simCacheKey = `marketplace_pricing_sims_${user?.id || '0'}`;
+  const [isLoading, setIsLoading] = useState(() => {
+    try { return !localStorage.getItem(simCacheKey); } catch { return true; }
+  });
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
-  const [rows, setRows] = useState([]);
+  const [rows, setRows] = useState(() => {
+    try {
+      const raw = localStorage.getItem(simCacheKey);
+      return raw ? JSON.parse(raw) : [];
+    } catch { return []; }
+  });
 
   // Fetch from DB on mount
   useEffect(() => {
@@ -28,7 +36,7 @@ function PricingCalculator() {
       .then(res => res.json())
       .then(data => {
         if (data && data.length > 0) {
-          setRows(data.map(d => ({
+          const mapped = data.map(d => ({
             id: d.id,
             name: d.name,
             platform: d.platform,
@@ -41,7 +49,9 @@ function PricingCalculator() {
             r_markupPct: Number(d.markup_pct),
             r_targetMarginMode: d.target_margin_mode,
             r_targetMarginValue: d.target_margin_value
-          })));
+          }));
+          setRows(mapped);
+          try { localStorage.setItem(simCacheKey, JSON.stringify(mapped)); } catch { /* ignore */ }
         } else {
           // Fallback if empty database
           setRows([{ 
@@ -156,7 +166,7 @@ function PricingCalculator() {
             <tr>
               <th style={{ width: '22%' }}>Nama Produk/Catatan</th>
               <th style={{ width: '10%' }}>Platform</th>
-              <th style={{ textAlign: 'right', width: '12%' }}>HPP (Modal)</th>
+              <th style={{ textAlign: 'right', width: '12%' }}>HPP</th>
               <th style={{ textAlign: 'right', width: '12%' }}>Harga Jual</th>
               <th style={{ textAlign: 'right' }}>Harga Coret</th>
               <th style={{ textAlign: 'right' }}>Beban Platform</th>
@@ -282,17 +292,17 @@ function PricingCalculator() {
                 </div>
                 <div style={{ height: '1px', background: 'var(--border-light)', margin: '0.25rem 0' }} />
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.375rem' }}>Target Margin Minimum</label>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.375rem' }}>Target Laba Minimum</label>
                   <div style={{ display: 'flex', gap: '0.375rem' }}>
                     <select className="im-input" value={targetMarginMode} onChange={e => setTargetMarginMode(e.target.value)} style={{ padding: '0.5rem', width: 'auto' }}>
                        <option value="nominal">Rp</option>
-                       <option value="percent">% (HPP)</option>
+                       <option value="percent">% dari HPP (Markup)</option>
                     </select>
                     <input type="text" className="im-input" value={targetMarginMode === 'nominal' ? fmtRp(targetMarginValue) : targetMarginValue} onChange={e => setTargetMarginValue(toRawNum(e.target.value))} style={{ width: '100%', flex: 1, padding: '0.5rem' }} />
                   </div>
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.375rem' }}>Target Markup Harga (% Coret)</label>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.375rem' }}>Diskon Harga Coret (%)</label>
                   <div style={{ position: 'relative' }}>
                     <input type="number" className="im-input" value={markupPct} onChange={e => setMarkupPct(e.target.value)} style={{ width: '100%', padding: '0.5rem' }} />
                     <span style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-tertiary)', fontSize: '0.75rem', pointerEvents: 'none' }}>% Mark-up</span>
@@ -366,17 +376,17 @@ function PricingCalculator() {
                 <div style={{ height: '1px', background: 'var(--border-light)', margin: '0.25rem 0' }} />
                 
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.375rem' }}>Margin Auto-Calculate</label>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.375rem' }}>Target Laba Otomatis</label>
                   <div style={{ display: 'flex', gap: '0.375rem' }}>
                     <select className="im-input" value={editingRow.r_targetMarginMode} onChange={e => updateRow(editingRow.id, 'r_targetMarginMode', e.target.value)} style={{ padding: '0.5rem', width: 'auto' }}>
                        <option value="nominal">Rp</option>
-                       <option value="percent">% (HPP)</option>
+                       <option value="percent">% dari HPP (Markup)</option>
                     </select>
                     <input type="text" className="im-input" value={editingRow.r_targetMarginMode === 'nominal' ? fmtRp(editingRow.r_targetMarginValue) : editingRow.r_targetMarginValue} onChange={e => updateRow(editingRow.id, 'r_targetMarginValue', toRawNum(e.target.value))} style={{ width: '100%', flex: 1, padding: '0.5rem' }} />
                   </div>
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.375rem' }}>Target Markup Harga (% Coret)</label>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.375rem' }}>Diskon Harga Coret (%)</label>
                   <input type="number" className="im-input" value={editingRow.r_markupPct} onChange={e => updateRow(editingRow.id, 'r_markupPct', e.target.value)} style={{ width: '100%', padding: '0.5rem' }} />
                 </div>
              </div>

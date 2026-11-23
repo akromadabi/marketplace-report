@@ -1,10 +1,21 @@
-import React, { useMemo, useState, useRef, useEffect } from "react";
+import React, { useMemo, useState, useRef, useEffect, useDeferredValue } from "react";
 import * as XLSX from "xlsx";
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { ClipboardList, Filter, ArrowUp, ArrowDown, ArrowUpDown, X, Download, CheckCircle, XCircle, Calendar, ChevronLeft, ChevronRight, Search, Copy, Check } from 'lucide-react';
 import { useProcessedOrders } from '../hooks/useProcessedOrders';
 import { useDataCache } from '../contexts/DataContext';
+
+// Nama kolom tampilan sesuai istilah standar keuangan (kunci data internal tidak diubah)
+const COLUMN_LABELS = {
+    'PENCAIRAN': 'PENERIMAAN DANA',
+    'LABA': 'MARGIN KONTRIBUSI',
+    'AFFILIASI': 'KOMISI AFILIASI',
+    'KET AFFILIASI': 'KET AFILIASI',
+    'TERKIRIM': 'STATUS PENGIRIMAN',
+    'Menanggung Ongkir': 'Ongkir Retur Dibebankan ke Pembeli',
+};
+const colLabel = (c) => COLUMN_LABELS[c] || c;
 
 export default function RangkumanTransaksi({ isHidden = false }) {
     const { getComputed, setComputed } = useDataCache();
@@ -15,17 +26,19 @@ export default function RangkumanTransaksi({ isHidden = false }) {
     // No more duplicate calculation on this page.
     const {
         rangkumanData,
+        rangkumanVersion,
         loading: isLoading,
         returnTimeByOrderId,
         returnResiByOrderId,
         ordersGroupedById,
         modalValues,
-        paymentsData,
     } = useProcessedOrders();
 
     function formatRupiah(number) {
         if (typeof number !== 'number' || isNaN(number)) return '';
-        return 'Rp' + number.toLocaleString('id-ID', { maximumFractionDigits: 0 });
+        const rounded = Math.round(number);
+        if (rounded < 0) return 'Rp-' + (-rounded).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        return 'Rp' + rounded.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
     }
 
     // ─── Pre-built Verifikasi Paket objects (reused across all rows, 0 allocations per row) ──
@@ -60,36 +73,23 @@ export default function RangkumanTransaksi({ isHidden = false }) {
         '-': { text: '-', jsx: '-' },
     }), []);
 
-    // ─── Map rangkumanData → table rows (VERY fast — no recalculation) ───
-    const dataFingerprint = `rangkuman::${rangkumanData.length}::${paymentsData ? paymentsData.length : 0}::${Object.keys(modalValues || {}).length}`;
+    // ─── Map rangkumanData → table rows (VERY fast — cached in DataContext) ───
+    const dataFingerprint = `rangkuman_v3::${rangkumanVersion || rangkumanData.length}`;
 
-    const [rawTableData, setRawTableData] = useState(() => {
-        const cached = getComputed(dataFingerprint + '::table');
-        return cached && cached.length > 0 ? cached : [];
-    });
-    const [dataProcessing, setDataProcessing] = useState(false);
-
-    // Track which fingerprint we've processed to avoid re-running
-    const processedFingerprintRef = useRef(null);
-
-    // Convert rangkumanData rows (already computed) into table rows with JSX
-    useMemo(() => {
-        if (isLoading) return;
-        if (rangkumanData.length === 0) { setRawTableData([]); return; }
-        if (processedFingerprintRef.current === dataFingerprint) return;
+    const effectiveTableData = useMemo(() => {
+        if (rangkumanData.length === 0) return [];
 
         const cached = getComputed(dataFingerprint + '::table');
         if (cached && cached.length > 0) {
-            setRawTableData(cached);
-            processedFingerprintRef.current = dataFingerprint;
-            return;
+            return cached;
         }
 
-        setDataProcessing(true);
-        const rows = rangkumanData.map(r => {
+        const rows = new Array(rangkumanData.length);
+        for (let i = 0; i < rangkumanData.length; i++) {
+            const r = rangkumanData[i];
             const verifikasiPaketText = r.verifikasiPaket || '-';
             const verifikasiObj = verifikasiObjMap[verifikasiPaketText] || { text: verifikasiPaketText, jsx: verifikasiPaketText };
-            return {
+            rows[i] = {
                 'ORDER ID': r.orderId,
                 'WAKTU PESANAN DIBUAT': r.waktuPesananDibuat,
                 'WAKTU PENGIRIMAN': r.waktuPengiriman,
@@ -113,21 +113,16 @@ export default function RangkumanTransaksi({ isHidden = false }) {
                 'Resi': r.resi,
                 'Verifikasi Paket': verifikasiObj,
                 'Kerugian': r.kerugian,
+                '_searchStr': `${r.orderId} ${r.alamat} ${r.resi} ${r.statusOrder} ${r.metode} ${r.paketGagalKirim} ${r.hppDisplay} ${r.pencairanDisplay} ${r.profitDisplay}`.toLowerCase(),
             };
-        });
+        }
 
         setComputed(dataFingerprint + '::table', rows);
-        setComputed('LATEST_RANGKUMAN', rows);
-        processedFingerprintRef.current = dataFingerprint;
-        setRawTableData(rows);
-        setDataProcessing(false);
+        return rows;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isLoading, rangkumanData, dataFingerprint]);
+    }, [rangkumanData, dataFingerprint, verifikasiObjMap]);
 
-
-    // Effective loading: show skeleton if API still loading or if processing deferred data
-    const effectiveTableData = rawTableData;
-    const effectiveLoading = isLoading || (dataProcessing && rawTableData.length === 0);
+    const effectiveLoading = isLoading && effectiveTableData.length === 0;
     const [columnFilters, setColumnFilters] = useState({});
     const [filterPopupOpen, setFilterPopupOpen] = useState(null);
     const filterPopupRef = useRef(null);
@@ -140,6 +135,7 @@ export default function RangkumanTransaksi({ isHidden = false }) {
     const [selectedRow, setSelectedRow] = useState(null);
     const [qrPopupResi, setQrPopupResi] = useState(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const deferredSearchQuery = useDeferredValue(searchQuery);
     const [copiedField, setCopiedField] = useState(null);
     const [showPdfMenu, setShowPdfMenu] = useState(false);
     const [showFilterMenu, setShowFilterMenu] = useState(false);
@@ -475,7 +471,7 @@ export default function RangkumanTransaksi({ isHidden = false }) {
 
     const filteredTableData = useMemo(() => {
         const hasDateFilter = Boolean(filterStartDate || filterEndDate);
-        const q = searchQuery.trim().toLowerCase();
+        const q = deferredSearchQuery.trim().toLowerCase();
         const hasCustomFilter = pdfChecked.retur || pdfChecked.gagal_kirim || pdfChecked.cancel;
         const activeColFilters = Object.entries(columnFilters).filter(([, s]) => s && s.size > 0);
         const monthsIndoSet = new Set(['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']);
@@ -492,19 +488,9 @@ export default function RangkumanTransaksi({ isHidden = false }) {
                 if (filterStartDate && dateKey < filterStartDate) return false;
                 if (filterEndDate && dateKey > filterEndDate) return false;
             }
-            // Search filter
-            if (q) {
-                const match =
-                    (row['ORDER ID'] && row['ORDER ID'].toString().toLowerCase().includes(q)) ||
-                    (row['ALAMAT'] && row['ALAMAT'].toString().toLowerCase().includes(q)) ||
-                    (row['Resi'] && row['Resi'].toString().toLowerCase().includes(q)) ||
-                    (row['STATUS ORDER'] && row['STATUS ORDER'].toString().toLowerCase().includes(q)) ||
-                    (row['METODE'] && row['METODE'].toString().toLowerCase().includes(q)) ||
-                    (row['Alasan Cancel'] && row['Alasan Cancel'].toString().toLowerCase().includes(q)) ||
-                    (row['HPP'] && row['HPP'].toString().toLowerCase().includes(q)) ||
-                    (row['PENCAIRAN'] && row['PENCAIRAN'].toString().toLowerCase().includes(q)) ||
-                    (row['LABA'] && row['LABA'].toString().toLowerCase().includes(q));
-                if (!match) return false;
+            // Fast O(1) search filter using pre-lowercased _searchStr
+            if (q && (!row._searchStr || !row._searchStr.includes(q))) {
+                return false;
             }
             if (hasCustomFilter) {
                 const status = (row['STATUS ORDER'] || '').toLowerCase();
@@ -530,7 +516,7 @@ export default function RangkumanTransaksi({ isHidden = false }) {
             }
             return true;
         });
-    }, [effectiveTableData, pdfChecked, columnFilters, filterStartDate, filterEndDate, searchQuery]);
+    }, [effectiveTableData, pdfChecked, columnFilters, filterStartDate, filterEndDate, deferredSearchQuery]);
 
     const columns = ['ORDER ID', 'WAKTU PESANAN DIBUAT', 'WAKTU PENGIRIMAN', 'QTT', 'STATUS ORDER', 'HPP', 'PENCAIRAN', 'LABA', 'AFFILIASI', 'KET AFFILIASI', 'PEMBAYARAN CS', 'METODE', 'ALAMAT', 'TERKIRIM', 'Menanggung Ongkir', 'Alasan Cancel', 'Waktu Pengembalian', 'Resi', 'Verifikasi Paket', 'Kerugian'];
 
@@ -552,6 +538,11 @@ export default function RangkumanTransaksi({ isHidden = false }) {
         if (!sortConfig.key) return filteredTableData;
         const key = sortConfig.key;
         const direction = sortConfig.direction;
+        if (key === 'WAKTU PESANAN DIBUAT') {
+            return [...filteredTableData].sort((a, b) =>
+                direction === 'asc' ? (a._timestamp || 0) - (b._timestamp || 0) : (b._timestamp || 0) - (a._timestamp || 0)
+            );
+        }
         // Pre-compute sort keys once per row instead of inside the comparator
         const monthsIndo = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
         const dayNamesIndo = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
@@ -790,15 +781,16 @@ export default function RangkumanTransaksi({ isHidden = false }) {
                             <div style={{ height: '1px', background: 'var(--border-subtle)' }} />
                             <button type="button" onClick={() => {
                                 setShowPdfMenu(false);
-                                const exportColumns = columns;
+                                const exportColumns = columns.map(colLabel);
                                 const worksheetData = sortedData.map(row => {
                                     const obj = {};
-                                    exportColumns.forEach(col => {
+                                    columns.forEach(col => {
+                                        const outKey = colLabel(col);
                                         if (col === 'Verifikasi Paket') {
-                                            if (typeof row[col] === 'string') obj[col] = row[col];
-                                            else if (typeof row[col] === 'object' && row[col] !== null && 'text' in row[col]) obj[col] = row[col].text;
-                                            else obj[col] = '';
-                                        } else obj[col] = row[col] || '';
+                                            if (typeof row[col] === 'string') obj[outKey] = row[col];
+                                            else if (typeof row[col] === 'object' && row[col] !== null && 'text' in row[col]) obj[outKey] = row[col].text;
+                                            else obj[outKey] = '';
+                                        } else obj[outKey] = row[col] || '';
                                     });
                                     return obj;
                                 });
@@ -857,13 +849,13 @@ export default function RangkumanTransaksi({ isHidden = false }) {
                                 <tr>
                                     <th style={{ width: '3rem' }}>No</th>
                                     {columns.map(col => {
-                                        const uniqueValues = getUniqueValuesForColumn(col);
+                                        const uniqueValues = filterPopupOpen === col ? getUniqueValuesForColumn(col) : [];
                                         const selectedValues = columnFilters[col] || new Set();
                                         const isFilterActive = selectedValues.size > 0;
                                         return (
                                             <th key={col} style={{ position: 'relative' }}>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                                    <span onClick={() => requestSort(col)} style={{ cursor: 'pointer', flex: 1, userSelect: 'none' }}>{col}</span>
+                                                    <span onClick={() => requestSort(col)} style={{ cursor: 'pointer', flex: 1, userSelect: 'none' }}>{colLabel(col)}</span>
                                                     <button type="button" onClick={e => { e.stopPropagation(); setFilterPopupOpen(filterPopupOpen === col ? null : col); }}
                                                         style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: isFilterActive ? '#a78bfa' : 'var(--text-tertiary)' }}>
                                                         <Filter size={11} />
@@ -948,7 +940,7 @@ export default function RangkumanTransaksi({ isHidden = false }) {
                                                             if (!isNaN(num)) profitStyle = { color: num >= 0 ? '#34d399' : '#f87171', fontWeight: 600 };
                                                         } else if (profitVal === 'CANCEL') profitStyle = { color: '#f87171', fontWeight: 600 };
                                                         else if (profitVal === 'Return' || profitVal === 'Gagal Kirim') profitStyle = { color: '#fbbf24', fontWeight: 600 };
-                                                        else if (profitVal === 'Belum Cair') profitStyle = { color: '#60a5fa', fontWeight: 600 };
+                                                        else if (profitVal === 'Dana Belum Diterima') profitStyle = { color: '#60a5fa', fontWeight: 600 };
                                                         return <td key={col} title={row[col]} style={profitStyle}>{row[col]}</td>;
                                                     }
                                                     return <td key={col} title={row[col]}>{row[col]}</td>;
@@ -1186,7 +1178,7 @@ export default function RangkumanTransaksi({ isHidden = false }) {
 
                                         return (
                                             <div key={col} style={{ display: 'flex', flexDirection: 'column', gap: '0.125rem', padding: '0.5rem 0.75rem', background: 'var(--bg-glass)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }}>
-                                                <span style={{ fontSize: '0.6875rem', color: 'var(--text-tertiary)', fontWeight: 600, textTransform: 'uppercase' }}>{col}</span>
+                                                <span style={{ fontSize: '0.6875rem', color: 'var(--text-tertiary)', fontWeight: 600, textTransform: 'uppercase' }}>{colLabel(col)}</span>
                                                 {isResi && val && val.toString().trim() !== '-' && val.toString().trim() !== '' ? (
                                                     <span onClick={(e) => { e.stopPropagation(); setQrPopupResi(val.toString().trim()); }}
                                                         title="Tampilkan QR Code"

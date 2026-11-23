@@ -1,7 +1,7 @@
-import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback, useDeferredValue } from 'react';
 import * as XLSX from 'xlsx';
 import { Search, PackageCheck, Undo2, Package, AlertTriangle, Calendar, Download, ChevronLeft, ChevronRight, Camera, Trash2, Loader, XCircle, ArrowUpDown, ArrowUp, ArrowDown, X, ExternalLink } from 'lucide-react';
-import { useApiData } from '../hooks/useApiData';
+import { useProcessedOrders } from '../hooks/useProcessedOrders';
 import { useDataCache } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useStore } from '../contexts/StoreContext';
@@ -9,12 +9,11 @@ import BarcodeScanner from './BarcodeScanner';
 
 function PengembalianTable() {
   const { activeStoreId } = useStore();
-  const { data: pengembalianData, loading } = useApiData('pengembalian', activeStoreId);
-  const { data: returnData } = useApiData('returns', activeStoreId);
-  const { data: ordersData } = useApiData('orders', activeStoreId);
-  const { invalidateType } = useDataCache();
+  const { rangkumanData, returnData, pengembalianData, scanData, loading } = useProcessedOrders(activeStoreId);
+  const { setCacheData, fetchData } = useDataCache();
   const { user } = useAuth();
   const [search, setSearch] = useState('');
+  const deferredSearch = useDeferredValue(search);
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
   const [showDateRangePicker, setShowDateRangePicker] = useState(false);
@@ -32,31 +31,7 @@ function PengembalianTable() {
 
   // ─── Scanner state ────────────────────────────────────────────
   const [showScanner, setShowScanner] = useState(false);
-  const [scanData, setScanData] = useState([]);
-  const [scanLoading, setScanLoading] = useState(false);
   const [scanDeleting, setScanDeleting] = useState(null);
-
-  // ─── Fetch scanned resi data (cross-store) ─────────────────
-  const fetchScanData = useCallback(async () => {
-    setScanLoading(true);
-    try {
-      const res = await fetch('/api/scan', {
-        headers: { 'Accept': 'application/json' },
-      });
-      if (res.ok) {
-        const contentType = res.headers.get('content-type');
-        if (contentType && contentType.includes('application/json')) {
-          const data = await res.json();
-          setScanData(data);
-        }
-      }
-    } catch (err) {
-      console.error('Fetch scan data error:', err);
-    }
-    setScanLoading(false);
-  }, []);
-
-  useEffect(() => { fetchScanData(); }, [fetchScanData]);
 
   const scannedResiSet = useMemo(() => new Set(scanData.map(s => s.resi)), [scanData]);
 
@@ -77,20 +52,19 @@ function PengembalianTable() {
       err.duplicate = json.duplicate;
       throw err;
     }
-    setScanData(prev => [{ id: json.id, resi: json.resi, scanned_at: new Date().toISOString(), scanned_by_name: user?.name || '-', store_id: null, notes: null }, ...prev]);
-    invalidateType('scan');
-  }, [user, invalidateType]);
+    const newItem = { id: json.id, resi: json.resi, scanned_at: new Date().toISOString(), scanned_by_name: user?.name || '-', store_id: null, notes: null };
+    setCacheData('scan', null, [newItem, ...scanData]);
+  }, [user, scanData, setCacheData]);
 
   const handleDeleteScan = useCallback(async (id, resi) => {
     if (!window.confirm(`Hapus resi "${resi}"?`)) return;
     setScanDeleting(id);
     try {
       await fetch(`/api/scan/${id}`, { method: 'DELETE', headers: { 'Accept': 'application/json' } });
-      setScanData(prev => prev.filter(s => s.id !== id));
-      invalidateType('scan');
+      setCacheData('scan', null, scanData.filter(s => s.id !== id));
     } catch (err) { console.error('Delete scan error:', err); }
     setScanDeleting(null);
-  }, [invalidateType]);
+  }, [scanData, setCacheData]);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -126,30 +100,27 @@ function PengembalianTable() {
     return { returnResiSet: set, returnByTrackingId: map };
   }, [returnData]);
 
-  // ─── Single-pass over ordersData for Tracking ID maps & sets ────────
+  // ─── Single-pass over rangkumanData for Tracking ID maps & sets (uses cached snapshot!) ────
   const { ordersByTrackingId, cancelTrackingSet, returnRefundTrackingSet, normalTrackingSet } = useMemo(() => {
     const map = new Map();
     const cancelSet = new Set();
     const returnSet = new Set();
     const normalSet = new Set();
-    for (let i = 0; i < ordersData.length; i++) {
-      const row = ordersData[i];
-      const rawTracking = row['Tracking ID'] ?? row['tracking id'];
-      const trackingVal = rawTracking ? rawTracking.toString().trim() : '';
-      if (!trackingVal) continue;
+    for (let i = 0; i < rangkumanData.length; i++) {
+      const r = rangkumanData[i];
+      const trackingVal = r.trackingId || '';
+      if (!trackingVal || trackingVal === '-') continue;
 
-      let arr = map.get(trackingVal);
-      if (!arr) { arr = []; map.set(trackingVal, arr); }
-      arr.push(row);
+      map.set(trackingVal, r);
 
-      const orderStatus = (row['Order Status'] ?? row['order status'] ?? '').toString().toLowerCase();
-      const crt = (row['Cancelation/Return Type'] ?? row['cancelation/return type'] ?? '').toString().toLowerCase();
-      if (orderStatus.includes('batal') || crt === 'cancel') cancelSet.add(trackingVal);
+      const orderStatus = r._rawStatusLower || r.statusLower || '';
+      const crt = r._crt || '';
+      if (orderStatus.includes('batal') || orderStatus.includes('cancel') || crt === 'cancel') cancelSet.add(trackingVal);
       else if (crt.includes('return') || crt.includes('refund')) returnSet.add(trackingVal);
       else normalSet.add(trackingVal);
     }
     return { ordersByTrackingId: map, cancelTrackingSet: cancelSet, returnRefundTrackingSet: returnSet, normalTrackingSet: normalSet };
-  }, [ordersData]);
+  }, [rangkumanData]);
 
   const resiKey = columns.find(col => col.toLowerCase().includes('resi'));
   const tanggalKey = columns.find(col => col.toLowerCase().includes('tanggal') || col.toLowerCase().includes('date'));
@@ -165,7 +136,7 @@ function PengembalianTable() {
 
   const STATUS_MAP = {
     retur_pembeli: { text: 'Retur Pembeli', icon: <Undo2 size={14} />, color: '#34d399' },
-    cancel: { text: 'Cancel', icon: <XCircle size={14} />, color: '#fbbf24' },
+    cancel: { text: 'Dibatalkan', icon: <XCircle size={14} />, color: '#fbbf24' },
     retur_refund: { text: 'Retur/Refund', icon: <Undo2 size={14} />, color: '#a78bfa' },
     pengembalian: { text: 'Pengembalian Paket', icon: <Package size={14} />, color: '#60a5fa' },
     unknown: { text: 'Tidak Dikenal', icon: <AlertTriangle size={14} />, color: '#f87171' },
@@ -234,8 +205,8 @@ function PengembalianTable() {
   const filteredData = useMemo(() => {
     let data = mergedData;
     if (filterStatus !== 'all') data = data.filter(r => r.statusKey === filterStatus);
-    if (search.trim()) {
-      const s = search.toLowerCase();
+    if (deferredSearch.trim()) {
+      const s = deferredSearch.toLowerCase();
       data = data.filter(row =>
         row.resi.toLowerCase().includes(s) ||
         row.tanggal.toLowerCase().includes(s) ||
@@ -244,7 +215,7 @@ function PengembalianTable() {
       );
     }
     return data;
-  }, [mergedData, filterStatus, search]);
+  }, [mergedData, filterStatus, deferredSearch]);
 
   // ─── Apply sort ───────────────────────────────────────────────
   const displayData = useMemo(() => {
@@ -407,7 +378,7 @@ function PengembalianTable() {
                 </tr>
               </thead>
               <tbody>
-                {(loading || scanLoading) ? (
+                {loading ? (
                   Array.from({ length: 10 }).map((_, i) => (
                     <tr key={`skel-${i}`}>
                       {Array.from({ length: 5 }).map((__, j) => (
@@ -528,14 +499,13 @@ function PengembalianTable() {
 
       {/* ── Order Detail Popup Modal ──────────────────────────────── */}
       {selectedResi && (() => {
-        const orderRows = ordersByTrackingId.get(selectedResi) || [];
+        const matchedOrder = ordersByTrackingId.get(selectedResi) || null;
+        const orderRows = matchedOrder ? (matchedOrder.orders || []) : [];
         const returnRows = returnByTrackingId.get(selectedResi) || [];
         const hasOrder = orderRows.length > 0;
         const hasReturn = returnRows.length > 0;
 
-        // Get first order to extract general info
-        const firstOrder = orderRows[0] || {};
-        const orderId = firstOrder['Order ID'] || firstOrder['order_id'] || '';
+        const orderId = matchedOrder ? matchedOrder.orderId : '';
 
         // Determine header style based on status
         const statusKey = getStatusKey(selectedResi);
@@ -547,9 +517,20 @@ function PengembalianTable() {
         else if (statusKey === 'pengembalian') { headerBg = 'rgba(96, 165, 250, 0.15)'; headerBorder = '1px solid rgba(96, 165, 250, 0.3)'; }
         else { headerBg = 'rgba(248, 113, 113, 0.15)'; headerBorder = '1px solid rgba(248, 113, 113, 0.3)'; }
 
-        // Columns to show in the order info grid (exclude product-level columns)
-        const skipCols = new Set(['Product Name', 'product_name', 'Seller SKU', 'seller_sku', 'SKU ID', 'sku_id', 'Variation', 'variation', 'Quantity', 'quantity']);
-        const orderInfoCols = hasOrder ? Object.keys(firstOrder).filter(c => !skipCols.has(c)) : [];
+        const orderInfoItems = matchedOrder ? [
+          { label: 'Order ID', val: matchedOrder.orderId },
+          { label: 'Status Order', val: matchedOrder.statusOrder },
+          { label: 'Tracking ID', val: matchedOrder.trackingId },
+          { label: 'Waktu Pesanan Dibuat', val: matchedOrder.waktuPesananDibuat },
+          { label: 'Waktu Pengiriman', val: matchedOrder.waktuPengiriman },
+          { label: 'Metode Pembayaran', val: matchedOrder.metode },
+          { label: 'Penerima', val: matchedOrder.customerName },
+          { label: 'Username Pembeli', val: matchedOrder.buyerUsername },
+          { label: 'Kota / Kabupaten', val: matchedOrder.regencyAndCity },
+          { label: 'Provinsi', val: matchedOrder.province },
+          { label: 'Alasan Pembatalan', val: matchedOrder.paketGagalKirim },
+          { label: 'Penerimaan Dana', val: matchedOrder.pencairanDisplay },
+        ] : [];
 
         return (
           <div onClick={() => setSelectedResi(null)} style={{
@@ -621,24 +602,20 @@ function PengembalianTable() {
                 )}
 
                 {/* Order Info Grid */}
-                {hasOrder && orderInfoCols.length > 0 && (
+                {hasOrder && orderInfoItems.length > 0 && (
                   <div style={{ marginBottom: '1.25rem' }}>
                     <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                       Informasi Order
                     </h4>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '0.5rem' }}>
-                      {orderInfoCols.map(col => {
-                        let val = firstOrder[col];
-                        if (typeof val === 'object' && val !== null && 'text' in val) val = val.text;
-                        return (
-                          <div key={col} style={{ display: 'flex', flexDirection: 'column', gap: '0.125rem', padding: '0.5rem 0.75rem', background: 'var(--bg-glass)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }}>
-                            <span style={{ fontSize: '0.6875rem', color: 'var(--text-tertiary)', fontWeight: 600, textTransform: 'uppercase' }}>{col}</span>
-                            <span style={{ fontSize: '0.8125rem', color: 'var(--text-primary)', fontWeight: 600, wordBreak: 'break-word' }}>
-                              {val !== null && val !== undefined && val !== '' ? String(val) : '-'}
-                            </span>
-                          </div>
-                        );
-                      })}
+                      {orderInfoItems.map(({ label, val }) => (
+                        <div key={label} style={{ display: 'flex', flexDirection: 'column', gap: '0.125rem', padding: '0.5rem 0.75rem', background: 'var(--bg-glass)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)' }}>
+                          <span style={{ fontSize: '0.6875rem', color: 'var(--text-tertiary)', fontWeight: 600, textTransform: 'uppercase' }}>{label}</span>
+                          <span style={{ fontSize: '0.8125rem', color: 'var(--text-primary)', fontWeight: 600, wordBreak: 'break-word' }}>
+                            {val !== null && val !== undefined && val !== '' ? String(val) : '-'}
+                          </span>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
@@ -685,7 +662,7 @@ function PengembalianTable() {
       })()}
 
       {/* Scanner Modal */}
-      <BarcodeScanner isOpen={showScanner} onClose={() => { setShowScanner(false); fetchScanData(); }}
+      <BarcodeScanner isOpen={showScanner} onClose={() => { setShowScanner(false); fetchData('scan', null, { background: true }); }}
         onScan={handleScanResi} scannedResis={scannedResiSet} />
     </div>
   );

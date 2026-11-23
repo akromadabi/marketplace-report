@@ -105,7 +105,7 @@ function PriceCalculatorModal({
                     {/* HPP & Target */}
                     <div style={{ display: 'flex', gap: '1rem' }}>
                         <div style={{ flex: 1 }}>
-                            <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.375rem', display: 'block' }}>HPP (Modal) Rp</label>
+                            <label style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.375rem', display: 'block' }}>HPP (Harga Pokok Penjualan) Rp</label>
                             <input 
                                 type="text" 
                                 inputMode="numeric"
@@ -191,7 +191,7 @@ function PriceCalculatorModal({
                                 <span style={{ color: '#ef4444' }}>-{fmtRp(Math.round(platformDeduction + affiliateDeduction))}</span>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <span>Modal (HPP):</span>
+                                <span>HPP:</span>
                                 <span style={{ color: '#ef4444' }}>-{fmtRp(hpp)}</span>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
