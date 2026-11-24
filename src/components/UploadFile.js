@@ -98,7 +98,7 @@ function MigrateOrphanBanner({ userId, storeId, onMigrated, migratingOrphans, se
 
 function UploadFile() {
   const { user } = useAuth();
-  const { activeStoreId, stores, loading: storesLoading } = useStore();
+  const { activeStore, activeStoreId, stores, loading: storesLoading } = useStore();
   const { invalidateAll } = useDataCache();
   const { addNotification, updateNotification } = useNotification();
   const navigate = useNavigate();
@@ -828,9 +828,91 @@ function UploadFile() {
 
   return (
     <div>
-      <div className="page-header">
-        <h2 className="gradient-text" style={isMobile ? { fontSize: '1.125rem' } : undefined}>Upload File Excel</h2>
-        <p style={isMobile ? { fontSize: '0.6875rem' } : undefined}>Upload file data dari TikTok Shop dan Shopee, sistem akan mendeteksi otomatis</p>
+      {/* ── Top Header Toolbar (Separate Card) ── */}
+      <div
+        style={{
+          flexShrink: 0,
+          background: '#ffffff',
+          borderRadius: '12px',
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02)',
+          padding: isMobile ? '0.55rem 0.65rem' : '0.55rem 0.85rem',
+          marginBottom: '0.65rem',
+          display: 'flex',
+          flexDirection: isMobile ? 'column' : 'row',
+          alignItems: isMobile ? 'stretch' : 'center',
+          justifyContent: 'space-between',
+          gap: isMobile ? '0.5rem' : '0.85rem',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: isMobile ? 'space-between' : 'flex-start', gap: '0.65rem', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+            <div
+              style={{
+                width: isMobile ? 28 : 32,
+                height: isMobile ? 28 : 32,
+                borderRadius: '8px',
+                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#ffffff',
+                flexShrink: 0,
+                boxShadow: '0 2px 6px rgba(99, 102, 241, 0.22)',
+              }}
+            >
+              <UploadIcon size={isMobile ? 15 : 17} strokeWidth={2.3} />
+            </div>
+            <h2
+              style={{
+                margin: 0,
+                fontSize: isMobile ? '0.925rem' : '1.025rem',
+                fontWeight: 800,
+                color: '#0f172a',
+                letterSpacing: '-0.02em',
+              }}
+            >
+              Upload File Excel
+            </h2>
+          </div>
+          <span
+            style={{
+              fontSize: isMobile ? '0.675rem' : '0.725rem',
+              fontWeight: 600,
+              color: '#475569',
+              background: '#f1f5f9',
+              border: '1px solid #e2e8f0',
+              padding: '2px 8px',
+              borderRadius: '9999px',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {uploadHistory.length} file tersimpan
+          </span>
+        </div>
+
+        {/* Right side: Active store indicator */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: isMobile ? 'stretch' : 'flex-end' }}>
+          {activeStore && (
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                padding: '4px 10px',
+                borderRadius: '8px',
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                color: '#4f46e5',
+              }}
+            >
+              <Store size={13} />
+              {activeStore.name}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Gate: belum ada toko */}
@@ -1121,26 +1203,53 @@ function UploadFile() {
       )}
 
       {/* ─── Upload History ─────────────────────────────────────── */}
-      <div style={{ marginTop: isMobile ? '1.5rem' : '2.5rem' }}>
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: isMobile ? '0.375rem' : '0.625rem',
-          marginBottom: isMobile ? '0.75rem' : '1.25rem',
-        }}>
-          <div style={{
-            width: isMobile ? '1.75rem' : '2.25rem', height: isMobile ? '1.75rem' : '2.25rem', borderRadius: 'var(--radius-md)',
-            background: 'var(--gradient-primary)', display: 'flex',
-            alignItems: 'center', justifyContent: 'center', opacity: 0.85,
-          }}>
-            <Database size={isMobile ? 13 : 16} color="white" />
+      <div style={{ marginTop: '1.25rem' }}>
+        <div
+          style={{
+            background: '#ffffff',
+            borderRadius: '12px',
+            border: '1px solid #e2e8f0',
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
+            padding: '0.55rem 0.85rem',
+            marginBottom: '0.65rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+            <div
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: '8px',
+                background: 'linear-gradient(135deg, #10b981, #059669)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#ffffff',
+                flexShrink: 0,
+              }}
+            >
+              <Database size={15} strokeWidth={2.3} />
+            </div>
+            <h3 style={{ margin: 0, fontSize: '0.925rem', fontWeight: 800, color: '#0f172a' }}>
+              Riwayat Upload
+            </h3>
           </div>
-          <div>
-            <h3 style={{
-              fontSize: isMobile ? '0.875rem' : '1.0625rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0,
-            }}>Riwayat Upload</h3>
-            <p style={{ fontSize: isMobile ? '0.625rem' : '0.75rem', color: 'var(--text-tertiary)', margin: 0 }}>
-              {uploadHistory.length} file tersimpan di database
-            </p>
-          </div>
+          <span
+            style={{
+              fontSize: '0.725rem',
+              fontWeight: 600,
+              color: '#475569',
+              background: '#f1f5f9',
+              border: '1px solid #e2e8f0',
+              padding: '2px 8px',
+              borderRadius: '9999px',
+            }}
+          >
+            {uploadHistory.length} file tersimpan
+          </span>
         </div>
 
         {historyLoading ? (

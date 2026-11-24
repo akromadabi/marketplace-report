@@ -15,7 +15,7 @@ import {
     TrendingUp, RotateCcw,
     ArrowUpRight, Package, Calendar, ChevronLeft, ChevronRight,
     HourglassIcon, Handshake, Truck, Landmark, Info, Search, CreditCard, Clock, Store,
-    Filter, Check,
+    Filter, Check, X,
 } from 'lucide-react';
 
 function formatRupiah(number) {
@@ -1245,206 +1245,313 @@ function Dashboard() {
                 style={{
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: isMobile ? '0.5rem' : '0.75rem',
-                    marginBottom: isMobile ? '0.75rem' : '1.35rem',
+                    gap: isMobile ? '0.35rem' : '0.75rem',
+                    marginBottom: isMobile ? '0.65rem' : '1.35rem',
                     background: '#ffffff',
-                    padding: isMobile ? '0.65rem 0.85rem' : '1rem 1.5rem',
-                    borderRadius: isMobile ? '16px' : '20px',
+                    padding: isMobile ? '0.55rem 0.75rem' : '1rem 1.5rem',
+                    borderRadius: isMobile ? '14px' : '20px',
                     border: '1px solid #eef0f6',
                     boxShadow: '0 2px 12px rgba(0, 0, 0, 0.025)',
                 }}
             >
-                {/* Upper Row: Avatar + Greeting + Calendar Button */}
-                <div
-                    style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: '0.65rem',
-                        width: '100%',
-                    }}
-                >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '0.55rem' : '0.875rem', minWidth: 0 }}>
+                {isMobile ? (
+                    /* ── Simplified Mobile Greeting Banner ── */
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', width: '100%' }}>
+                        {/* Row 1: Store Name + Order Count Badge */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', minWidth: 0 }}>
+                                <div
+                                    style={{
+                                        width: 26,
+                                        height: 26,
+                                        borderRadius: '7px',
+                                        background: 'linear-gradient(135deg, #7c3aed, #06b6d4)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        color: '#ffffff',
+                                        fontWeight: 800,
+                                        fontSize: '0.75rem',
+                                        flexShrink: 0,
+                                    }}
+                                >
+                                    {(activeStore?.name || user?.name || 'M')[0].toUpperCase()}
+                                </div>
+                                <h2 style={{
+                                    margin: 0,
+                                    fontSize: '0.925rem',
+                                    fontWeight: 800,
+                                    color: 'var(--text-primary)',
+                                    letterSpacing: '-0.02em',
+                                    whiteSpace: 'nowrap',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                }}>
+                                    {activeStore?.name || user?.name || 'Dashboard'}
+                                </h2>
+                            </div>
+                            <span
+                                style={{
+                                    fontSize: '0.675rem',
+                                    fontWeight: 600,
+                                    color: '#475569',
+                                    background: '#f1f5f9',
+                                    border: '1px solid #e2e8f0',
+                                    padding: '2px 8px',
+                                    borderRadius: '9999px',
+                                    whiteSpace: 'nowrap',
+                                    flexShrink: 0,
+                                }}
+                            >
+                                {sums.pesananOrder.toLocaleString('id-ID')} pesanan
+                            </span>
+                        </div>
+
+                        {/* Row 2: Unified 1-Tap Preset Pills + Custom Date Picker Pill */}
                         <div
                             style={{
-                                width: isMobile ? 32 : 44,
-                                height: isMobile ? 32 : 44,
-                                borderRadius: isMobile ? '10px' : '14px',
-                                background: 'linear-gradient(135deg, #7c3aed, #06b6d4)',
                                 display: 'flex',
                                 alignItems: 'center',
-                                justifySelf: 'center',
-                                justifyContent: 'center',
-                                color: '#ffffff',
-                                fontWeight: 800,
-                                fontSize: isMobile ? '0.85rem' : '1.125rem',
-                                boxShadow: '0 4px 12px rgba(124, 58, 237, 0.22)',
-                                flexShrink: 0,
+                                gap: '0.35rem',
+                                overflowX: 'auto',
+                                WebkitOverflowScrolling: 'touch',
+                                scrollbarWidth: 'none',
+                                paddingTop: '0.1rem',
+                                paddingBottom: '2px',
                             }}
+                            ref={datePickerRef}
                         >
-                            {(user?.name || activeStore?.name || 'M')[0].toUpperCase()}
-                        </div>
-                        <div style={{ minWidth: 0 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                                <h2 style={{ margin: 0, fontSize: isMobile ? '0.925rem' : '1.3rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.02em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                    Halo, {user?.name || activeStore?.name || 'Partner'}
-                                </h2>
-                                {activeStore && (
-                                    <span
+                            {datePresets.map((p) => {
+                                const isPresetActive = (!filterStartDate && !filterEndDate)
+                                    ? p.id === 'all'
+                                    : activeDatePreset === p.id;
+                                return (
+                                    <button
+                                        key={p.id}
+                                        type="button"
+                                        onClick={() => applyDatePreset(p.id)}
                                         style={{
-                                            display: 'inline-flex',
-                                            alignItems: 'center',
-                                            gap: '0.25rem',
-                                            fontSize: isMobile ? '0.625rem' : '0.7rem',
-                                            fontWeight: 700,
-                                            padding: isMobile ? '1px 7px' : '3px 10px',
+                                            padding: '0.28rem 0.65rem',
                                             borderRadius: '9999px',
-                                            background: 'rgba(124, 58, 237, 0.1)',
-                                            color: '#7c3aed',
-                                            border: '1px solid rgba(124, 58, 237, 0.2)',
+                                            border: isPresetActive ? '1px solid #7c3aed' : '1px solid #e5e7f0',
+                                            fontSize: '0.6875rem',
+                                            fontWeight: 700,
+                                            cursor: 'pointer',
+                                            background: isPresetActive ? '#7c3aed' : '#f8f9fc',
+                                            color: isPresetActive ? '#ffffff' : 'var(--text-secondary)',
+                                            boxShadow: isPresetActive ? '0 2px 6px rgba(124, 58, 237, 0.25)' : 'none',
+                                            whiteSpace: 'nowrap',
                                             flexShrink: 0,
+                                            transition: 'all 0.15s ease',
                                         }}
                                     >
-                                        <Store size={isMobile ? 10 : 12} strokeWidth={2.2} />
-                                        {activeStore.name}
-                                    </span>
-                                )}
-                            </div>
-                            <p style={{ color: 'var(--text-secondary)', fontSize: isMobile ? '0.68rem' : '0.8125rem', margin: '0.05rem 0 0', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {isMobile ? (
-                                    <>Ringkasan · <strong style={{ color: 'var(--text-primary)' }}>{sums.pesananOrder.toLocaleString('id-ID')}</strong> pesanan</>
-                                ) : (
-                                    <>Ringkasan performa interaktif · <strong style={{ color: 'var(--text-primary)' }}>{sums.pesananOrder.toLocaleString('id-ID')}</strong> pesanan tercatat</>
-                                )}
-                            </p>
-                        </div>
-                    </div>
+                                        {p.label}
+                                    </button>
+                                );
+                            })}
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexShrink: 0 }}>
-                        {!isMobile && (
-                            <div
-                                style={{
-                                    display: 'flex',
-                                    background: '#f4f5f9',
-                                    padding: '3px',
-                                    borderRadius: '9999px',
-                                    border: '1px solid #e5e7f0',
-                                }}
-                            >
-                                {datePresets.map((p) => {
-                                    const isPresetActive = (!filterStartDate && !filterEndDate)
-                                        ? p.id === 'all'
-                                        : activeDatePreset === p.id;
-                                    return (
-                                        <button
-                                            key={p.id}
-                                            type="button"
-                                            onClick={() => applyDatePreset(p.id)}
-                                            style={{
-                                                padding: '0.35rem 0.75rem',
-                                                borderRadius: '9999px',
-                                                border: 'none',
-                                                fontSize: '0.75rem',
-                                                fontWeight: 600,
-                                                cursor: 'pointer',
-                                                background: isPresetActive ? '#ffffff' : 'transparent',
-                                                color: isPresetActive ? '#7c3aed' : 'var(--text-secondary)',
-                                                boxShadow: isPresetActive ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
-                                                transition: 'background 0.15s ease, color 0.15s ease',
-                                            }}
-                                        >
-                                            {p.label}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        )}
-
-                        <div style={{ position: 'relative' }} ref={datePickerRef}>
-                            <button
-                                type="button"
-                                onClick={() => setShowDatePicker(!showDatePicker)}
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: isMobile ? '0.35rem' : '0.45rem',
-                                    padding: isMobile ? '0.35rem 0.7rem' : '0.55rem 1.1rem',
-                                    background: filterStartDate || filterEndDate ? 'rgba(124, 58, 237, 0.08)' : '#ffffff',
-                                    border: filterStartDate || filterEndDate ? '1px solid rgba(124, 58, 237, 0.35)' : '1px solid #e2e5ef',
-                                    borderRadius: '9999px',
-                                    cursor: 'pointer',
-                                    fontSize: isMobile ? '0.7rem' : '0.8125rem',
-                                    fontWeight: 700,
-                                    color: filterStartDate || filterEndDate ? '#7c3aed' : 'var(--text-primary)',
-                                    boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                                    whiteSpace: 'nowrap',
-                                }}
-                            >
-                                <Calendar size={isMobile ? 13 : 15} color="#7c3aed" />
-                                <span>{formatDateDisplay()}</span>
-                            </button>
-                            {showDatePicker && (
-                                <div style={{ position: 'absolute', top: '110%', right: 0, zIndex: 120 }}>
-                                    <DateRangePicker
-                                        startDate={filterStartDate}
-                                        endDate={filterEndDate}
-                                        onChange={({ startDate, endDate }) => {
-                                            setFilterStartDate(startDate);
-                                            setFilterEndDate(endDate);
-                                            setActiveDatePreset(!startDate && !endDate ? 'all' : 'custom');
-                                            setSelectedBarIndex(null);
-                                        }}
-                                        onClose={() => setShowDatePicker(false)}
-                                    />
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Mobile Quick Date Preset Bar: 1-Tap Swipable Pills */}
-                {isMobile && (
-                    <div
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.35rem',
-                            overflowX: 'auto',
-                            WebkitOverflowScrolling: 'touch',
-                            scrollbarWidth: 'none',
-                            paddingTop: '0.15rem',
-                            paddingBottom: '2px',
-                        }}
-                    >
-                        {datePresets.map((p) => {
-                            const isPresetActive = (!filterStartDate && !filterEndDate)
-                                ? p.id === 'all'
-                                : activeDatePreset === p.id;
-                            return (
+                            {/* Custom Date Range Pill */}
+                            <div style={{ position: 'relative', flexShrink: 0 }}>
                                 <button
-                                    key={p.id}
                                     type="button"
-                                    onClick={() => applyDatePreset(p.id)}
+                                    onClick={() => setShowDatePicker(!showDatePicker)}
                                     style={{
-                                        padding: '0.3rem 0.65rem',
+                                        padding: '0.28rem 0.65rem',
                                         borderRadius: '9999px',
-                                        border: isPresetActive ? '1px solid #7c3aed' : '1px solid #e5e7f0',
+                                        border: (filterStartDate || filterEndDate) ? '1px solid #7c3aed' : '1px solid #e5e7f0',
                                         fontSize: '0.6875rem',
                                         fontWeight: 700,
                                         cursor: 'pointer',
-                                        background: isPresetActive ? '#7c3aed' : '#f8f9fc',
-                                        color: isPresetActive ? '#ffffff' : 'var(--text-secondary)',
-                                        boxShadow: isPresetActive ? '0 2px 6px rgba(124, 58, 237, 0.25)' : 'none',
+                                        background: (filterStartDate || filterEndDate) ? 'rgba(124, 58, 237, 0.1)' : '#f8f9fc',
+                                        color: (filterStartDate || filterEndDate) ? '#7c3aed' : 'var(--text-secondary)',
                                         whiteSpace: 'nowrap',
-                                        flexShrink: 0,
-                                        transition: 'background 0.15s ease, color 0.15s ease',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '0.3rem',
+                                        transition: 'all 0.15s ease',
                                     }}
                                 >
-                                    {p.label}
+                                    <Calendar size={12} color={filterStartDate || filterEndDate ? '#7c3aed' : '#64748b'} />
+                                    <span>{(filterStartDate && filterEndDate) ? (`${filterStartDate} — ${filterEndDate}`) : 'Kustom'}</span>
+                                    {(filterStartDate || filterEndDate) && (
+                                        <span
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setFilterStartDate('');
+                                                setFilterEndDate('');
+                                                setActiveDatePreset('all');
+                                            }}
+                                            title="Reset tanggal"
+                                            style={{ marginLeft: 2, display: 'inline-flex', color: '#7c3aed' }}
+                                        >
+                                            <X size={11} />
+                                        </span>
+                                    )}
                                 </button>
-                            );
-                        })}
+
+                                {showDatePicker && (
+                                    <div style={{ position: 'absolute', top: '120%', right: 0, zIndex: 200 }}>
+                                        <DateRangePicker
+                                            startDate={filterStartDate}
+                                            endDate={filterEndDate}
+                                            onChange={({ startDate, endDate }) => {
+                                                setFilterStartDate(startDate);
+                                                setFilterEndDate(endDate);
+                                                setActiveDatePreset(!startDate && !endDate ? 'all' : 'custom');
+                                                setSelectedBarIndex(null);
+                                            }}
+                                            onClose={() => setShowDatePicker(false)}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     </div>
+                ) : (
+                    /* ── Desktop Greeting Banner ── */
+                    <>
+                        {/* Upper Row: Avatar + Greeting + Calendar Button */}
+                        <div
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                gap: '0.65rem',
+                                width: '100%',
+                            }}
+                        >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem', minWidth: 0 }}>
+                                <div
+                                    style={{
+                                        width: 44,
+                                        height: 44,
+                                        borderRadius: '14px',
+                                        background: 'linear-gradient(135deg, #7c3aed, #06b6d4)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifySelf: 'center',
+                                        justifyContent: 'center',
+                                        color: '#ffffff',
+                                        fontWeight: 800,
+                                        fontSize: '1.125rem',
+                                        boxShadow: '0 4px 12px rgba(124, 58, 237, 0.22)',
+                                        flexShrink: 0,
+                                    }}
+                                >
+                                    {(user?.name || activeStore?.name || 'M')[0].toUpperCase()}
+                                </div>
+                                <div style={{ minWidth: 0 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                        <h2 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.02em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                            Halo, {user?.name || activeStore?.name || 'Partner'}
+                                        </h2>
+                                        {activeStore && (
+                                            <span
+                                                style={{
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '0.25rem',
+                                                    fontSize: '0.7rem',
+                                                    fontWeight: 700,
+                                                    padding: '3px 10px',
+                                                    borderRadius: '9999px',
+                                                    background: 'rgba(124, 58, 237, 0.1)',
+                                                    color: '#7c3aed',
+                                                    border: '1px solid rgba(124, 58, 237, 0.2)',
+                                                    flexShrink: 0,
+                                                }}
+                                            >
+                                                <Store size={12} strokeWidth={2.2} />
+                                                {activeStore.name}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.8125rem', margin: '0.05rem 0 0', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                        Ringkasan performa interaktif · <strong style={{ color: 'var(--text-primary)' }}>{sums.pesananOrder.toLocaleString('id-ID')}</strong> pesanan tercatat
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexShrink: 0 }}>
+                                <div
+                                    style={{
+                                        display: 'flex',
+                                        background: '#f4f5f9',
+                                        padding: '3px',
+                                        borderRadius: '9999px',
+                                        border: '1px solid #e5e7f0',
+                                    }}
+                                >
+                                    {datePresets.map((p) => {
+                                        const isPresetActive = (!filterStartDate && !filterEndDate)
+                                            ? p.id === 'all'
+                                            : activeDatePreset === p.id;
+                                        return (
+                                            <button
+                                                key={p.id}
+                                                type="button"
+                                                onClick={() => applyDatePreset(p.id)}
+                                                style={{
+                                                    padding: '0.35rem 0.75rem',
+                                                    borderRadius: '9999px',
+                                                    border: 'none',
+                                                    fontSize: '0.75rem',
+                                                    fontWeight: 600,
+                                                    cursor: 'pointer',
+                                                    background: isPresetActive ? '#ffffff' : 'transparent',
+                                                    color: isPresetActive ? '#7c3aed' : 'var(--text-secondary)',
+                                                    boxShadow: isPresetActive ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
+                                                    transition: 'background 0.15s ease, color 0.15s ease',
+                                                }}
+                                            >
+                                                {p.label}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+
+                                <div style={{ position: 'relative' }} ref={datePickerRef}>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowDatePicker(!showDatePicker)}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '0.45rem',
+                                            padding: '0.55rem 1.1rem',
+                                            background: filterStartDate || filterEndDate ? 'rgba(124, 58, 237, 0.08)' : '#ffffff',
+                                            border: filterStartDate || filterEndDate ? '1px solid rgba(124, 58, 237, 0.35)' : '1px solid #e2e5ef',
+                                            borderRadius: '9999px',
+                                            cursor: 'pointer',
+                                            fontSize: '0.8125rem',
+                                            fontWeight: 700,
+                                            color: filterStartDate || filterEndDate ? '#7c3aed' : 'var(--text-primary)',
+                                            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                                            whiteSpace: 'nowrap',
+                                        }}
+                                    >
+                                        <Calendar size={15} color="#7c3aed" />
+                                        <span>{formatDateDisplay()}</span>
+                                    </button>
+                                    {showDatePicker && (
+                                        <div style={{ position: 'absolute', top: '110%', right: 0, zIndex: 120 }}>
+                                            <DateRangePicker
+                                                startDate={filterStartDate}
+                                                endDate={filterEndDate}
+                                                onChange={({ startDate, endDate }) => {
+                                                    setFilterStartDate(startDate);
+                                                    setFilterEndDate(endDate);
+                                                    setActiveDatePreset(!startDate && !endDate ? 'all' : 'custom');
+                                                    setSelectedBarIndex(null);
+                                                }}
+                                                onClose={() => setShowDatePicker(false)}
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </>
                 )}
             </div>
 

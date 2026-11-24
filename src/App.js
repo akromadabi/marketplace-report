@@ -148,13 +148,13 @@ function UserLayout() {
                                 marginLeft: isDesktop ? (sidebarOpen ? 'var(--sidebar-width-expanded)' : 'var(--sidebar-width-collapsed)') : '0',
                                 transition: 'margin-left var(--transition-normal)',
                                 minHeight: '100vh',
-                                padding: isDesktop ? (['/rangkuman', '/olahan', '/return', '/pengembalian', '/analisis'].includes(location.pathname) ? '0.65rem 1rem' : '1.5rem') : '0.5rem',
-                                paddingTop: isDesktop ? (['/rangkuman', '/olahan', '/return', '/pengembalian', '/analisis'].includes(location.pathname) ? '0.65rem' : '1.5rem') : '3.65rem',
-                                paddingBottom: isDesktop ? (['/rangkuman', '/olahan', '/return', '/pengembalian', '/analisis'].includes(location.pathname) ? '0.65rem' : '1.5rem') : '4.5rem',
+                                padding: isDesktop ? '0.65rem 1rem' : '0.5rem',
+                                paddingTop: isDesktop ? '0.65rem' : '3.65rem',
+                                paddingBottom: isDesktop ? '0.65rem' : '4.5rem',
                                 overflowX: 'hidden',
                             }}
                         >
-                            <div style={{ maxWidth: ['/rangkuman', '/olahan', '/analisis', '/return', '/pengembalian', '/kalkulator', '/kampanye'].includes(location.pathname) ? '100%' : '1400px', margin: '0 auto' }}>
+                            <div style={{ maxWidth: '100%', margin: '0 auto' }}>
                                 <Suspense fallback={<PageLoader />}>
                                     <Routes>
                                         <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
@@ -206,13 +206,13 @@ function AdminLayout() {
                     marginLeft: isDesktop ? (sidebarOpen ? 'var(--sidebar-width-expanded)' : 'var(--sidebar-width-collapsed)') : '0',
                     transition: 'margin-left var(--transition-normal)',
                     minHeight: '100vh',
-                    padding: isDesktop ? '1.5rem' : '0.75rem',
-                    paddingTop: isDesktop ? '1.5rem' : '4.25rem',
-                    paddingBottom: isDesktop ? '1.5rem' : '1.5rem',
+                    padding: isDesktop ? '0.65rem 1rem' : '0.75rem',
+                    paddingTop: isDesktop ? '0.65rem' : '4.25rem',
+                    paddingBottom: isDesktop ? '0.65rem' : '1.5rem',
                     overflowX: 'hidden',
                 }}
             >
-                <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
+                <div style={{ maxWidth: '100%', margin: '0 auto' }}>
                     <Suspense fallback={<PageLoader />}>
                         <Routes>
                             <Route path="/dashboard" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
