@@ -1758,7 +1758,7 @@ function Dashboard() {
                             )}
                         </div>
 
-                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.6rem', flexWrap: 'wrap', marginBottom: '0.2rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: isMobile ? 'space-between' : 'flex-start', gap: '0.6rem', flexWrap: 'wrap', marginBottom: '0.25rem' }}>
                             <span style={{ fontSize: isMobile ? '1.35rem' : '2.05rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.03em' }}>
                                 {earningHeroConfig.value}
                             </span>
@@ -1767,7 +1767,7 @@ function Dashboard() {
                                     display: 'inline-flex',
                                     alignItems: 'center',
                                     gap: '2px',
-                                    padding: isMobile ? '2px 7px' : '4px 10px',
+                                    padding: isMobile ? '2px 8px' : '4px 10px',
                                     borderRadius: '9999px',
                                     fontSize: isMobile ? '0.68rem' : '0.735rem',
                                     fontWeight: 700,
@@ -1785,30 +1785,29 @@ function Dashboard() {
 
                     <div>
                         {peakEarningPoint && (
-                            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.35rem' }}>
-                                <div
-                                    style={{
-                                        display: 'inline-flex',
-                                        alignItems: 'center',
-                                        gap: '0.35rem',
-                                        padding: isMobile ? '3px 8px' : '4px 12px',
-                                        borderRadius: '10px',
-                                        background: '#f8f9fc',
-                                        border: '1px solid #e5e7f0',
-                                        fontSize: isMobile ? '0.68rem' : '0.735rem',
-                                    }}
-                                >
-                                    <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>
-                                        Puncak ({formatPeriodLabel(peakEarningPoint.date, isMonthly)}) :
-                                    </span>
-                                    <strong style={{ color: 'var(--text-primary)', fontWeight: 800 }}>
-                                        {formatRupiah(peakEarningPoint[earningHeroConfig.dataKey])}
-                                    </strong>
-                                </div>
+                            <div
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    padding: isMobile ? '0.35rem 0.65rem' : '4px 12px',
+                                    borderRadius: '8px',
+                                    background: '#f8f9fc',
+                                    border: '1px solid #eef0f6',
+                                    marginBottom: isMobile ? '0.55rem' : '0.35rem',
+                                    fontSize: isMobile ? '0.72rem' : '0.735rem',
+                                }}
+                            >
+                                <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>
+                                    Puncak Tren ({formatPeriodLabel(peakEarningPoint.date, isMonthly)})
+                                </span>
+                                <strong style={{ color: earningHeroConfig.stroke, fontWeight: 800 }}>
+                                    {formatRupiah(peakEarningPoint[earningHeroConfig.dataKey])}
+                                </strong>
                             </div>
                         )}
 
-                        <div style={{ height: isMobile ? 115 : 145, marginLeft: '-0.5rem', marginRight: '-0.5rem' }}>
+                        <div style={{ height: isMobile ? 130 : 145, marginLeft: isMobile ? '-0.25rem' : '-0.5rem', marginRight: 0 }}>
                             <ResponsiveContainer width="100%" height="100%">
                                 <AreaChart data={chartData}>
                                     <defs>
@@ -1833,6 +1832,23 @@ function Dashboard() {
                                         axisLine={false}
                                         tickLine={false}
                                         interval="preserveStartEnd"
+                                    />
+                                    <YAxis
+                                        tick={{ fill: 'var(--text-tertiary)', fontSize: 9, fontWeight: 500 }}
+                                        axisLine={false}
+                                        tickLine={false}
+                                        width={isMobile ? 36 : 50}
+                                        tickFormatter={(v) =>
+                                            v >= 1000000000
+                                                ? (v / 1000000000).toFixed(1) + 'M'
+                                                : v >= 1000000
+                                                    ? (v / 1000000).toFixed(0) + 'Jt'
+                                                    : v >= 1000
+                                                        ? (v / 1000).toFixed(0) + 'K'
+                                                        : v > 0
+                                                            ? v.toString()
+                                                            : '0'
+                                        }
                                     />
                                     <RechartsTooltip
                                         contentStyle={{
@@ -1982,7 +1998,7 @@ function Dashboard() {
                             )}
                         </div>
 
-                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.6rem', flexWrap: 'wrap', marginBottom: '0.2rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: isMobile ? 'space-between' : 'flex-start', gap: '0.6rem', flexWrap: 'wrap', marginBottom: '0.25rem' }}>
                             <span style={{ fontSize: isMobile ? '1.35rem' : '2.05rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.03em' }}>
                                 {breakdownConfig.heroValue}
                             </span>
@@ -1991,7 +2007,7 @@ function Dashboard() {
                                     display: 'inline-flex',
                                     alignItems: 'center',
                                     gap: '2px',
-                                    padding: isMobile ? '2px 7px' : '4px 10px',
+                                    padding: isMobile ? '2px 8px' : '4px 10px',
                                     borderRadius: '9999px',
                                     fontSize: isMobile ? '0.68rem' : '0.735rem',
                                     fontWeight: 700,
@@ -2012,48 +2028,93 @@ function Dashboard() {
                             Rincian Proporsi
                         </div>
 
-                        <div
-                            style={{
-                                display: 'grid',
-                                gridTemplateColumns: 'repeat(3, 1fr)',
-                                gap: isMobile ? '0.35rem' : '0.5rem',
-                                marginBottom: isMobile ? '0.6rem' : '0.85rem',
-                            }}
-                        >
-                            {breakdownConfig.segments.map((seg) => (
-                                <div key={seg.label} style={{ minWidth: 0 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', marginBottom: '0.15rem' }}>
-                                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: seg.color, flexShrink: 0 }} />
-                                        <span
-                                            style={{
-                                                fontSize: isMobile ? '0.68rem' : '0.75rem',
-                                                fontWeight: 700,
-                                                color: 'var(--text-primary)',
-                                                whiteSpace: 'nowrap',
-                                                overflow: 'hidden',
-                                                textOverflow: 'ellipsis',
-                                            }}
-                                        >
-                                            {seg.label}
-                                        </span>
+                        {isMobile ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginBottom: '0.65rem' }}>
+                                {breakdownConfig.segments.map((seg) => (
+                                    <div
+                                        key={seg.label}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between',
+                                            padding: '0.4rem 0.65rem',
+                                            borderRadius: '8px',
+                                            background: '#f8fafc',
+                                            border: '1px solid #edf2f7',
+                                        }}
+                                    >
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', minWidth: 0 }}>
+                                            <span style={{ width: 8, height: 8, borderRadius: '50%', background: seg.color, flexShrink: 0 }} />
+                                            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#1e293b' }}>
+                                                {seg.label}
+                                            </span>
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexShrink: 0 }}>
+                                            <strong style={{ fontSize: '0.775rem', fontWeight: 800, color: '#0f172a' }}>
+                                                {seg.amount}
+                                            </strong>
+                                            <span
+                                                style={{
+                                                    fontSize: '0.68rem',
+                                                    fontWeight: 700,
+                                                    color: seg.color,
+                                                    background: `${seg.color}15`,
+                                                    padding: '1px 6px',
+                                                    borderRadius: '6px',
+                                                    minWidth: '38px',
+                                                    textAlign: 'center',
+                                                }}
+                                            >
+                                                {seg.rawPct}%
+                                            </span>
+                                        </div>
                                     </div>
-                                    <div style={{ fontSize: isMobile ? '0.72rem' : '0.8rem', fontWeight: 700, color: 'var(--text-secondary)', paddingLeft: isMobile ? '0.65rem' : '0.9rem' }}>
-                                        {seg.amount} <span style={{ fontSize: isMobile ? '0.65rem' : '0.7rem', color: 'var(--text-tertiary)' }}>({seg.rawPct}%)</span>
+                                ))}
+                            </div>
+                        ) : (
+                            <div
+                                style={{
+                                    display: 'grid',
+                                    gridTemplateColumns: 'repeat(3, 1fr)',
+                                    gap: '0.5rem',
+                                    marginBottom: '0.85rem',
+                                }}
+                            >
+                                {breakdownConfig.segments.map((seg) => (
+                                    <div key={seg.label} style={{ minWidth: 0 }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', marginBottom: '0.15rem' }}>
+                                            <span style={{ width: 8, height: 8, borderRadius: '50%', background: seg.color, flexShrink: 0 }} />
+                                            <span
+                                                style={{
+                                                    fontSize: '0.75rem',
+                                                    fontWeight: 700,
+                                                    color: 'var(--text-primary)',
+                                                    whiteSpace: 'nowrap',
+                                                    overflow: 'hidden',
+                                                    textOverflow: 'ellipsis',
+                                                }}
+                                            >
+                                                {seg.label}
+                                            </span>
+                                        </div>
+                                        <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)', paddingLeft: '0.9rem' }}>
+                                            {seg.amount} <span style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>({seg.rawPct}%)</span>
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
-                        </div>
+                                ))}
+                            </div>
+                        )}
 
                         <div
                             style={{
                                 display: 'flex',
                                 width: '100%',
-                                height: isMobile ? '26px' : '40px',
-                                borderRadius: '10px',
+                                height: isMobile ? '14px' : '36px',
+                                borderRadius: isMobile ? '7px' : '10px',
                                 overflow: 'hidden',
-                                gap: '3px',
+                                gap: '2px',
                                 background: '#f1f2f8',
-                                padding: '3px',
+                                padding: '2px',
                             }}
                         >
                             {breakdownConfig.segments.map((seg) => (
@@ -2064,7 +2125,7 @@ function Dashboard() {
                                         width: `${seg.pct}%`,
                                         height: '100%',
                                         background: seg.color,
-                                        borderRadius: '7px',
+                                        borderRadius: isMobile ? '5px' : '7px',
                                         transition: 'width 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
                                         display: 'flex',
                                         alignItems: 'center',
@@ -2076,7 +2137,7 @@ function Dashboard() {
                                         whiteSpace: 'nowrap',
                                     }}
                                 >
-                                    {seg.pct >= 14 ? `${seg.rawPct}%` : ''}
+                                    {!isMobile && seg.pct >= 14 ? `${seg.rawPct}%` : ''}
                                 </div>
                             ))}
                         </div>
@@ -2229,7 +2290,7 @@ function Dashboard() {
                             )}
                         </div>
 
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.6rem', marginBottom: '0.75rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.4rem', marginBottom: isMobile ? '0.4rem' : '0.75rem' }}>
                             <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', flexWrap: 'wrap' }}>
                                 <div style={{ fontSize: isMobile ? '1.45rem' : '2.15rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.03em' }}>
                                     {activeCashFlowCfg.heroTotal}
@@ -2240,35 +2301,39 @@ function Dashboard() {
                                     </span>
                                 )}
                             </div>
-
-                            {activeBarPoint && (
-                                <div
-                                    style={{
-                                        padding: '0.35rem 0.75rem',
-                                        borderRadius: '10px',
-                                        background: '#f8f9fc',
-                                        border: `1.5px solid ${activeCashFlowCfg.color}40`,
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '0.4rem',
-                                    }}
-                                >
-                                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: activeCashFlowCfg.color }} />
-                                    <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                                        {formatPeriodLabel(activeBarPoint.date, isMonthly)} :
-                                    </span>
-                                    <strong style={{ fontSize: '0.8rem', color: 'var(--text-primary)', fontWeight: 800 }}>
-                                        {activeCashFlowCfg.isCurrency
-                                            ? formatRupiah(activeBarPoint[cashFlowTab])
-                                            : cashFlowTab === 'sudahCair'
-                                                ? `${(activeBarPoint.sudahCair || 0).toLocaleString('id-ID')} Order (${(activeBarPoint.sudahCairPCS || 0).toLocaleString('id-ID')} PCS)`
-                                                : cashFlowTab === 'belumCair'
-                                                    ? `${(activeBarPoint.belumCair || 0).toLocaleString('id-ID')} Order (${(activeBarPoint.belumCairPCS || 0).toLocaleString('id-ID')} PCS)`
-                                                    : `${(activeBarPoint[cashFlowTab] || 0).toLocaleString('id-ID')}${activeCashFlowCfg.unit}`}
-                                    </strong>
-                                </div>
-                            )}
                         </div>
+
+                        {activeBarPoint && (
+                            <div
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    padding: isMobile ? '0.35rem 0.65rem' : '0.4rem 0.85rem',
+                                    borderRadius: '8px',
+                                    background: '#f8f9fc',
+                                    border: `1px solid ${activeCashFlowCfg.color}35`,
+                                    marginBottom: isMobile ? '0.55rem' : '0.75rem',
+                                    boxSizing: 'border-box',
+                                }}
+                            >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: activeCashFlowCfg.color, flexShrink: 0 }} />
+                                    <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                                        {formatPeriodLabel(activeBarPoint.date, isMonthly)}
+                                    </span>
+                                </div>
+                                <strong style={{ fontSize: '0.8rem', color: activeCashFlowCfg.color, fontWeight: 800 }}>
+                                    {activeCashFlowCfg.isCurrency
+                                        ? formatRupiah(activeBarPoint[cashFlowTab])
+                                        : cashFlowTab === 'sudahCair'
+                                            ? `${(activeBarPoint.sudahCair || 0).toLocaleString('id-ID')} Order (${(activeBarPoint.sudahCairPCS || 0).toLocaleString('id-ID')} PCS)`
+                                            : cashFlowTab === 'belumCair'
+                                                ? `${(activeBarPoint.belumCair || 0).toLocaleString('id-ID')} Order (${(activeBarPoint.belumCairPCS || 0).toLocaleString('id-ID')} PCS)`
+                                                : `${(activeBarPoint[cashFlowTab] || 0).toLocaleString('id-ID')}${activeCashFlowCfg.unit}`}
+                                </strong>
+                            </div>
+                        )}
 
                         <div
                             style={{
@@ -2386,31 +2451,57 @@ function Dashboard() {
                     {activeBarPoint && (
                         <div
                             style={{
-                                marginTop: isMobile ? '0.5rem' : '0.75rem',
-                                padding: isMobile ? '0.5rem 0.65rem' : '0.7rem 1rem',
+                                marginTop: isMobile ? '0.55rem' : '0.75rem',
+                                padding: isMobile ? '0.55rem 0.65rem' : '0.75rem 1rem',
                                 borderRadius: '12px',
                                 background: '#f8f9fc',
-                                border: '1px solid #eef0f6',
-                                fontSize: isMobile ? '0.7rem' : '0.75rem',
+                                border: '1px solid #edf2f7',
                             }}
                         >
-                            <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: isMobile ? '0.35rem' : '0.5rem' }}>
-                                Rincian Periode {formatPeriodLabel(activeBarPoint.date, isMonthly)}:
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.45rem' }}>
+                                <span style={{ fontSize: isMobile ? '0.725rem' : '0.8rem', fontWeight: 800, color: '#0f172a' }}>
+                                    Rincian Periode {formatPeriodLabel(activeBarPoint.date, isMonthly)}
+                                </span>
+                                <span style={{ fontSize: '0.65rem', fontWeight: 600, color: '#64748b', background: '#ffffff', padding: '1px 7px', borderRadius: '4px', border: '1px solid #e2e8f0' }}>
+                                    {isMonthly ? 'Bulanan' : 'Harian'}
+                                </span>
                             </div>
                             <div
                                 style={{
                                     display: 'grid',
                                     gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : 'repeat(auto-fit, minmax(130px, 1fr))',
-                                    gap: isMobile ? '0.35rem 0.6rem' : '0.5rem 1rem',
-                                    fontSize: isMobile ? '0.68rem' : '0.75rem',
+                                    gap: isMobile ? '0.35rem 0.45rem' : '0.5rem 1rem',
                                 }}
                             >
-                                <div>Penerimaan: <strong style={{ color: '#06b6d4' }}>{formatCompact(activeBarPoint.labaKotor)}</strong></div>
-                                <div>Margin: <strong style={{ color: '#7c3aed' }}>{formatCompact(activeBarPoint.labaBersih)}</strong></div>
-                                <div>Terjual: <strong style={{ color: '#10b981' }}>{activeBarPoint.fixTerbeli.toLocaleString('id-ID')} PCS</strong></div>
-                                <div>Dana Masuk: <strong style={{ color: '#f59e0b' }}>{activeBarPoint.sudahCair.toLocaleString('id-ID')}</strong></div>
-                                <div>Piutang: <strong style={{ color: '#2563eb' }}>{activeBarPoint.belumCair.toLocaleString('id-ID')}</strong></div>
-                                <div>Batal/Retur: <strong style={{ color: '#ef4444' }}>{activeBarPoint.cancelRetur.toLocaleString('id-ID')}</strong></div>
+                                {[
+                                    { label: 'Penerimaan', val: formatCompact(activeBarPoint.labaKotor), color: '#06b6d4' },
+                                    { label: 'Margin', val: formatCompact(activeBarPoint.labaBersih), color: '#7c3aed' },
+                                    { label: 'Terjual', val: `${activeBarPoint.fixTerbeli.toLocaleString('id-ID')} PCS`, color: '#10b981' },
+                                    { label: 'Dana Masuk', val: `${activeBarPoint.sudahCair.toLocaleString('id-ID')} Order`, color: '#f59e0b' },
+                                    { label: 'Piutang', val: `${activeBarPoint.belumCair.toLocaleString('id-ID')} Order`, color: '#2563eb' },
+                                    { label: 'Batal/Retur', val: `${activeBarPoint.cancelRetur.toLocaleString('id-ID')} Order`, color: '#ef4444' },
+                                ].map(item => (
+                                    <div
+                                        key={item.label}
+                                        style={{
+                                            padding: isMobile ? '0.35rem 0.55rem' : '0.4rem 0.65rem',
+                                            borderRadius: '8px',
+                                            background: '#ffffff',
+                                            border: '1px solid #eef2f6',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between',
+                                            gap: '0.3rem',
+                                        }}
+                                    >
+                                        <span style={{ fontSize: isMobile ? '0.66rem' : '0.72rem', color: '#64748b', fontWeight: 600 }}>
+                                            {item.label}
+                                        </span>
+                                        <strong style={{ fontSize: isMobile ? '0.75rem' : '0.8rem', color: item.color, fontWeight: 800 }}>
+                                            {item.val}
+                                        </strong>
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     )}
@@ -2423,40 +2514,113 @@ function Dashboard() {
                             <h3 style={{ fontSize: isMobile ? '0.875rem' : '1rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
                                 Status & Insight Utama
                             </h3>
-                            <div
-                                style={{
-                                    display: 'flex',
-                                    background: '#f4f5f9',
-                                    padding: '2px',
-                                    borderRadius: '9999px',
-                                    border: '1px solid #e5e7f0',
-                                }}
-                            >
-                                {[
-                                    { id: 'operasional', label: 'Status' },
-                                    { id: 'pembayaran', label: 'Metode' },
-                                    { id: 'keuangan', label: 'Keuangan' },
-                                ].map((t) => (
+                            {isMobile ? (
+                                <div style={{ position: 'relative' }} data-mobile-card-menu="insight">
                                     <button
-                                        key={t.id}
                                         type="button"
-                                        onClick={() => setRightPanelTab(t.id)}
+                                        title="Pilih Tipe Insight"
+                                        onClick={() => setMobileCardMenu(mobileCardMenu === 'insight' ? null : 'insight')}
                                         style={{
-                                            padding: isMobile ? '2px 7px' : '3px 9px',
-                                            borderRadius: '9999px',
-                                            border: 'none',
-                                            fontSize: isMobile ? '0.65rem' : '0.685rem',
-                                            fontWeight: 700,
+                                            width: 28,
+                                            height: 28,
+                                            borderRadius: '50%',
+                                            background: rightPanelTab !== 'operasional' ? 'rgba(124, 58, 237, 0.12)' : '#f4f5f9',
+                                            border: rightPanelTab !== 'operasional' ? '1px solid #7c3aed' : '1px solid #e5e7f0',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
                                             cursor: 'pointer',
-                                            background: rightPanelTab === t.id ? '#ffffff' : 'transparent',
-                                            color: rightPanelTab === t.id ? '#7c3aed' : 'var(--text-secondary)',
-                                            boxShadow: rightPanelTab === t.id ? '0 1px 2px rgba(0,0,0,0.08)' : 'none',
+                                            color: rightPanelTab !== 'operasional' ? '#7c3aed' : 'var(--text-secondary)',
+                                            transition: 'all 0.15s ease',
                                         }}
                                     >
-                                        {t.label}
+                                        <Filter size={13} />
                                     </button>
-                                ))}
-                            </div>
+                                    {mobileCardMenu === 'insight' && (
+                                        <div
+                                            style={{
+                                                position: 'absolute',
+                                                top: '120%',
+                                                right: 0,
+                                                width: '185px',
+                                                background: '#ffffff',
+                                                borderRadius: '12px',
+                                                padding: '0.4rem',
+                                                boxShadow: '0 10px 28px rgba(0,0,0,0.15)',
+                                                border: '1px solid #e5e7f0',
+                                                zIndex: 100,
+                                            }}
+                                        >
+                                            <div style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', fontWeight: 700, padding: '0.2rem 0.5rem', textTransform: 'uppercase' }}>
+                                                Tipe Insight
+                                            </div>
+                                            {[
+                                                { id: 'operasional', label: 'Status Operasional' },
+                                                { id: 'pembayaran', label: 'Metode Pembayaran' },
+                                                { id: 'keuangan', label: 'Arus Keuangan' },
+                                            ].map((t) => (
+                                                <button
+                                                    key={t.id}
+                                                    type="button"
+                                                    onClick={() => { setRightPanelTab(t.id); setMobileCardMenu(null); }}
+                                                    style={{
+                                                        width: '100%',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'space-between',
+                                                        padding: '0.45rem 0.55rem',
+                                                        background: rightPanelTab === t.id ? 'rgba(124, 58, 237, 0.08)' : 'transparent',
+                                                        border: 'none',
+                                                        color: rightPanelTab === t.id ? '#7c3aed' : 'var(--text-primary)',
+                                                        borderRadius: '8px',
+                                                        fontSize: '0.75rem',
+                                                        fontWeight: 600,
+                                                        cursor: 'pointer',
+                                                    }}
+                                                >
+                                                    <span>{t.label}</span>
+                                                    {rightPanelTab === t.id && <Check size={14} color="#7c3aed" />}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div
+                                    style={{
+                                        display: 'flex',
+                                        background: '#f4f5f9',
+                                        padding: '2px',
+                                        borderRadius: '9999px',
+                                        border: '1px solid #e5e7f0',
+                                    }}
+                                >
+                                    {[
+                                        { id: 'operasional', label: 'Status' },
+                                        { id: 'pembayaran', label: 'Metode' },
+                                        { id: 'keuangan', label: 'Keuangan' },
+                                    ].map((t) => (
+                                        <button
+                                            key={t.id}
+                                            type="button"
+                                            onClick={() => setRightPanelTab(t.id)}
+                                            style={{
+                                                padding: '3px 9px',
+                                                borderRadius: '9999px',
+                                                border: 'none',
+                                                fontSize: '0.685rem',
+                                                fontWeight: 700,
+                                                cursor: 'pointer',
+                                                background: rightPanelTab === t.id ? '#ffffff' : 'transparent',
+                                                color: rightPanelTab === t.id ? '#7c3aed' : 'var(--text-secondary)',
+                                                boxShadow: rightPanelTab === t.id ? '0 1px 2px rgba(0,0,0,0.08)' : 'none',
+                                            }}
+                                        >
+                                            {t.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '0.38rem' : '0.7rem' }}>

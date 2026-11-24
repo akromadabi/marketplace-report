@@ -16,7 +16,18 @@ function PengembalianTable() {
   const deferredSearch = useDeferredValue(search);
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [removeDuplicateResi, setRemoveDuplicateResi] = useState(false);
   const [showDateRangePicker, setShowDateRangePicker] = useState(false);
+  const [rowsPerPage, setRowsPerPage] = useState(20);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [sortColumn, setSortColumn] = useState(null);
+  const [sortDirection, setSortDirection] = useState('asc');
+  const [selectedResi, setSelectedResi] = useState(null);
+  const [showScanner, setShowScanner] = useState(false);
+  const [scanDeleting, setScanDeleting] = useState(null);
+  const datePickerRef = useRef(null);
+
   const [windowWidth, setWindowWidth] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : 1200));
   useEffect(() => {
     function handleResize() { setWindowWidth(window.innerWidth); }
@@ -33,22 +44,6 @@ function PengembalianTable() {
     setFilterStatus('all');
     setCurrentPage(1);
   };
-
-  const [rowsPerPage, setRowsPerPage] = useState(20);
-  const [currentPage, setCurrentPage] = useState(1);
-  const datePickerRef = useRef(null);
-
-  // ─── Filter & Sort state ──────────────────────────────────────
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [sortColumn, setSortColumn] = useState(null);
-  const [sortDirection, setSortDirection] = useState('asc');
-
-  // ─── Detail popup state ───────────────────────────────────────
-  const [selectedResi, setSelectedResi] = useState(null);
-
-  // ─── Scanner state ────────────────────────────────────────────
-  const [showScanner, setShowScanner] = useState(false);
-  const [scanDeleting, setScanDeleting] = useState(null);
 
   const scannedResiSet = useMemo(() => new Set(scanData.map(s => s.resi)), [scanData]);
 
@@ -99,7 +94,6 @@ function PengembalianTable() {
     return Array.from(keysSet);
   }, [pengembalianData]);
 
-  const [removeDuplicateResi, setRemoveDuplicateResi] = useState(false);
 
   const { returnResiSet, returnByTrackingId } = useMemo(() => {
     const set = new Set();
