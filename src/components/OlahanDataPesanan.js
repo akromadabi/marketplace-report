@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useRef, useEffect } from "react";
 import * as XLSX from "xlsx";
-import { Calendar, Download, ChevronLeft, ChevronRight, X, Copy, Check, MapPin, Package, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
+import { Calendar, Download, ChevronLeft, ChevronRight, X, Copy, Check, MapPin, Package, ArrowUp, ArrowDown, ArrowUpDown, RotateCcw, BarChart3, Search } from 'lucide-react';
 import { useProcessedOrders, formatDateKey, formatIndonesianDateFromDateObj } from '../hooks/useProcessedOrders';
 import { useDataCache } from '../contexts/DataContext';
 
@@ -360,6 +360,23 @@ function OlahanDataPesanan() {
     const stickyPrimaryTd = { ...tdStyle, textAlign: 'left', fontWeight: 600, position: 'sticky', left: '3rem', zIndex: 1, background: 'var(--bg-card)', maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: hasSecondary ? 'normal' : 'nowrap' };
     const stickyNoSummary = { ...summaryTdStyle, position: 'sticky', left: 0, zIndex: 3, background: 'var(--bg-card)' };
     const stickyPrimarySummary = { ...summaryTdStyle, position: 'sticky', left: '3rem', zIndex: 3, background: 'var(--bg-card)' };
+    const [windowWidth, setWindowWidth] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : 1200));
+    useEffect(() => {
+        function handleResize() { setWindowWidth(window.innerWidth); }
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+    const isMobile = windowWidth < 768;
+
+    const [searchQuery, setSearchQuery] = useState('');
+    const hasAnyFilter = Boolean(filterStartDate || filterEndDate || searchQuery.trim());
+    const handleResetAllFilters = () => {
+        setFilterStartDate('');
+        setFilterEndDate('');
+        setSearchQuery('');
+        setCurrentPage(1);
+    };
+
     const [rowsPerPage, setRowsPerPage] = useState(20);
     const [currentPage, setCurrentPage] = useState(1);
 
@@ -407,6 +424,15 @@ function OlahanDataPesanan() {
             return dir === 'asc' ? cmp : -cmp;
         });
     }, [tableData, sortConfig]);
+
+    const filteredSortedTableData = useMemo(() => {
+        if (!searchQuery.trim()) return sortedTableData;
+        const q = searchQuery.toLowerCase();
+        return sortedTableData.filter(r =>
+            (r._primaryCol && r._primaryCol.toString().toLowerCase().includes(q)) ||
+            (r._secondaryCol && r._secondaryCol.toString().toLowerCase().includes(q))
+        );
+    }, [sortedTableData, searchQuery]);
     function SortIcon({ columnKey }) {
         const s = 10;
         if (sortConfig.key !== columnKey) return <ArrowUpDown size={s} style={{ opacity: 0.3, marginLeft: '2px', verticalAlign: 'middle' }} />;
@@ -416,55 +442,256 @@ function OlahanDataPesanan() {
     }
 
     return (
-        <div>
-            <div className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
-                <div>
-                    <h2 className="gradient-text" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <Calendar size={24} style={{ color: '#7c3aed' }} />
-                        SUB — Analisis Pesanan
-                    </h2>
-                    <p>{tableData.length} {analysisMode === 'waktu' ? 'hari' : analysisMode.startsWith('provinsi') ? 'lokasi' : 'produk'} data</p>
-                </div>
-            </div>
-
-            <div style={{ marginBottom: '1rem', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.75rem' }}>
-                <div style={{ position: 'relative' }} ref={popupRef}>
-                    <button type="button" onClick={() => setShowDateRangePicker(!showDateRangePicker)}
-                        className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', padding: '0.5rem 1rem', fontSize: '0.8125rem' }}>
-                        <Calendar size={14} /> Pilih Rentang Tanggal
-                    </button>
-                    {showDateRangePicker && (
-                        <div style={{ position: 'absolute', zIndex: 50, marginTop: '0.5rem' }}>
-                            <DateRangePicker startDate={filterStartDate || null} endDate={filterEndDate || null} onChange={({ startDate, endDate }) => {
-                                setFilterStartDate(startDate); setFilterEndDate(endDate);
-                            }} onClose={() => setShowDateRangePicker(false)} />
+        <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            height: isMobile ? 'calc(100vh - 8.35rem)' : 'calc(100vh - 1.3rem)',
+            overflow: 'hidden',
+        }}>
+            {/* ── Top Header Toolbar (Separate Card) ── */}
+            <div
+                style={{
+                    flexShrink: 0,
+                    background: '#ffffff',
+                    borderRadius: '12px',
+                    border: '1px solid #e2e8f0',
+                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02)',
+                    padding: isMobile ? '0.55rem 0.65rem' : '0.55rem 0.85rem',
+                    marginBottom: '0.5rem',
+                    display: 'flex',
+                    flexDirection: isMobile ? 'column' : 'row',
+                    alignItems: isMobile ? 'stretch' : 'center',
+                    justifyContent: 'space-between',
+                    gap: isMobile ? '0.5rem' : '0.85rem',
+                }}
+            >
+                {/* Left: Icon + Title + Count Badge */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: isMobile ? 'space-between' : 'flex-start', gap: '0.65rem', flexShrink: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                        <div
+                            style={{
+                                width: isMobile ? 28 : 32,
+                                height: isMobile ? 28 : 32,
+                                borderRadius: '8px',
+                                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: '#ffffff',
+                                flexShrink: 0,
+                                boxShadow: '0 2px 6px rgba(99, 102, 241, 0.22)',
+                            }}
+                        >
+                            <BarChart3 size={isMobile ? 15 : 17} strokeWidth={2.3} />
                         </div>
-                    )}
+                        <h2
+                            style={{
+                                margin: 0,
+                                fontSize: isMobile ? '0.925rem' : '1.025rem',
+                                fontWeight: 800,
+                                color: '#0f172a',
+                                letterSpacing: '-0.02em',
+                            }}
+                        >
+                            Analisis Pesanan
+                        </h2>
+                    </div>
+                    <span
+                        style={{
+                            fontSize: isMobile ? '0.675rem' : '0.725rem',
+                            fontWeight: 600,
+                            color: '#475569',
+                            background: '#f1f5f9',
+                            border: '1px solid #e2e8f0',
+                            padding: '2px 8px',
+                            borderRadius: '9999px',
+                            whiteSpace: 'nowrap',
+                        }}
+                    >
+                        {filteredSortedTableData.length} {analysisMode === 'waktu' ? 'hari' : analysisMode.startsWith('provinsi') ? 'lokasi' : 'produk'}
+                    </span>
                 </div>
-                <button onClick={handleDownloadExcel} type="button"
-                    className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', padding: '0.5rem 1rem', fontSize: '0.8125rem' }}>
-                    <Download size={14} /> Download Data
-                </button>
-                <select
-                    value={analysisMode}
-                    onChange={(e) => setAnalysisMode(e.target.value)}
-                    className="btn-secondary"
-                    style={{
-                        padding: '0.5rem 2rem 0.5rem 0.75rem', fontSize: '0.8125rem', fontWeight: 600,
-                        cursor: 'pointer', appearance: 'auto',
-                    }}>
-                    <option value="waktu">Waktu</option>
-                    <option value="provinsi">Provinsi</option>
-                    <option value="provinsi_kota">Provinsi + Kota</option>
-                    <option value="produk">Produk</option>
-                    <option value="produk_var">Produk + Variasi</option>
-                </select>
+
+                {/* Right: Search Box (Pepet Kanan) + Dimension Selector + Date Filter + Reset + Export */}
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.45rem',
+                    flexWrap: isMobile ? 'wrap' : 'nowrap',
+                    width: isMobile ? '100%' : 'auto',
+                    justifyContent: isMobile ? 'stretch' : 'flex-end',
+                }}>
+                    {/* Search Box */}
+                    <div style={{ position: 'relative', width: isMobile ? '100%' : '180px', flexShrink: 0 }}>
+                        <Search size={14} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: searchQuery ? '#6366f1' : '#94a3b8', pointerEvents: 'none' }} />
+                        <input
+                            type="text"
+                            placeholder="Cari..."
+                            value={searchQuery}
+                            onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                            style={{
+                                width: '100%',
+                                height: '34px',
+                                padding: '0 1.8rem 0 2.2rem',
+                                borderRadius: '8px',
+                                border: searchQuery ? '1px solid #6366f1' : '1px solid #e2e8f0',
+                                background: searchQuery ? '#f5f3ff' : '#f8fafc',
+                                color: '#0f172a',
+                                fontSize: '0.775rem',
+                                fontWeight: 500,
+                                outline: 'none',
+                                transition: 'all 0.15s ease',
+                            }}
+                        />
+                        {searchQuery && (
+                            <button type="button" onClick={() => { setSearchQuery(''); setCurrentPage(1); }}
+                                style={{ position: 'absolute', right: '0.55rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: '0.15rem', display: 'flex' }}>
+                                <X size={13} />
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Dimension Selector */}
+                    <select
+                        value={analysisMode}
+                        onChange={(e) => { setAnalysisMode(e.target.value); setCurrentPage(1); }}
+                        style={{
+                            height: '34px',
+                            padding: '0 0.65rem',
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            borderRadius: '8px',
+                            border: '1px solid #e2e8f0',
+                            background: '#ffffff',
+                            color: '#334155',
+                            cursor: 'pointer',
+                            outline: 'none',
+                        }}
+                    >
+                        <option value="waktu">Waktu</option>
+                        <option value="provinsi">Provinsi</option>
+                        <option value="provinsi_kota">Provinsi + Kota</option>
+                        <option value="produk">Produk</option>
+                        <option value="produk_var">Produk + Variasi</option>
+                    </select>
+
+                    {/* Date Range Picker */}
+                    <div style={{ position: 'relative', flex: isMobile ? 1 : 'none' }} ref={popupRef}>
+                        <button
+                            type="button"
+                            onClick={() => setShowDateRangePicker(!showDateRangePicker)}
+                            style={{
+                                width: isMobile ? '100%' : 'auto',
+                                height: '34px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '0.4rem',
+                                padding: '0 0.75rem',
+                                borderRadius: '8px',
+                                border: (filterStartDate || filterEndDate) ? '1px solid #6366f1' : '1px solid #e2e8f0',
+                                background: (filterStartDate || filterEndDate) ? '#f5f3ff' : '#ffffff',
+                                color: (filterStartDate || filterEndDate) ? '#6366f1' : '#334155',
+                                fontSize: '0.75rem',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                whiteSpace: 'nowrap',
+                            }}
+                        >
+                            <Calendar size={13} style={{ color: (filterStartDate || filterEndDate) ? '#6366f1' : '#64748b' }} />
+                            <span>{(filterStartDate && filterEndDate) ? (`${filterStartDate} — ${filterEndDate}`) : 'Tanggal'}</span>
+                            {(filterStartDate || filterEndDate) && (
+                                <span
+                                    onClick={(e) => { e.stopPropagation(); setFilterStartDate(''); setFilterEndDate(''); setCurrentPage(1); }}
+                                    title="Hapus filter tanggal"
+                                    style={{ marginLeft: '2px', display: 'inline-flex', color: '#6366f1', padding: '1px' }}
+                                >
+                                    <X size={11} />
+                                </span>
+                            )}
+                        </button>
+                        {showDateRangePicker && (
+                            <div style={{ position: 'absolute', top: '105%', left: isMobile ? 0 : 'auto', right: isMobile ? 'auto' : 0, zIndex: 120 }}>
+                                <DateRangePicker startDate={filterStartDate || null} endDate={filterEndDate || null} onChange={({ startDate, endDate }) => {
+                                    setFilterStartDate(startDate); setFilterEndDate(endDate); setCurrentPage(1);
+                                }} onClose={() => setShowDateRangePicker(false)} />
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Reset Filters Button */}
+                    {hasAnyFilter && (
+                        <button
+                            type="button"
+                            onClick={handleResetAllFilters}
+                            title="Reset semua filter"
+                            style={{
+                                height: '34px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.35rem',
+                                padding: '0 0.65rem',
+                                borderRadius: '8px',
+                                border: '1px solid #fecaca',
+                                background: '#fff1f2',
+                                color: '#e11d48',
+                                fontSize: '0.725rem',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                whiteSpace: 'nowrap',
+                            }}
+                        >
+                            <RotateCcw size={12} />
+                            <span>Reset</span>
+                        </button>
+                    )}
+
+                    {!isMobile && <div style={{ height: '20px', width: '1px', background: '#e2e8f0', margin: '0 2px' }} />}
+
+                    {/* Export Button */}
+                    <button
+                        onClick={handleDownloadExcel}
+                        type="button"
+                        style={{
+                            height: '34px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.4rem',
+                            padding: '0 0.85rem',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            borderRadius: '8px',
+                            border: 'none',
+                            background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
+                            color: '#ffffff',
+                            cursor: 'pointer',
+                            boxShadow: '0 2px 6px rgba(79, 70, 229, 0.28)',
+                            whiteSpace: 'nowrap',
+                        }}
+                    >
+                        <Download size={13} />
+                        <span>Download</span>
+                    </button>
+                </div>
             </div>
 
-            <div className="modern-table-wrapper">
-                <div style={{ overflowX: 'auto' }}>
-                    <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
-                        <table className="modern-table">
+            {/* ── Table Container (Separate Card Filling All Remaining Space) ── */}
+            <div
+                className="modern-table-wrapper"
+                style={{
+                    flex: 1,
+                    minHeight: 0,
+                    background: '#ffffff',
+                    borderRadius: '12px',
+                    border: '1px solid #e2e8f0',
+                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02)',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    flexDirection: 'column',
+                }}
+            >
+                <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+                    <table className="modern-table compact-table" style={{ width: '100%', minWidth: isMobile ? '700px' : '100%' }}>
                             <thead>
                                 <tr>
                                     <th rowSpan={2} style={{ ...stickyNoTh, cursor: 'pointer' }} onClick={() => requestSort('_idx')}>No</th>
@@ -574,7 +801,7 @@ function OlahanDataPesanan() {
                                         const totalPages = Math.ceil(sortedTableData.length / rowsPerPage);
                                         const safePage = Math.min(currentPage, totalPages || 1);
                                         const startIdx = (safePage - 1) * rowsPerPage;
-                                        const pageData = sortedTableData.slice(startIdx, startIdx + rowsPerPage);
+                                        const pageData = filteredSortedTableData.slice(startIdx, startIdx + rowsPerPage);
                                         return pageData.map((row, i) => (
                                             <tr key={startIdx + i}>
                                                 <td style={stickyNoTd}>{startIdx + i + 1}</td>
@@ -609,62 +836,95 @@ function OlahanDataPesanan() {
                             </tbody>
                         </table>
                     </div>
-                </div>
-            </div>
 
-            {/* Pagination Controls */}
-            {(() => {
-                const totalPages = Math.max(1, Math.ceil(sortedTableData.length / rowsPerPage));
-                const safePage = Math.min(currentPage, totalPages);
-                const startIdx = (safePage - 1) * rowsPerPage;
-                const endIdx = Math.min(startIdx + rowsPerPage, sortedTableData.length);
-                const maxButtons = 7;
-                let startPage = Math.max(1, safePage - Math.floor(maxButtons / 2));
-                let endPage = Math.min(totalPages, startPage + maxButtons - 1);
-                if (endPage - startPage + 1 < maxButtons) startPage = Math.max(1, endPage - maxButtons + 1);
-                const pageButtons = [];
-                for (let p = startPage; p <= endPage; p++) pageButtons.push(p);
-                return (
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginTop: '1rem', padding: '0.75rem 1rem', background: 'var(--bg-glass)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                            <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>Tampilkan</span>
-                            <select value={rowsPerPage} onChange={e => { setRowsPerPage(Number(e.target.value)); setCurrentPage(1); }}
-                                style={{ padding: '0.25rem 0.5rem', fontSize: '0.8125rem', fontWeight: 600, borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)', background: 'var(--bg-glass)', color: 'var(--text-secondary)', cursor: 'pointer' }}>
-                                {[10, 20, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}
-                            </select>
-                            <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                                | {sortedTableData.length > 0 ? `${startIdx + 1}–${endIdx}` : '0'} dari {sortedTableData.length} data
-                            </span>
-                        </div>
-                        {totalPages > 1 && (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                <button type="button" disabled={safePage <= 1} onClick={() => setCurrentPage(1)}
-                                    style={{ padding: '0.375rem 0.625rem', fontSize: '0.75rem', fontWeight: 600, borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)', background: 'var(--bg-glass)', color: safePage <= 1 ? 'var(--text-tertiary)' : 'var(--text-secondary)', cursor: safePage <= 1 ? 'default' : 'pointer', opacity: safePage <= 1 ? 0.5 : 1 }}>
-                                    «
-                                </button>
-                                <button type="button" disabled={safePage <= 1} onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                                    style={{ padding: '0.375rem 0.625rem', fontSize: '0.75rem', fontWeight: 600, borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)', background: 'var(--bg-glass)', color: safePage <= 1 ? 'var(--text-tertiary)' : 'var(--text-secondary)', cursor: safePage <= 1 ? 'default' : 'pointer', opacity: safePage <= 1 ? 0.5 : 1 }}>
-                                    ‹
-                                </button>
-                                {pageButtons.map(p => (
-                                    <button key={p} type="button" onClick={() => setCurrentPage(p)}
-                                        style={{ padding: '0.375rem 0.625rem', fontSize: '0.75rem', fontWeight: 600, borderRadius: 'var(--radius-sm)', border: p === safePage ? '1px solid var(--accent-primary)' : '1px solid var(--border-subtle)', background: p === safePage ? 'var(--accent-primary)' : 'var(--bg-glass)', color: p === safePage ? '#fff' : 'var(--text-secondary)', cursor: 'pointer' }}>
-                                        {p}
-                                    </button>
-                                ))}
-                                <button type="button" disabled={safePage >= totalPages} onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                                    style={{ padding: '0.375rem 0.625rem', fontSize: '0.75rem', fontWeight: 600, borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)', background: 'var(--bg-glass)', color: safePage >= totalPages ? 'var(--text-tertiary)' : 'var(--text-secondary)', cursor: safePage >= totalPages ? 'default' : 'pointer', opacity: safePage >= totalPages ? 0.5 : 1 }}>
-                                    ›
-                                </button>
-                                <button type="button" disabled={safePage >= totalPages} onClick={() => setCurrentPage(totalPages)}
-                                    style={{ padding: '0.375rem 0.625rem', fontSize: '0.75rem', fontWeight: 600, borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)', background: 'var(--bg-glass)', color: safePage >= totalPages ? 'var(--text-tertiary)' : 'var(--text-secondary)', cursor: safePage >= totalPages ? 'default' : 'pointer', opacity: safePage >= totalPages ? 0.5 : 1 }}>
-                                    »
-                                </button>
+                    {/* ── Compact Pagination Integrated Footer ── */}
+                    {(() => {
+                        const totalPages = Math.max(1, Math.ceil(filteredSortedTableData.length / rowsPerPage));
+                        const safePage = Math.min(currentPage, totalPages);
+                        const startIdx = (safePage - 1) * rowsPerPage;
+                        const endIdx = Math.min(startIdx + rowsPerPage, filteredSortedTableData.length);
+                        const maxButtons = isMobile ? 3 : 7;
+                        let startPage = Math.max(1, safePage - Math.floor(maxButtons / 2));
+                        let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+                        if (endPage - startPage + 1 < maxButtons) startPage = Math.max(1, endPage - maxButtons + 1);
+                        const pageButtons = [];
+                        for (let p = startPage; p <= endPage; p++) pageButtons.push(p);
+
+                        return (
+                            <div style={{
+                                flexShrink: 0,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                flexWrap: 'wrap',
+                                gap: '0.4rem',
+                                padding: isMobile ? '0.35rem 0.6rem' : '0.4rem 0.85rem',
+                                background: '#fcfdfe',
+                                borderTop: '1px solid #eef0f6',
+                                fontSize: isMobile ? '0.7rem' : '0.75rem',
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                                    <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Tampilkan</span>
+                                    <select
+                                        value={rowsPerPage}
+                                        onChange={e => { setRowsPerPage(Number(e.target.value)); setCurrentPage(1); }}
+                                        style={{
+                                            padding: '2px 5px',
+                                            height: '25px',
+                                            fontSize: '0.735rem',
+                                            fontWeight: 600,
+                                            borderRadius: '6px',
+                                            border: '1px solid #e2e8f0',
+                                            background: '#ffffff',
+                                            color: 'var(--text-primary)',
+                                            cursor: 'pointer',
+                                        }}
+                                    >
+                                        {[10, 20, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}
+                                    </select>
+                                    <span style={{ color: 'var(--text-tertiary)' }}>
+                                        | {filteredSortedTableData.length > 0 ? `${startIdx + 1}–${endIdx}` : '0'} dari <strong style={{ color: 'var(--text-primary)' }}>{filteredSortedTableData.length}</strong>
+                                    </span>
+                                </div>
+
+                                {totalPages > 1 && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                        <button type="button" disabled={safePage <= 1} onClick={() => setCurrentPage(1)}
+                                            style={{ height: 25, minWidth: 25, padding: '0 4px', fontSize: '0.7rem', fontWeight: 700, borderRadius: '5px', border: '1px solid #e2e8f0', background: '#ffffff', color: safePage <= 1 ? 'var(--text-tertiary)' : 'var(--text-secondary)', cursor: safePage <= 1 ? 'default' : 'pointer', opacity: safePage <= 1 ? 0.4 : 1 }}>
+                                            «
+                                        </button>
+                                        <button type="button" disabled={safePage <= 1} onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                            style={{ height: 25, minWidth: 25, padding: '0 4px', fontSize: '0.7rem', fontWeight: 700, borderRadius: '5px', border: '1px solid #e2e8f0', background: '#ffffff', color: safePage <= 1 ? 'var(--text-tertiary)' : 'var(--text-secondary)', cursor: safePage <= 1 ? 'default' : 'pointer', opacity: safePage <= 1 ? 0.4 : 1 }}>
+                                            ‹
+                                        </button>
+                                        {pageButtons.map(p => (
+                                            <button key={p} type="button" onClick={() => setCurrentPage(p)}
+                                                style={{
+                                                    height: 25, minWidth: 25, padding: '0 5px', fontSize: '0.725rem', fontWeight: 700,
+                                                    borderRadius: '5px',
+                                                    border: p === safePage ? '1px solid #7c3aed' : '1px solid #e2e8f0',
+                                                    background: p === safePage ? '#7c3aed' : '#ffffff',
+                                                    color: p === safePage ? '#ffffff' : 'var(--text-secondary)',
+                                                    cursor: 'pointer',
+                                                }}>
+                                                {p}
+                                            </button>
+                                        ))}
+                                        <button type="button" disabled={safePage >= totalPages} onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                            style={{ height: 25, minWidth: 25, padding: '0 4px', fontSize: '0.7rem', fontWeight: 700, borderRadius: '5px', border: '1px solid #e2e8f0', background: '#ffffff', color: safePage >= totalPages ? 'var(--text-tertiary)' : 'var(--text-secondary)', cursor: safePage >= totalPages ? 'default' : 'pointer', opacity: safePage >= totalPages ? 0.4 : 1 }}>
+                                            ›
+                                        </button>
+                                        <button type="button" disabled={safePage >= totalPages} onClick={() => setCurrentPage(totalPages)}
+                                            style={{ height: 25, minWidth: 25, padding: '0 4px', fontSize: '0.7rem', fontWeight: 700, borderRadius: '5px', border: '1px solid #e2e8f0', background: '#ffffff', color: safePage >= totalPages ? 'var(--text-tertiary)' : 'var(--text-secondary)', cursor: safePage >= totalPages ? 'default' : 'pointer', opacity: safePage >= totalPages ? 0.4 : 1 }}>
+                                            »
+                                        </button>
+                                    </div>
+                                )}
                             </div>
-                        )}
-                    </div>
-                );
-            })()}
+                        );
+                    })()}
+                </div>
+
             {/* Detail Popup Modal */}
             {detailPopup && (
                 <div style={{

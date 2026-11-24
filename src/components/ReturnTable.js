@@ -21,6 +21,22 @@ function ReturnTable() {
     const [filterStartDate, setFilterStartDate] = useState('');
     const [filterEndDate, setFilterEndDate] = useState('');
     const [showDateRangePicker, setShowDateRangePicker] = useState(false);
+    const [windowWidth, setWindowWidth] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : 1200));
+    useEffect(() => {
+        function handleResize() { setWindowWidth(window.innerWidth); }
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+    const isMobile = windowWidth < 768;
+
+    const hasAnyFilter = Boolean(filterStartDate || filterEndDate || search.trim());
+    const handleResetAllFilters = () => {
+        setFilterStartDate('');
+        setFilterEndDate('');
+        setSearch('');
+        setCurrentPage(1);
+    };
+
     const [rowsPerPage, setRowsPerPage] = useState(20);
     const [currentPage, setCurrentPage] = useState(1);
     const datePickerRef = useRef(null);
@@ -544,92 +560,282 @@ function ReturnTable() {
     const tdStyle = { padding: '0.625rem 1rem', whiteSpace: 'nowrap', fontSize: '0.8125rem' };
 
     return (
-        <div>
-            <div className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
-                <div>
-                    <h2 className="gradient-text" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <RotateCcw size={24} style={{ color: '#7c3aed' }} />
-                        Retur Penjualan
-                    </h2>
-                    <p>{sortedData.length.toLocaleString('id-ID')} data return</p>
+        <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            height: isMobile ? 'calc(100vh - 8.35rem)' : 'calc(100vh - 1.3rem)',
+            overflow: 'hidden',
+        }}>
+            {/* ── Top Header Toolbar (Separate Card) ── */}
+            <div
+                style={{
+                    flexShrink: 0,
+                    background: '#ffffff',
+                    borderRadius: '12px',
+                    border: '1px solid #e2e8f0',
+                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02)',
+                    padding: isMobile ? '0.55rem 0.65rem' : '0.55rem 0.85rem',
+                    marginBottom: '0.5rem',
+                    display: 'flex',
+                    flexDirection: isMobile ? 'column' : 'row',
+                    alignItems: isMobile ? 'stretch' : 'center',
+                    justifyContent: 'space-between',
+                    gap: isMobile ? '0.5rem' : '0.85rem',
+                }}
+            >
+                {/* Left: Icon + Title + Count Badge */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: isMobile ? 'space-between' : 'flex-start', gap: '0.65rem', flexShrink: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                        <div
+                            style={{
+                                width: isMobile ? 28 : 32,
+                                height: isMobile ? 28 : 32,
+                                borderRadius: '8px',
+                                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: '#ffffff',
+                                flexShrink: 0,
+                                boxShadow: '0 2px 6px rgba(99, 102, 241, 0.22)',
+                            }}
+                        >
+                            <RotateCcw size={isMobile ? 15 : 17} strokeWidth={2.3} />
+                        </div>
+                        <h2
+                            style={{
+                                margin: 0,
+                                fontSize: isMobile ? '0.925rem' : '1.025rem',
+                                fontWeight: 800,
+                                color: '#0f172a',
+                                letterSpacing: '-0.02em',
+                            }}
+                        >
+                            Retur Penjualan
+                        </h2>
+                    </div>
+                    <span
+                        style={{
+                            fontSize: isMobile ? '0.675rem' : '0.725rem',
+                            fontWeight: 600,
+                            color: '#475569',
+                            background: '#f1f5f9',
+                            border: '1px solid #e2e8f0',
+                            padding: '2px 8px',
+                            borderRadius: '9999px',
+                            whiteSpace: 'nowrap',
+                        }}
+                    >
+                        {sortedData.length.toLocaleString('id-ID')} data
+                    </span>
                 </div>
-                <div style={{ position: 'relative', maxWidth: '20rem', flex: '1' }}>
-                    <Search size={16} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-tertiary)' }} />
-                    <input type="text" placeholder="Cari di Retur..." value={search}
-                        onChange={(e) => setSearch(e.target.value)} className="search-input" />
+
+                {/* Right: Search Box (Pepet Kanan) + Date Range + Reset + Export Buttons */}
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.45rem',
+                    flexWrap: isMobile ? 'wrap' : 'nowrap',
+                    width: isMobile ? '100%' : 'auto',
+                    justifyContent: isMobile ? 'stretch' : 'flex-end',
+                }}>
+                    {/* Search Input */}
+                    <div style={{ position: 'relative', width: isMobile ? '100%' : '210px', flexShrink: 0 }}>
+                        <Search size={14} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: search ? '#6366f1' : '#94a3b8', pointerEvents: 'none' }} />
+                        <input
+                            type="text"
+                            placeholder="Cari di Retur..."
+                            value={search}
+                            onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
+                            style={{
+                                width: '100%',
+                                height: '34px',
+                                padding: '0 1.8rem 0 2.2rem',
+                                borderRadius: '8px',
+                                border: search ? '1px solid #6366f1' : '1px solid #e2e8f0',
+                                background: search ? '#f5f3ff' : '#f8fafc',
+                                color: '#0f172a',
+                                fontSize: '0.775rem',
+                                fontWeight: 500,
+                                outline: 'none',
+                                transition: 'all 0.15s ease',
+                            }}
+                        />
+                        {search && (
+                            <button type="button" onClick={() => { setSearch(''); setCurrentPage(1); }}
+                                style={{ position: 'absolute', right: '0.55rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: '0.15rem', display: 'flex' }}>
+                                <X size={13} />
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Date Range Picker */}
+                    <div style={{ position: 'relative', flex: isMobile ? 1 : 'none' }} ref={datePickerRef}>
+                        <button
+                            type="button"
+                            onClick={() => setShowDateRangePicker(!showDateRangePicker)}
+                            style={{
+                                width: isMobile ? '100%' : 'auto',
+                                height: '34px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '0.4rem',
+                                padding: '0 0.75rem',
+                                borderRadius: '8px',
+                                border: (filterStartDate || filterEndDate) ? '1px solid #6366f1' : '1px solid #e2e8f0',
+                                background: (filterStartDate || filterEndDate) ? '#f5f3ff' : '#ffffff',
+                                color: (filterStartDate || filterEndDate) ? '#6366f1' : '#334155',
+                                fontSize: '0.75rem',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                whiteSpace: 'nowrap',
+                            }}
+                        >
+                            <Calendar size={13} style={{ color: (filterStartDate || filterEndDate) ? '#6366f1' : '#64748b' }} />
+                            <span>{(filterStartDate && filterEndDate) ? (`${filterStartDate} — ${filterEndDate}`) : 'Tanggal'}</span>
+                            {(filterStartDate || filterEndDate) && (
+                                <span
+                                    onClick={(e) => { e.stopPropagation(); setFilterStartDate(''); setFilterEndDate(''); setCurrentPage(1); }}
+                                    title="Hapus filter tanggal"
+                                    style={{ marginLeft: '2px', display: 'inline-flex', color: '#6366f1', padding: '1px' }}
+                                >
+                                    <X size={11} />
+                                </span>
+                            )}
+                        </button>
+                        {showDateRangePicker && (
+                            <div style={{ position: 'absolute', top: '105%', left: isMobile ? 0 : 'auto', right: isMobile ? 'auto' : 0, zIndex: 120 }}>
+                                <DateRangePicker startDate={filterStartDate || null} endDate={filterEndDate || null} onChange={({ startDate, endDate }) => {
+                                    setFilterStartDate(startDate); setFilterEndDate(endDate); setCurrentPage(1);
+                                }} onClose={() => setShowDateRangePicker(false)} />
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Reset Button */}
+                    {hasAnyFilter && (
+                        <button
+                            type="button"
+                            onClick={handleResetAllFilters}
+                            title="Reset semua filter"
+                            style={{
+                                height: '34px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.35rem',
+                                padding: '0 0.65rem',
+                                borderRadius: '8px',
+                                border: '1px solid #fecaca',
+                                background: '#fff1f2',
+                                color: '#e11d48',
+                                fontSize: '0.725rem',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                whiteSpace: 'nowrap',
+                            }}
+                        >
+                            <RotateCcw size={12} />
+                            <span>Reset</span>
+                        </button>
+                    )}
+
+                    {!isMobile && <div style={{ height: '20px', width: '1px', background: '#e2e8f0', margin: '0 2px' }} />}
+
+                    {/* Download Excel */}
+                    <button onClick={handleDownloadExcel} type="button"
+                        style={{
+                            height: '34px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.4rem',
+                            padding: '0 0.85rem',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            borderRadius: '8px',
+                            border: 'none',
+                            background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
+                            color: '#ffffff',
+                            cursor: 'pointer',
+                            boxShadow: '0 2px 6px rgba(79, 70, 229, 0.28)',
+                            whiteSpace: 'nowrap',
+                        }}>
+                        <Download size={13} />
+                        <span>Excel</span>
+                    </button>
+
+                    {/* PDF Dropdown */}
+                    <div style={{ position: 'relative', flex: isMobile ? 1 : 'none' }} ref={pdfMenuRef}>
+                        <button onClick={() => setShowPdfMenu(!showPdfMenu)} type="button"
+                            style={{
+                                width: isMobile ? '100%' : 'auto',
+                                height: '34px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '0.4rem',
+                                padding: '0 0.75rem',
+                                fontSize: '0.75rem',
+                                fontWeight: 700,
+                                borderRadius: '8px',
+                                border: '1px solid #fecaca',
+                                background: showPdfMenu ? '#fee2e2' : '#fff1f2',
+                                color: '#ef4444',
+                                cursor: 'pointer',
+                                whiteSpace: 'nowrap',
+                            }}>
+                            <FileText size={13} /> PDF ▾
+                        </button>
+                        {showPdfMenu && (
+                            <div style={{
+                                position: 'absolute', top: '105%', right: 0, zIndex: 120,
+                                background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '10px',
+                                boxShadow: '0 10px 25px rgba(0,0,0,0.12)', overflow: 'hidden', minWidth: '175px',
+                            }}>
+                                <button type="button" onClick={() => handleDownloadPdf('semua')}
+                                    style={{
+                                        display: 'flex', alignItems: 'center', gap: '0.45rem', width: '100%', padding: '0.55rem 0.85rem',
+                                        background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.735rem', fontWeight: 600,
+                                        color: 'var(--text-primary)', textAlign: 'left',
+                                    }}
+                                    onMouseEnter={e => e.target.style.background = '#f8fafc'}
+                                    onMouseLeave={e => e.target.style.background = 'none'}>
+                                    📦 Semua Barang
+                                </button>
+                                <div style={{ height: '1px', background: '#f1f3f9' }} />
+                                <button type="button" onClick={() => handleDownloadPdf('belum')}
+                                    style={{
+                                        display: 'flex', alignItems: 'center', gap: '0.45rem', width: '100%', padding: '0.55rem 0.85rem',
+                                        background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.735rem', fontWeight: 600,
+                                        color: '#f59e0b', textAlign: 'left',
+                                    }}
+                                    onMouseEnter={e => e.target.style.background = '#f8fafc'}
+                                    onMouseLeave={e => e.target.style.background = 'none'}>
+                                    ⏳ Belum Diterima Saja
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
 
-            <div style={{ marginBottom: '1rem', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.75rem' }}>
-                <div style={{ position: 'relative' }} ref={datePickerRef}>
-                    <button type="button" onClick={() => setShowDateRangePicker(!showDateRangePicker)}
-                        style={{
-                            display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem',
-                            borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)',
-                            background: (filterStartDate || filterEndDate) ? 'rgba(124,58,237,0.15)' : 'var(--bg-glass)',
-                            color: (filterStartDate || filterEndDate) ? '#a78bfa' : 'var(--text-secondary)',
-                            cursor: 'pointer', fontSize: '0.8125rem', fontWeight: 600,
-                        }}>
-                        <Calendar size={14} />
-                        {(filterStartDate || filterEndDate) ? `${filterStartDate || '...'} → ${filterEndDate || '...'}` : 'Pilih Rentang Tanggal'}
-                    </button>
-                    {showDateRangePicker && (
-                        <div style={{ position: 'absolute', zIndex: 50, marginTop: '0.5rem' }}>
-                            <DateRangePicker startDate={filterStartDate || null} endDate={filterEndDate || null} onChange={({ startDate, endDate }) => {
-                                setFilterStartDate(startDate); setFilterEndDate(endDate); setCurrentPage(1);
-                            }} onClose={() => setShowDateRangePicker(false)} />
-                        </div>
-                    )}
-                </div>
-                <button onClick={handleDownloadExcel} type="button"
-                    className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', padding: '0.5rem 1rem', fontSize: '0.8125rem' }}>
-                    <Download size={14} /> Download Excel
-                </button>
-                <div style={{ position: 'relative' }} ref={pdfMenuRef}>
-                    <button onClick={() => setShowPdfMenu(!showPdfMenu)} type="button"
-                        style={{
-                            display: 'flex', alignItems: 'center', gap: '0.375rem', padding: '0.5rem 1rem', fontSize: '0.8125rem',
-                            fontWeight: 700, borderRadius: 'var(--radius-md)', border: '1px solid #ef4444',
-                            background: showPdfMenu ? 'rgba(239, 68, 68, 0.2)' : 'rgba(239, 68, 68, 0.1)', color: '#f87171', cursor: 'pointer',
-                        }}>
-                        <FileText size={14} /> Download PDF ▾
-                    </button>
-                    {showPdfMenu && (
-                        <div style={{
-                            position: 'absolute', top: '100%', left: 0, marginTop: '0.375rem', zIndex: 50,
-                            background: 'var(--bg-card)', border: '1px solid var(--border-medium)', borderRadius: 'var(--radius-md)',
-                            boxShadow: 'var(--shadow-lg)', overflow: 'hidden', minWidth: '200px',
-                        }}>
-                            <button type="button" onClick={() => handleDownloadPdf('semua')}
-                                style={{
-                                    display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%', padding: '0.625rem 1rem',
-                                    background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.8125rem', fontWeight: 600,
-                                    color: 'var(--text-primary)', textAlign: 'left',
-                                }}
-                                onMouseEnter={e => e.target.style.background = 'var(--bg-glass)'}
-                                onMouseLeave={e => e.target.style.background = 'none'}>
-                                📦 Semua Barang
-                            </button>
-                            <div style={{ height: '1px', background: 'var(--border-subtle)' }} />
-                            <button type="button" onClick={() => handleDownloadPdf('belum')}
-                                style={{
-                                    display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%', padding: '0.625rem 1rem',
-                                    background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.8125rem', fontWeight: 600,
-                                    color: '#f59e0b', textAlign: 'left',
-                                }}
-                                onMouseEnter={e => e.target.style.background = 'rgba(245,158,11,0.08)'}
-                                onMouseLeave={e => e.target.style.background = 'none'}>
-                                ⏳ Belum Diterima Saja
-                            </button>
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            <div className="modern-table-wrapper">
-                <div style={{ overflowX: 'auto' }}>
-                    <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
-                        <table className="modern-table">
+            {/* ── Table Container (Separate Card Filling All Remaining Space) ── */}
+            <div
+                className="modern-table-wrapper"
+                style={{
+                    flex: 1,
+                    minHeight: 0,
+                    background: '#ffffff',
+                    borderRadius: '12px',
+                    border: '1px solid #e2e8f0',
+                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02)',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    flexDirection: 'column',
+                }}
+            >
+                <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+                    <table className="modern-table compact-table" style={{ width: '100%', minWidth: isMobile ? '700px' : '100%' }}>
                             <thead>
                                 <tr>
                                     <th style={{ width: '3rem' }}>No</th>
@@ -757,62 +963,94 @@ function ReturnTable() {
                             </tbody>
                         </table>
                     </div>
-                </div>
-            </div>
 
-            {/* Pagination Controls */}
-            {(() => {
-                const totalPages = Math.max(1, Math.ceil(sortedData.length / rowsPerPage));
-                const safePage = Math.min(currentPage, totalPages);
-                const startIdx = (safePage - 1) * rowsPerPage;
-                const endIdx = Math.min(startIdx + rowsPerPage, sortedData.length);
-                const maxButtons = 7;
-                let startPage = Math.max(1, safePage - Math.floor(maxButtons / 2));
-                let endPage = Math.min(totalPages, startPage + maxButtons - 1);
-                if (endPage - startPage + 1 < maxButtons) startPage = Math.max(1, endPage - maxButtons + 1);
-                const pageButtons = [];
-                for (let p = startPage; p <= endPage; p++) pageButtons.push(p);
-                return (
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginTop: '1rem', padding: '0.75rem 1rem', background: 'var(--bg-glass)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                            <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>Tampilkan</span>
-                            <select value={rowsPerPage} onChange={e => { setRowsPerPage(Number(e.target.value)); setCurrentPage(1); }}
-                                style={{ padding: '0.25rem 0.5rem', fontSize: '0.8125rem', fontWeight: 600, borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)', background: 'var(--bg-glass)', color: 'var(--text-secondary)', cursor: 'pointer' }}>
-                                {[10, 20, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}
-                            </select>
-                            <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                                | {sortedData.length > 0 ? `${startIdx + 1}–${endIdx}` : '0'} dari {sortedData.length.toLocaleString('id-ID')} data
-                            </span>
-                        </div>
-                        {totalPages > 1 && (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                <button type="button" disabled={safePage <= 1} onClick={() => setCurrentPage(1)}
-                                    style={{ padding: '0.375rem 0.625rem', fontSize: '0.75rem', fontWeight: 600, borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)', background: 'var(--bg-glass)', color: safePage <= 1 ? 'var(--text-tertiary)' : 'var(--text-secondary)', cursor: safePage <= 1 ? 'default' : 'pointer', opacity: safePage <= 1 ? 0.5 : 1 }}>
-                                    «
-                                </button>
-                                <button type="button" disabled={safePage <= 1} onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                                    style={{ padding: '0.375rem 0.625rem', fontSize: '0.75rem', fontWeight: 600, borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)', background: 'var(--bg-glass)', color: safePage <= 1 ? 'var(--text-tertiary)' : 'var(--text-secondary)', cursor: safePage <= 1 ? 'default' : 'pointer', opacity: safePage <= 1 ? 0.5 : 1 }}>
-                                    ‹
-                                </button>
-                                {pageButtons.map(p => (
-                                    <button key={p} type="button" onClick={() => setCurrentPage(p)}
-                                        style={{ padding: '0.375rem 0.625rem', fontSize: '0.75rem', fontWeight: 600, borderRadius: 'var(--radius-sm)', border: p === safePage ? '1px solid var(--accent-primary)' : '1px solid var(--border-subtle)', background: p === safePage ? 'var(--accent-primary)' : 'var(--bg-glass)', color: p === safePage ? '#fff' : 'var(--text-secondary)', cursor: 'pointer' }}>
-                                        {p}
-                                    </button>
-                                ))}
-                                <button type="button" disabled={safePage >= totalPages} onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                                    style={{ padding: '0.375rem 0.625rem', fontSize: '0.75rem', fontWeight: 600, borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)', background: 'var(--bg-glass)', color: safePage >= totalPages ? 'var(--text-tertiary)' : 'var(--text-secondary)', cursor: safePage >= totalPages ? 'default' : 'pointer', opacity: safePage >= totalPages ? 0.5 : 1 }}>
-                                    ›
-                                </button>
-                                <button type="button" disabled={safePage >= totalPages} onClick={() => setCurrentPage(totalPages)}
-                                    style={{ padding: '0.375rem 0.625rem', fontSize: '0.75rem', fontWeight: 600, borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)', background: 'var(--bg-glass)', color: safePage >= totalPages ? 'var(--text-tertiary)' : 'var(--text-secondary)', cursor: safePage >= totalPages ? 'default' : 'pointer', opacity: safePage >= totalPages ? 0.5 : 1 }}>
-                                    »
-                                </button>
+                    {/* ── Compact Pagination Integrated Footer ── */}
+                    {(() => {
+                        const totalPages = Math.max(1, Math.ceil(sortedData.length / rowsPerPage));
+                        const safePage = Math.min(currentPage, totalPages);
+                        const startIdx = (safePage - 1) * rowsPerPage;
+                        const endIdx = Math.min(startIdx + rowsPerPage, sortedData.length);
+                        const maxButtons = isMobile ? 3 : 7;
+                        let startPage = Math.max(1, safePage - Math.floor(maxButtons / 2));
+                        let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+                        if (endPage - startPage + 1 < maxButtons) startPage = Math.max(1, endPage - maxButtons + 1);
+                        const pageButtons = [];
+                        for (let p = startPage; p <= endPage; p++) pageButtons.push(p);
+
+                        return (
+                            <div style={{
+                                flexShrink: 0,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                flexWrap: 'wrap',
+                                gap: '0.4rem',
+                                padding: isMobile ? '0.35rem 0.6rem' : '0.4rem 0.85rem',
+                                background: '#fcfdfe',
+                                borderTop: '1px solid #eef0f6',
+                                fontSize: isMobile ? '0.7rem' : '0.75rem',
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                                    <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Tampilkan</span>
+                                    <select
+                                        value={rowsPerPage}
+                                        onChange={e => { setRowsPerPage(Number(e.target.value)); setCurrentPage(1); }}
+                                        style={{
+                                            padding: '2px 5px',
+                                            height: '25px',
+                                            fontSize: '0.735rem',
+                                            fontWeight: 600,
+                                            borderRadius: '6px',
+                                            border: '1px solid #e2e8f0',
+                                            background: '#ffffff',
+                                            color: 'var(--text-primary)',
+                                            cursor: 'pointer',
+                                        }}
+                                    >
+                                        {[10, 20, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}
+                                    </select>
+                                    <span style={{ color: 'var(--text-tertiary)' }}>
+                                        | {sortedData.length > 0 ? `${startIdx + 1}–${endIdx}` : '0'} dari <strong style={{ color: 'var(--text-primary)' }}>{sortedData.length.toLocaleString('id-ID')}</strong>
+                                    </span>
+                                </div>
+
+                                {totalPages > 1 && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                        <button type="button" disabled={safePage <= 1} onClick={() => setCurrentPage(1)}
+                                            style={{ height: 25, minWidth: 25, padding: '0 4px', fontSize: '0.7rem', fontWeight: 700, borderRadius: '5px', border: '1px solid #e2e8f0', background: '#ffffff', color: safePage <= 1 ? 'var(--text-tertiary)' : 'var(--text-secondary)', cursor: safePage <= 1 ? 'default' : 'pointer', opacity: safePage <= 1 ? 0.4 : 1 }}>
+                                            «
+                                        </button>
+                                        <button type="button" disabled={safePage <= 1} onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                            style={{ height: 25, minWidth: 25, padding: '0 4px', fontSize: '0.7rem', fontWeight: 700, borderRadius: '5px', border: '1px solid #e2e8f0', background: '#ffffff', color: safePage <= 1 ? 'var(--text-tertiary)' : 'var(--text-secondary)', cursor: safePage <= 1 ? 'default' : 'pointer', opacity: safePage <= 1 ? 0.4 : 1 }}>
+                                            ‹
+                                        </button>
+                                        {pageButtons.map(p => (
+                                            <button key={p} type="button" onClick={() => setCurrentPage(p)}
+                                                style={{
+                                                    height: 25, minWidth: 25, padding: '0 5px', fontSize: '0.725rem', fontWeight: 700,
+                                                    borderRadius: '5px',
+                                                    border: p === safePage ? '1px solid #7c3aed' : '1px solid #e2e8f0',
+                                                    background: p === safePage ? '#7c3aed' : '#ffffff',
+                                                    color: p === safePage ? '#ffffff' : 'var(--text-secondary)',
+                                                    cursor: 'pointer',
+                                                }}>
+                                                {p}
+                                            </button>
+                                        ))}
+                                        <button type="button" disabled={safePage >= totalPages} onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                            style={{ height: 25, minWidth: 25, padding: '0 4px', fontSize: '0.7rem', fontWeight: 700, borderRadius: '5px', border: '1px solid #e2e8f0', background: '#ffffff', color: safePage >= totalPages ? 'var(--text-tertiary)' : 'var(--text-secondary)', cursor: safePage >= totalPages ? 'default' : 'pointer', opacity: safePage >= totalPages ? 0.4 : 1 }}>
+                                            ›
+                                        </button>
+                                        <button type="button" disabled={safePage >= totalPages} onClick={() => setCurrentPage(totalPages)}
+                                            style={{ height: 25, minWidth: 25, padding: '0 4px', fontSize: '0.7rem', fontWeight: 700, borderRadius: '5px', border: '1px solid #e2e8f0', background: '#ffffff', color: safePage >= totalPages ? 'var(--text-tertiary)' : 'var(--text-secondary)', cursor: safePage >= totalPages ? 'default' : 'pointer', opacity: safePage >= totalPages ? 0.4 : 1 }}>
+                                            »
+                                        </button>
+                                    </div>
+                                )}
                             </div>
-                        )}
-                    </div>
-                );
-            })()}
+                        );
+                    })()}
+                </div>
 
             {/* ─── Order Detail Popup ─────────────────────────────────── */}
             {selectedRow && (() => {

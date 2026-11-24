@@ -148,9 +148,9 @@ function UserLayout() {
                                 marginLeft: isDesktop ? (sidebarOpen ? 'var(--sidebar-width-expanded)' : 'var(--sidebar-width-collapsed)') : '0',
                                 transition: 'margin-left var(--transition-normal)',
                                 minHeight: '100vh',
-                                padding: isDesktop ? (location.pathname === '/rangkuman' ? '0.65rem 1rem' : '1.5rem') : '0.5rem',
-                                paddingTop: isDesktop ? (location.pathname === '/rangkuman' ? '0.65rem' : '1.5rem') : '3.65rem',
-                                paddingBottom: isDesktop ? (location.pathname === '/rangkuman' ? '0.65rem' : '1.5rem') : '4.5rem',
+                                padding: isDesktop ? (['/rangkuman', '/olahan', '/return', '/pengembalian', '/analisis'].includes(location.pathname) ? '0.65rem 1rem' : '1.5rem') : '0.5rem',
+                                paddingTop: isDesktop ? (['/rangkuman', '/olahan', '/return', '/pengembalian', '/analisis'].includes(location.pathname) ? '0.65rem' : '1.5rem') : '3.65rem',
+                                paddingBottom: isDesktop ? (['/rangkuman', '/olahan', '/return', '/pengembalian', '/analisis'].includes(location.pathname) ? '0.65rem' : '1.5rem') : '4.5rem',
                                 overflowX: 'hidden',
                             }}
                         >

@@ -280,6 +280,9 @@ const DashboardModernCards = React.memo(function DashboardModernCards({
         flexDirection: 'column',
         justifyContent: 'space-between',
         position: 'relative',
+        minWidth: 0,
+        width: '100%',
+        overflow: 'hidden',
     };
 
     return (
@@ -287,7 +290,7 @@ const DashboardModernCards = React.memo(function DashboardModernCards({
             ref={containerRef}
             style={{
                 display: 'grid',
-                gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(360px, 1fr))',
+                gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : 'repeat(auto-fit, minmax(360px, 1fr))',
                 gap: isMobile ? '0.75rem' : '1.25rem',
                 marginBottom: isMobile ? '0.75rem' : '1.5rem',
             }}
@@ -483,14 +486,14 @@ const DashboardModernCards = React.memo(function DashboardModernCards({
                         alignItems: 'center',
                         justifyContent: 'space-between',
                         gap: isMobile ? '0.75rem' : '1.5rem',
-                        flexWrap: isMobile ? 'wrap' : 'nowrap',
+                        flexDirection: isMobile ? 'column' : 'row',
                     }}
                 >
                     <div
                         style={{
                             position: 'relative',
-                            width: isMobile ? 140 : 164,
-                            height: isMobile ? 140 : 164,
+                            width: isMobile ? 120 : 164,
+                            height: isMobile ? 120 : 164,
                             margin: '0 auto',
                             display: 'flex',
                             alignItems: 'center',
@@ -499,15 +502,15 @@ const DashboardModernCards = React.memo(function DashboardModernCards({
                         }}
                     >
                         <svg
-                            width={isMobile ? 140 : 164}
-                            height={isMobile ? 140 : 164}
-                            viewBox={isMobile ? '0 0 140 140' : '0 0 164 164'}
+                            width={isMobile ? 120 : 164}
+                            height={isMobile ? 120 : 164}
+                            viewBox={isMobile ? '0 0 120 120' : '0 0 164 164'}
                             style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}
                         >
                             <circle
-                                cx={isMobile ? 70 : 82}
-                                cy={isMobile ? 70 : 82}
-                                r={isMobile ? 65 : 77}
+                                cx={isMobile ? 60 : 82}
+                                cy={isMobile ? 60 : 82}
+                                r={isMobile ? 55 : 77}
                                 fill="none"
                                 stroke="rgba(124, 58, 237, 0.22)"
                                 strokeWidth="1.4"
@@ -515,7 +518,7 @@ const DashboardModernCards = React.memo(function DashboardModernCards({
                             />
                         </svg>
 
-                        <ResponsiveContainer width={isMobile ? 130 : 150} height={isMobile ? 130 : 150}>
+                        <ResponsiveContainer width={isMobile ? 110 : 150} height={isMobile ? 110 : 150}>
                             <PieChart>
                                 <RechartsTooltip
                                     content={({ active, payload }) => {
@@ -548,8 +551,8 @@ const DashboardModernCards = React.memo(function DashboardModernCards({
                                     data={viewData.chartSlices}
                                     cx="50%"
                                     cy="50%"
-                                    innerRadius={isMobile ? 38 : 47}
-                                    outerRadius={isMobile ? 56 : 67}
+                                    innerRadius={isMobile ? 32 : 47}
+                                    outerRadius={isMobile ? 48 : 67}
                                     paddingAngle={3}
                                     dataKey="value"
                                     stroke="none"
@@ -572,12 +575,12 @@ const DashboardModernCards = React.memo(function DashboardModernCards({
                                 transform: 'translate(-50%, -50%)',
                                 textAlign: 'center',
                                 pointerEvents: 'none',
-                                width: isMobile ? '76px' : '88px',
+                                width: isMobile ? '68px' : '88px',
                             }}
                         >
                             <div
                                 style={{
-                                    fontSize: isMobile ? '0.6rem' : '0.65rem',
+                                    fontSize: isMobile ? '0.58rem' : '0.65rem',
                                     color: 'var(--text-tertiary)',
                                     fontWeight: 700,
                                     textTransform: 'uppercase',
@@ -588,10 +591,10 @@ const DashboardModernCards = React.memo(function DashboardModernCards({
                             </div>
                             <div
                                 style={{
-                                    fontSize: isMobile ? '0.78rem' : '0.85rem',
+                                    fontSize: isMobile ? '0.75rem' : '0.85rem',
                                     color: 'var(--text-primary)',
                                     fontWeight: 800,
-                                    marginTop: '2px',
+                                    marginTop: '1px',
                                     lineHeight: 1.15,
                                 }}
                             >
@@ -602,13 +605,13 @@ const DashboardModernCards = React.memo(function DashboardModernCards({
 
                     <div
                         style={{
-                            flex: '1 1 200px',
+                            flex: isMobile ? 'none' : '1 1 200px',
                             display: 'flex',
                             flexDirection: 'column',
                             justifyContent: 'center',
-                            gap: isMobile ? '0.5rem' : '0.8rem',
+                            gap: isMobile ? '0.4rem' : '0.8rem',
                             minWidth: 0,
-                            width: isMobile ? '100%' : 'auto',
+                            width: '100%',
                         }}
                     >
                         {viewData.displayCategories.map((item, idx) => (

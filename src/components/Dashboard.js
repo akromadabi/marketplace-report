@@ -210,205 +210,336 @@ const BottomActivitySection = React.memo(function BottomActivitySection({
 
             {/* TAB 1: TOP PRODUCTS TABLE (Full width product name, no big empty gap) */}
             {bottomTableTab === 'products' && (
-                <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: '0.8125rem', tableLayout: isMobile ? 'auto' : 'fixed' }}>
-                        <thead>
-                            <tr style={{ background: '#f8f9fc' }}>
-                                <th style={{ width: isMobile ? 'auto' : '48%', padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: 'var(--text-tertiary)', fontSize: '0.725rem', textTransform: 'uppercase', letterSpacing: '0.04em', borderTop: '1px solid #eef0f6', borderBottom: '1px solid #eef0f6', borderTopLeftRadius: '10px', borderBottomLeftRadius: '10px' }}>
-                                    Aktivitas / Nama Produk
-                                </th>
-                                <th style={{ width: isMobile ? 'auto' : '13%', padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: 'var(--text-tertiary)', fontSize: '0.725rem', textTransform: 'uppercase', letterSpacing: '0.04em', borderTop: '1px solid #eef0f6', borderBottom: '1px solid #eef0f6' }}>
-                                    SKU
-                                </th>
-                                <th style={{ width: isMobile ? 'auto' : '15%', padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: 'var(--text-tertiary)', fontSize: '0.725rem', textTransform: 'uppercase', letterSpacing: '0.04em', borderTop: '1px solid #eef0f6', borderBottom: '1px solid #eef0f6' }}>
-                                    Unit Terjual
-                                </th>
-                                <th style={{ width: isMobile ? 'auto' : '14%', padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: 'var(--text-tertiary)', fontSize: '0.725rem', textTransform: 'uppercase', letterSpacing: '0.04em', borderTop: '1px solid #eef0f6', borderBottom: '1px solid #eef0f6' }}>
-                                    Estimasi Penerimaan Bersih
-                                </th>
-                                <th style={{ width: isMobile ? 'auto' : '10%', padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 700, color: 'var(--text-tertiary)', fontSize: '0.725rem', textTransform: 'uppercase', letterSpacing: '0.04em', borderTop: '1px solid #eef0f6', borderBottom: '1px solid #eef0f6', borderTopRightRadius: '10px', borderBottomRightRadius: '10px' }}>
-                                    Status
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filteredProducts.map((p, i) => {
-                                const badgeColor = CHART_COLORS[i % CHART_COLORS.length];
-                                const sharePct = Math.min(100, Math.max(6, Math.round((p.qty / maxProdQty) * 100)));
-                                return (
-                                    <tr key={`${p.sku}-${i}`}>
-                                        <td style={{ padding: '0.85rem 1rem', borderBottom: '1px solid #f2f3f8' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', minWidth: 0 }}>
-                                                <div
+                isMobile ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                        {filteredProducts.map((p, i) => {
+                            const badgeColor = CHART_COLORS[i % CHART_COLORS.length];
+                            return (
+                                <div
+                                    key={`${p.sku}-${i}`}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        padding: '0.65rem 0.65rem',
+                                        background: '#f9fafd',
+                                        borderRadius: '12px',
+                                        border: '1px solid #eef0f6',
+                                        gap: '0.5rem',
+                                    }}
+                                >
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', minWidth: 0, flex: 1 }}>
+                                        <div
+                                            style={{
+                                                width: 28,
+                                                height: 28,
+                                                borderRadius: '8px',
+                                                background: `${badgeColor}15`,
+                                                color: badgeColor,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                fontWeight: 800,
+                                                fontSize: '0.75rem',
+                                                flexShrink: 0,
+                                            }}
+                                        >
+                                            #{i + 1}
+                                        </div>
+                                        <div style={{ minWidth: 0, flex: 1 }}>
+                                            <div
+                                                style={{
+                                                    fontSize: '0.78rem',
+                                                    fontWeight: 700,
+                                                    color: 'var(--text-primary)',
+                                                    whiteSpace: 'nowrap',
+                                                    overflow: 'hidden',
+                                                    textOverflow: 'ellipsis',
+                                                }}
+                                                title={p.name}
+                                            >
+                                                {p.name}
+                                            </div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.68rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                                                <span style={{ background: '#eef0f6', padding: '1px 6px', borderRadius: '4px', fontWeight: 600 }}>{p.sku}</span>
+                                                <span>·</span>
+                                                <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{p.qty.toLocaleString('id-ID')} PCS</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                                        <div style={{ fontSize: '0.825rem', fontWeight: 800, color: '#10b981', lineHeight: 1.2 }}>
+                                            +{formatCompact(Math.round(p.revenue))}
+                                        </div>
+                                        <span
+                                            style={{
+                                                display: 'inline-block',
+                                                marginTop: '2px',
+                                                fontSize: '0.6rem',
+                                                fontWeight: 700,
+                                                padding: '1px 6px',
+                                                borderRadius: '9999px',
+                                                background: i < 3 ? 'rgba(124, 58, 237, 0.12)' : 'rgba(16, 185, 129, 0.12)',
+                                                color: i < 3 ? '#7c3aed' : '#10b981',
+                                            }}
+                                        >
+                                            {i < 3 ? 'Top Seller' : 'Aktif'}
+                                        </span>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                ) : (
+                    <div style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: '0.8125rem', tableLayout: 'fixed' }}>
+                            <thead>
+                                <tr style={{ background: '#f8f9fc' }}>
+                                    <th style={{ width: '48%', padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: 'var(--text-tertiary)', fontSize: '0.725rem', textTransform: 'uppercase', letterSpacing: '0.04em', borderTop: '1px solid #eef0f6', borderBottom: '1px solid #eef0f6', borderTopLeftRadius: '10px', borderBottomLeftRadius: '10px' }}>
+                                        Aktivitas / Nama Produk
+                                    </th>
+                                    <th style={{ width: '13%', padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: 'var(--text-tertiary)', fontSize: '0.725rem', textTransform: 'uppercase', letterSpacing: '0.04em', borderTop: '1px solid #eef0f6', borderBottom: '1px solid #eef0f6' }}>
+                                        SKU
+                                    </th>
+                                    <th style={{ width: '15%', padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: 'var(--text-tertiary)', fontSize: '0.725rem', textTransform: 'uppercase', letterSpacing: '0.04em', borderTop: '1px solid #eef0f6', borderBottom: '1px solid #eef0f6' }}>
+                                        Unit Terjual
+                                    </th>
+                                    <th style={{ width: '14%', padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 700, color: 'var(--text-tertiary)', fontSize: '0.725rem', textTransform: 'uppercase', letterSpacing: '0.04em', borderTop: '1px solid #eef0f6', borderBottom: '1px solid #eef0f6' }}>
+                                        Estimasi Penerimaan Bersih
+                                    </th>
+                                    <th style={{ width: '10%', padding: '0.75rem 1rem', textAlign: 'right', fontWeight: 700, color: 'var(--text-tertiary)', fontSize: '0.725rem', textTransform: 'uppercase', letterSpacing: '0.04em', borderTop: '1px solid #eef0f6', borderBottom: '1px solid #eef0f6', borderTopRightRadius: '10px', borderBottomRightRadius: '10px' }}>
+                                        Status
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {filteredProducts.map((p, i) => {
+                                    const badgeColor = CHART_COLORS[i % CHART_COLORS.length];
+                                    const sharePct = Math.min(100, Math.max(6, Math.round((p.qty / maxProdQty) * 100)));
+                                    return (
+                                        <tr key={`${p.sku}-${i}`}>
+                                            <td style={{ padding: '0.85rem 1rem', borderBottom: '1px solid #f2f3f8' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', minWidth: 0 }}>
+                                                    <div
+                                                        style={{
+                                                            width: 34,
+                                                            height: 34,
+                                                            borderRadius: '10px',
+                                                            background: `${badgeColor}15`,
+                                                            color: badgeColor,
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            fontWeight: 800,
+                                                            fontSize: '0.78rem',
+                                                            flexShrink: 0,
+                                                        }}
+                                                    >
+                                                        #{i + 1}
+                                                    </div>
+                                                    <div
+                                                        style={{
+                                                            color: 'var(--text-primary)',
+                                                            fontWeight: 600,
+                                                            overflow: 'hidden',
+                                                            textOverflow: 'ellipsis',
+                                                            whiteSpace: 'nowrap',
+                                                            width: '100%',
+                                                        }}
+                                                        title={p.name}
+                                                    >
+                                                        {p.name}
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td style={{ padding: '0.85rem 1rem', borderBottom: '1px solid #f2f3f8' }}>
+                                                <span
                                                     style={{
-                                                        width: 34,
-                                                        height: 34,
-                                                        borderRadius: '10px',
-                                                        background: `${badgeColor}15`,
-                                                        color: badgeColor,
-                                                        display: 'flex',
+                                                        display: 'inline-block',
+                                                        padding: '3px 9px',
+                                                        borderRadius: '6px',
+                                                        background: '#f4f5f9',
+                                                        color: 'var(--text-secondary)',
+                                                        fontWeight: 700,
+                                                        fontSize: '0.75rem',
+                                                    }}
+                                                >
+                                                    {p.sku}
+                                                </span>
+                                            </td>
+                                            <td style={{ padding: '0.85rem 1rem', borderBottom: '1px solid #f2f3f8' }}>
+                                                <div style={{ fontWeight: 800, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                                                    {p.qty.toLocaleString('id-ID')} PCS
+                                                </div>
+                                                <div style={{ width: '85%', height: 5, background: '#eef0f6', borderRadius: 9999, overflow: 'hidden' }}>
+                                                    <div style={{ width: `${sharePct}%`, height: '100%', background: badgeColor, borderRadius: 9999 }} />
+                                                </div>
+                                            </td>
+                                            <td style={{ padding: '0.85rem 1rem', borderBottom: '1px solid #f2f3f8', fontWeight: 800, color: '#10b981' }}>
+                                                +{formatRupiah(Math.round(p.revenue))}
+                                            </td>
+                                            <td style={{ padding: '0.85rem 1rem', borderBottom: '1px solid #f2f3f8', textAlign: 'right' }}>
+                                                <span
+                                                    style={{
+                                                        display: 'inline-flex',
                                                         alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        fontWeight: 800,
-                                                        fontSize: '0.78rem',
-                                                        flexShrink: 0,
+                                                        gap: '4px',
+                                                        padding: '4px 10px',
+                                                        borderRadius: '9999px',
+                                                        background: i < 3 ? 'rgba(124, 58, 237, 0.12)' : 'rgba(16, 185, 129, 0.12)',
+                                                        color: i < 3 ? '#7c3aed' : '#10b981',
+                                                        fontSize: '0.725rem',
+                                                        fontWeight: 700,
                                                     }}
                                                 >
-                                                    #{i + 1}
-                                                </div>
-                                                <div
-                                                    style={{
-                                                        color: 'var(--text-primary)',
-                                                        fontWeight: 600,
-                                                        overflow: 'hidden',
-                                                        textOverflow: 'ellipsis',
-                                                        whiteSpace: 'nowrap',
-                                                        width: '100%',
-                                                    }}
-                                                    title={p.name}
-                                                >
-                                                    {p.name}
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td style={{ padding: '0.85rem 1rem', borderBottom: '1px solid #f2f3f8' }}>
-                                            <span
-                                                style={{
-                                                    display: 'inline-block',
-                                                    padding: '3px 9px',
-                                                    borderRadius: '6px',
-                                                    background: '#f4f5f9',
-                                                    color: 'var(--text-secondary)',
-                                                    fontWeight: 700,
-                                                    fontSize: '0.75rem',
-                                                }}
-                                            >
-                                                {p.sku}
-                                            </span>
-                                        </td>
-                                        <td style={{ padding: '0.85rem 1rem', borderBottom: '1px solid #f2f3f8' }}>
-                                            <div style={{ fontWeight: 800, color: 'var(--text-primary)', marginBottom: '4px' }}>
-                                                {p.qty.toLocaleString('id-ID')} PCS
-                                            </div>
-                                            <div style={{ width: '85%', height: 5, background: '#eef0f6', borderRadius: 9999, overflow: 'hidden' }}>
-                                                <div style={{ width: `${sharePct}%`, height: '100%', background: badgeColor, borderRadius: 9999 }} />
-                                            </div>
-                                        </td>
-                                        <td style={{ padding: '0.85rem 1rem', borderBottom: '1px solid #f2f3f8', fontWeight: 800, color: '#10b981' }}>
-                                            +{formatRupiah(Math.round(p.revenue))}
-                                        </td>
-                                        <td style={{ padding: '0.85rem 1rem', borderBottom: '1px solid #f2f3f8', textAlign: 'right' }}>
-                                            <span
-                                                style={{
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    gap: '4px',
-                                                    padding: '4px 10px',
-                                                    borderRadius: '9999px',
-                                                    background: i < 3 ? 'rgba(124, 58, 237, 0.12)' : 'rgba(16, 185, 129, 0.12)',
-                                                    color: i < 3 ? '#7c3aed' : '#10b981',
-                                                    fontSize: '0.725rem',
-                                                    fontWeight: 700,
-                                                }}
-                                            >
-                                                ✓ {i < 3 ? 'Top Seller' : 'Aktif'}
-                                            </span>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                </div>
+                                                    ✓ {i < 3 ? 'Top Seller' : 'Aktif'}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                )
             )}
 
             {/* TAB 2: RECENT TRANSACTIONS TABLE */}
             {bottomTableTab === 'recent' && (
-                <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: '0.8125rem' }}>
-                        <thead>
-                            <tr style={{ background: '#f8f9fc' }}>
-                                {['Pesanan & Produk', 'Waktu Transaksi', 'Wilayah', 'Total Nilai', 'Status'].map((h, idx) => (
-                                    <th
-                                        key={h}
-                                        style={{
-                                            padding: '0.75rem 1rem',
-                                            textAlign: idx === 4 ? 'right' : 'left',
-                                            fontWeight: 700,
-                                            color: 'var(--text-tertiary)',
-                                            fontSize: '0.725rem',
-                                            textTransform: 'uppercase',
-                                            letterSpacing: '0.04em',
-                                            borderTop: '1px solid #eef0f6',
-                                            borderBottom: '1px solid #eef0f6',
-                                            borderTopLeftRadius: idx === 0 ? '10px' : 0,
-                                            borderBottomLeftRadius: idx === 0 ? '10px' : 0,
-                                            borderTopRightRadius: idx === 4 ? '10px' : 0,
-                                            borderBottomRightRadius: idx === 4 ? '10px' : 0,
-                                        }}
-                                    >
-                                        {h}
-                                    </th>
-                                ))}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filteredRecent.map((tx) => {
-                                const st = tx.status.toLowerCase();
-                                const isSuccess = st === 'completed' || st === 'shipped';
-                                const isCancel = st === 'canceled';
-                                const pillColor = isSuccess ? '#10b981' : isCancel ? '#ef4444' : '#f59e0b';
-                                const pillBg = isSuccess ? 'rgba(16,185,129,0.12)' : isCancel ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.14)';
-                                return (
-                                    <tr key={tx.orderId}>
-                                        <td style={{ padding: '0.85rem 1rem', borderBottom: '1px solid #f2f3f8' }}>
-                                            <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>#{tx.orderId}</div>
-                                            <div
-                                                style={{
-                                                    fontSize: '0.75rem',
-                                                    color: 'var(--text-secondary)',
-                                                    maxWidth: '480px',
-                                                    overflow: 'hidden',
-                                                    textOverflow: 'ellipsis',
-                                                    whiteSpace: 'nowrap',
-                                                }}
-                                            >
-                                                {tx.productName} ({tx.qty} PCS)
-                                            </div>
-                                        </td>
-                                        <td style={{ padding: '0.85rem 1rem', borderBottom: '1px solid #f2f3f8', color: 'var(--text-secondary)', fontWeight: 500 }}>
-                                            {tx.dateStr}
-                                        </td>
-                                        <td style={{ padding: '0.85rem 1rem', borderBottom: '1px solid #f2f3f8', color: 'var(--text-primary)', fontWeight: 600 }}>
+                isMobile ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                        {filteredRecent.map((tx) => {
+                            const st = tx.status.toLowerCase();
+                            const isSuccess = st === 'completed' || st === 'shipped';
+                            const isCancel = st === 'canceled';
+                            const pillColor = isSuccess ? '#10b981' : isCancel ? '#ef4444' : '#f59e0b';
+                            const pillBg = isSuccess ? 'rgba(16,185,129,0.12)' : isCancel ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.14)';
+                            return (
+                                <div
+                                    key={tx.orderId}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        padding: '0.65rem 0.65rem',
+                                        background: '#f9fafd',
+                                        borderRadius: '12px',
+                                        border: '1px solid #eef0f6',
+                                        gap: '0.5rem',
+                                    }}
+                                >
+                                    <div style={{ minWidth: 0, flex: 1 }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '2px' }}>
+                                            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-primary)' }}>#{tx.orderId}</span>
+                                            <span style={{ fontSize: '0.66rem', color: 'var(--text-tertiary)' }}>· {tx.dateStr}</span>
+                                        </div>
+                                        <div style={{ fontSize: '0.735rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                            {tx.productName} ({tx.qty} PCS)
+                                        </div>
+                                        <div style={{ fontSize: '0.66rem', color: 'var(--text-tertiary)', marginTop: '1px' }}>
                                             {tx.province}
-                                        </td>
-                                        <td style={{ padding: '0.85rem 1rem', borderBottom: '1px solid #f2f3f8', fontWeight: 800, color: isCancel ? 'var(--text-tertiary)' : '#10b981' }}>
-                                            {tx.amount > 0 ? `+${formatRupiah(tx.amount)}` : '-'}
-                                        </td>
-                                        <td style={{ padding: '0.85rem 1rem', borderBottom: '1px solid #f2f3f8', textAlign: 'right' }}>
-                                            <span
-                                                style={{
-                                                    display: 'inline-flex',
-                                                    alignItems: 'center',
-                                                    gap: '4px',
-                                                    padding: '4px 10px',
-                                                    borderRadius: '9999px',
-                                                    background: pillBg,
-                                                    color: pillColor,
-                                                    fontSize: '0.725rem',
-                                                    fontWeight: 700,
-                                                    textTransform: 'capitalize',
-                                                }}
-                                            >
-                                                ● {tx.status}
-                                            </span>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                </div>
+                                        </div>
+                                    </div>
+                                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                                        <div style={{ fontSize: '0.825rem', fontWeight: 800, color: isCancel ? 'var(--text-tertiary)' : '#10b981' }}>
+                                            {tx.amount > 0 ? `+${formatCompact(tx.amount)}` : '-'}
+                                        </div>
+                                        <span style={{ display: 'inline-block', marginTop: '2px', padding: '1px 6px', borderRadius: '9999px', background: pillBg, color: pillColor, fontSize: '0.625rem', fontWeight: 700, textTransform: 'capitalize' }}>
+                                            ● {tx.status}
+                                        </span>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                ) : (
+                    <div style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, fontSize: '0.8125rem' }}>
+                            <thead>
+                                <tr style={{ background: '#f8f9fc' }}>
+                                    {['Pesanan & Produk', 'Waktu Transaksi', 'Wilayah', 'Total Nilai', 'Status'].map((h, idx) => (
+                                        <th
+                                            key={h}
+                                            style={{
+                                                padding: '0.75rem 1rem',
+                                                textAlign: idx === 4 ? 'right' : 'left',
+                                                fontWeight: 700,
+                                                color: 'var(--text-tertiary)',
+                                                fontSize: '0.725rem',
+                                                textTransform: 'uppercase',
+                                                letterSpacing: '0.04em',
+                                                borderTop: '1px solid #eef0f6',
+                                                borderBottom: '1px solid #eef0f6',
+                                                borderTopLeftRadius: idx === 0 ? '10px' : 0,
+                                                borderBottomLeftRadius: idx === 0 ? '10px' : 0,
+                                                borderTopRightRadius: idx === 4 ? '10px' : 0,
+                                                borderBottomRightRadius: idx === 4 ? '10px' : 0,
+                                            }}
+                                        >
+                                            {h}
+                                        </th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {filteredRecent.map((tx) => {
+                                    const st = tx.status.toLowerCase();
+                                    const isSuccess = st === 'completed' || st === 'shipped';
+                                    const isCancel = st === 'canceled';
+                                    const pillColor = isSuccess ? '#10b981' : isCancel ? '#ef4444' : '#f59e0b';
+                                    const pillBg = isSuccess ? 'rgba(16,185,129,0.12)' : isCancel ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.14)';
+                                    return (
+                                        <tr key={tx.orderId}>
+                                            <td style={{ padding: '0.85rem 1rem', borderBottom: '1px solid #f2f3f8' }}>
+                                                <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>#{tx.orderId}</div>
+                                                <div
+                                                    style={{
+                                                        fontSize: '0.75rem',
+                                                        color: 'var(--text-secondary)',
+                                                        maxWidth: '480px',
+                                                        overflow: 'hidden',
+                                                        textOverflow: 'ellipsis',
+                                                        whiteSpace: 'nowrap',
+                                                    }}
+                                                >
+                                                    {tx.productName} ({tx.qty} PCS)
+                                                </div>
+                                            </td>
+                                            <td style={{ padding: '0.85rem 1rem', borderBottom: '1px solid #f2f3f8', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                                                {tx.dateStr}
+                                            </td>
+                                            <td style={{ padding: '0.85rem 1rem', borderBottom: '1px solid #f2f3f8', color: 'var(--text-primary)', fontWeight: 600 }}>
+                                                {tx.province}
+                                            </td>
+                                            <td style={{ padding: '0.85rem 1rem', borderBottom: '1px solid #f2f3f8', fontWeight: 800, color: isCancel ? 'var(--text-tertiary)' : '#10b981' }}>
+                                                {tx.amount > 0 ? `+${formatRupiah(tx.amount)}` : '-'}
+                                            </td>
+                                            <td style={{ padding: '0.85rem 1rem', borderBottom: '1px solid #f2f3f8', textAlign: 'right' }}>
+                                                <span
+                                                    style={{
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: '4px',
+                                                        padding: '4px 10px',
+                                                        borderRadius: '9999px',
+                                                        background: pillBg,
+                                                        color: pillColor,
+                                                        fontSize: '0.725rem',
+                                                        fontWeight: 700,
+                                                        textTransform: 'capitalize',
+                                                    }}
+                                                >
+                                                    ● {tx.status}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                )
             )}
 
             {/* TAB 3: PAYMENT METHOD & AFFILIATE DISTRIBUTION */}
@@ -1083,7 +1214,7 @@ function Dashboard() {
     ];
 
     return (
-        <div style={{ paddingBottom: isMobile ? '5.5rem' : '2rem' }}>
+        <div style={{ paddingBottom: isMobile ? '5.5rem' : '2rem', width: '100%', maxWidth: '100%', overflowX: 'hidden' }}>
             {/* ════════════════════════════════════════════════════════════════
                 1. FINLO-STYLE INTERACTIVE TOP HEADER BAR
                 ════════════════════════════════════════════════════════════════ */}
@@ -1478,13 +1609,13 @@ function Dashboard() {
             <div
                 style={{
                     display: 'grid',
-                    gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(380px, 1fr))',
-                    gap: isMobile ? '0.875rem' : '1.25rem',
-                    marginBottom: isMobile ? '0.875rem' : '1.35rem',
+                    gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : 'repeat(auto-fit, minmax(380px, 1fr))',
+                    gap: isMobile ? '0.75rem' : '1.25rem',
+                    marginBottom: isMobile ? '0.75rem' : '1.35rem',
                 }}
             >
                 {/* LEFT CARD: EARNING OVERVIEW */}
-                <div style={{ ...cardSurface, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                <div style={{ ...cardSurface, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minWidth: 0, width: '100%', overflow: 'hidden' }}>
                     <div>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.4rem', flexWrap: 'wrap', marginBottom: isMobile ? '0.5rem' : '0.75rem' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
@@ -1635,7 +1766,7 @@ function Dashboard() {
                 </div>
 
                 {/* RIGHT CARD: KOMPOSISI & BREAKDOWN */}
-                <div style={{ ...cardSurface, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                <div style={{ ...cardSurface, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minWidth: 0, width: '100%', overflow: 'hidden' }}>
                     <div>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.4rem', flexWrap: 'wrap', marginBottom: isMobile ? '0.5rem' : '0.75rem' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
@@ -1790,14 +1921,14 @@ function Dashboard() {
             <div
                 style={{
                     display: 'grid',
-                    gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1.85fr) minmax(320px, 1fr)',
-                    gap: isMobile ? '0.875rem' : '1.25rem',
-                    marginBottom: isMobile ? '0.875rem' : '1.5rem',
+                    gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : 'minmax(0, 1.85fr) minmax(320px, 1fr)',
+                    gap: isMobile ? '0.75rem' : '1.25rem',
+                    marginBottom: isMobile ? '0.75rem' : '1.5rem',
                     alignItems: 'stretch',
                 }}
             >
                 {/* LEFT 2/3: CASH FLOW & PERFORMANCE INTERACTIVE BAR CHART */}
-                <div style={{ ...cardSurface, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                <div style={{ ...cardSurface, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minWidth: 0, width: '100%', overflow: 'hidden' }}>
                     <div>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.4rem', marginBottom: '0.5rem' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -1937,16 +2068,16 @@ function Dashboard() {
                     </div>
 
                     {/* Interactive Rounded Bar Chart (Single clean click handler & instant highlight) */}
-                    <div style={{ height: isMobile ? 210 : 245, marginLeft: '-0.5rem', marginRight: '-0.25rem' }}>
+                    <div style={{ height: isMobile ? 150 : 245, marginLeft: isMobile ? 0 : '-0.5rem', marginRight: 0 }}>
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart
                                 data={chartData}
-                                barSize={isMobile ? 16 : (isMonthly ? 34 : 14)}
+                                barSize={isMobile ? (isMonthly ? 18 : 8) : (isMonthly ? 34 : 14)}
                             >
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f2f7" />
                                 <XAxis
                                     dataKey="date"
-                                    tick={{ fill: 'var(--text-secondary)', fontSize: 11, fontWeight: 600 }}
+                                    tick={{ fill: 'var(--text-secondary)', fontSize: isMobile ? 9 : 11, fontWeight: 600 }}
                                     tickFormatter={(v) => formatShortAxis(v, isMonthly)}
                                     axisLine={false}
                                     tickLine={false}
@@ -1956,7 +2087,7 @@ function Dashboard() {
                                     tick={{ fill: 'var(--text-tertiary)', fontSize: 10, fontWeight: 500 }}
                                     axisLine={false}
                                     tickLine={false}
-                                    width={isMobile ? 38 : 54}
+                                    width={isMobile ? 36 : 54}
                                     tickFormatter={(v) =>
                                         v >= 1000000000
                                             ? (v / 1000000000).toFixed(1) + 'M'
@@ -1991,7 +2122,7 @@ function Dashboard() {
                                 />
                                 <Bar
                                     dataKey={cashFlowTab}
-                                    radius={[10, 10, 10, 10]}
+                                    radius={[8, 8, 8, 8]}
                                     cursor="pointer"
                                     isAnimationActive={false}
                                     onClick={handleBarClick}
@@ -2010,39 +2141,41 @@ function Dashboard() {
                     {activeBarPoint && (
                         <div
                             style={{
-                                marginTop: '0.75rem',
-                                padding: '0.7rem 1rem',
-                                borderRadius: '14px',
+                                marginTop: isMobile ? '0.5rem' : '0.75rem',
+                                padding: isMobile ? '0.5rem 0.65rem' : '0.7rem 1rem',
+                                borderRadius: '12px',
                                 background: '#f8f9fc',
                                 border: '1px solid #eef0f6',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                flexWrap: 'wrap',
-                                gap: '0.75rem',
-                                fontSize: '0.75rem',
+                                fontSize: isMobile ? '0.7rem' : '0.75rem',
                             }}
                         >
-                            <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
+                            <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: isMobile ? '0.35rem' : '0.5rem' }}>
                                 Rincian Periode {formatPeriodLabel(activeBarPoint.date, isMonthly)}:
                             </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-                                <span>Penerimaan Bersih: <strong style={{ color: '#06b6d4' }}>{formatCompact(activeBarPoint.labaKotor)}</strong></span>
-                                <span>Margin Kontribusi: <strong style={{ color: '#7c3aed' }}>{formatCompact(activeBarPoint.labaBersih)}</strong></span>
-                                <span>Unit Terjual: <strong style={{ color: '#10b981' }}>{activeBarPoint.fixTerbeli.toLocaleString('id-ID')} PCS</strong></span>
-                                <span>Dana Diterima: <strong style={{ color: '#f59e0b' }}>{activeBarPoint.sudahCair.toLocaleString('id-ID')}</strong></span>
-                                <span>Piutang Marketplace: <strong style={{ color: '#2563eb' }}>{activeBarPoint.belumCair.toLocaleString('id-ID')}</strong></span>
-                                <span>Batal/Retur: <strong style={{ color: '#ef4444' }}>{activeBarPoint.cancelRetur.toLocaleString('id-ID')}</strong></span>
+                            <div
+                                style={{
+                                    display: 'grid',
+                                    gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : 'repeat(auto-fit, minmax(130px, 1fr))',
+                                    gap: isMobile ? '0.35rem 0.6rem' : '0.5rem 1rem',
+                                    fontSize: isMobile ? '0.68rem' : '0.75rem',
+                                }}
+                            >
+                                <div>Penerimaan: <strong style={{ color: '#06b6d4' }}>{formatCompact(activeBarPoint.labaKotor)}</strong></div>
+                                <div>Margin: <strong style={{ color: '#7c3aed' }}>{formatCompact(activeBarPoint.labaBersih)}</strong></div>
+                                <div>Terjual: <strong style={{ color: '#10b981' }}>{activeBarPoint.fixTerbeli.toLocaleString('id-ID')} PCS</strong></div>
+                                <div>Dana Masuk: <strong style={{ color: '#f59e0b' }}>{activeBarPoint.sudahCair.toLocaleString('id-ID')}</strong></div>
+                                <div>Piutang: <strong style={{ color: '#2563eb' }}>{activeBarPoint.belumCair.toLocaleString('id-ID')}</strong></div>
+                                <div>Batal/Retur: <strong style={{ color: '#ef4444' }}>{activeBarPoint.cancelRetur.toLocaleString('id-ID')}</strong></div>
                             </div>
                         </div>
                     )}
                 </div>
 
                 {/* RIGHT 1/3: STATUS & INSIGHT UTAMA */}
-                <div style={{ ...cardSurface, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                <div style={{ ...cardSurface, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minWidth: 0, width: '100%', overflow: 'hidden' }}>
                     <div>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: isMobile ? '0.6rem' : '0.9rem' }}>
-                            <h3 style={{ fontSize: isMobile ? '0.9rem' : '1rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: isMobile ? '0.55rem' : '0.9rem' }}>
+                            <h3 style={{ fontSize: isMobile ? '0.875rem' : '1rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
                                 Status & Insight Utama
                             </h3>
                             <div
@@ -2081,7 +2214,7 @@ function Dashboard() {
                             </div>
                         </div>
 
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '0.45rem' : '0.7rem' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '0.38rem' : '0.7rem' }}>
                             {rightPanelItems.map((item) => {
                                 const ItemIcon = item.icon;
                                 return (
@@ -2089,11 +2222,15 @@ function Dashboard() {
                                         key={item.id}
                                         onClick={() => navigate('/rangkuman')}
                                         style={{
-                                            padding: isMobile ? '0.6rem 0.75rem' : '0.85rem 1rem',
-                                            borderRadius: isMobile ? '12px' : '16px',
+                                            padding: isMobile ? '0.5rem 0.65rem' : '0.85rem 1rem',
+                                            borderRadius: isMobile ? '10px' : '16px',
                                             background: '#f9fafd',
                                             border: '1px solid #eef0f6',
                                             cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between',
+                                            gap: '0.45rem',
                                             transition: 'border-color 0.15s ease, background 0.15s ease',
                                         }}
                                         onMouseEnter={(e) => {
@@ -2105,46 +2242,45 @@ function Dashboard() {
                                             e.currentTarget.style.borderColor = '#eef0f6';
                                         }}
                                     >
-                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', marginBottom: isMobile ? '0.35rem' : '0.6rem' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '0.5rem' : '0.7rem', minWidth: 0 }}>
-                                                <div
-                                                    style={{
-                                                        width: isMobile ? 28 : 36,
-                                                        height: isMobile ? 28 : 36,
-                                                        borderRadius: isMobile ? '8px' : '10px',
-                                                        background: `${item.color}15`,
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        flexShrink: 0,
-                                                    }}
-                                                >
-                                                    <ItemIcon size={isMobile ? 14 : 17} color={item.color} strokeWidth={2.2} />
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '0.45rem' : '0.7rem', minWidth: 0, flex: 1 }}>
+                                            <div
+                                                style={{
+                                                    width: isMobile ? 26 : 36,
+                                                    height: isMobile ? 26 : 36,
+                                                    borderRadius: isMobile ? '6px' : '10px',
+                                                    background: `${item.color}15`,
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    flexShrink: 0,
+                                                }}
+                                            >
+                                                <ItemIcon size={isMobile ? 13 : 17} color={item.color} strokeWidth={2.2} />
+                                            </div>
+                                            <div style={{ minWidth: 0, flex: 1 }}>
+                                                <div style={{ fontSize: isMobile ? '0.75rem' : '0.835rem', fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                    {item.title}
                                                 </div>
-                                                <div style={{ minWidth: 0 }}>
-                                                    <div style={{ fontSize: isMobile ? '0.78rem' : '0.835rem', fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                        {item.title}
-                                                    </div>
-                                                    <div style={{ fontSize: isMobile ? '0.66rem' : '0.715rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                        {item.subtitle}
-                                                    </div>
+                                                <div style={{ fontSize: isMobile ? '0.64rem' : '0.715rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                    {item.subtitle}
                                                 </div>
                                             </div>
-                                            <ChevronRight size={14} color="var(--text-tertiary)" style={{ flexShrink: 0 }} />
                                         </div>
 
-                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                            <span style={{ fontSize: isMobile ? '0.85rem' : '0.925rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                                            <div style={{ fontSize: isMobile ? '0.78rem' : '0.925rem', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.2 }}>
                                                 {item.amount}
-                                            </span>
+                                            </div>
                                             <span
                                                 style={{
-                                                    fontSize: isMobile ? '0.625rem' : '0.675rem',
+                                                    fontSize: isMobile ? '0.58rem' : '0.675rem',
                                                     fontWeight: 700,
-                                                    padding: isMobile ? '2px 7px' : '3px 9px',
+                                                    padding: isMobile ? '1px 5px' : '3px 9px',
                                                     borderRadius: '9999px',
                                                     background: `${item.badgeColor}15`,
                                                     color: item.badgeColor,
+                                                    display: 'inline-block',
+                                                    marginTop: '1px',
                                                 }}
                                             >
                                                 {item.badge}

@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback, useDeferredValue } from 'react';
 import * as XLSX from 'xlsx';
-import { Search, PackageCheck, Undo2, Package, AlertTriangle, Calendar, Download, ChevronLeft, ChevronRight, Camera, Trash2, Loader, XCircle, ArrowUpDown, ArrowUp, ArrowDown, X, ExternalLink } from 'lucide-react';
+import { Search, PackageCheck, Undo2, Package, AlertTriangle, Calendar, Download, ChevronLeft, ChevronRight, Camera, Trash2, Loader, XCircle, ArrowUpDown, ArrowUp, ArrowDown, X, ExternalLink, RotateCcw } from 'lucide-react';
 import { useProcessedOrders } from '../hooks/useProcessedOrders';
 import { useDataCache } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -17,6 +17,23 @@ function PengembalianTable() {
   const [filterStartDate, setFilterStartDate] = useState('');
   const [filterEndDate, setFilterEndDate] = useState('');
   const [showDateRangePicker, setShowDateRangePicker] = useState(false);
+  const [windowWidth, setWindowWidth] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : 1200));
+  useEffect(() => {
+    function handleResize() { setWindowWidth(window.innerWidth); }
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  const isMobile = windowWidth < 768;
+
+  const hasAnyFilter = Boolean(filterStartDate || filterEndDate || search.trim() || filterStatus !== 'all');
+  const handleResetAllFilters = () => {
+    setFilterStartDate('');
+    setFilterEndDate('');
+    setSearch('');
+    setFilterStatus('all');
+    setCurrentPage(1);
+  };
+
   const [rowsPerPage, setRowsPerPage] = useState(20);
   const [currentPage, setCurrentPage] = useState(1);
   const datePickerRef = useRef(null);
@@ -273,95 +290,280 @@ function PengembalianTable() {
   }, [ordersByTrackingId, returnByTrackingId]);
 
   return (
-    <div>
-      <div className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
-        <div>
-          <h2 className="gradient-text" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <PackageCheck size={24} style={{ color: '#7c3aed' }} />
-            Pengembalian
-          </h2>
-          <p>{displayData.length.toLocaleString('id-ID')} data</p>
-        </div>
-        <div style={{ position: 'relative', maxWidth: '20rem', flex: '1' }}>
-          <Search size={16} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-tertiary)' }} />
-          <input type="text" placeholder="Cari resi..." value={search}
-            onChange={e => { setSearch(e.target.value); setCurrentPage(1); }} className="search-input" />
-        </div>
-      </div>
-
-      {/* ── Toolbar ─────────────────────────────────────────────── */}
-      <div style={{ marginBottom: '0.75rem', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.5rem' }}>
-        {/* Date Range Filter */}
-        <div style={{ position: 'relative' }} ref={datePickerRef}>
-          <button type="button" onClick={() => setShowDateRangePicker(!showDateRangePicker)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 0.75rem',
-              borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)',
-              background: (filterStartDate || filterEndDate) ? 'rgba(124,58,237,0.15)' : 'var(--bg-glass)',
-              color: (filterStartDate || filterEndDate) ? '#a78bfa' : 'var(--text-secondary)',
-              cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600,
-            }}>
-            <Calendar size={13} />
-            {(filterStartDate || filterEndDate) ? `${filterStartDate || '...'} → ${filterEndDate || '...'}` : 'Tanggal'}
-          </button>
-          {showDateRangePicker && (
-            <div style={{ position: 'absolute', zIndex: 50, marginTop: '0.5rem' }}>
-              <DateRangePicker startDate={filterStartDate || null} endDate={filterEndDate || null} onChange={({ startDate, endDate }) => {
-                setFilterStartDate(startDate); setFilterEndDate(endDate); setCurrentPage(1);
-              }} onClose={() => setShowDateRangePicker(false)} />
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      height: isMobile ? 'calc(100vh - 8.35rem)' : 'calc(100vh - 1.3rem)',
+      overflow: 'hidden',
+    }}>
+      {/* ── Top Header Toolbar (Separate Card) ── */}
+      <div
+        style={{
+          flexShrink: 0,
+          background: '#ffffff',
+          borderRadius: '12px',
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02)',
+          padding: isMobile ? '0.55rem 0.65rem' : '0.55rem 0.85rem',
+          marginBottom: '0.5rem',
+          display: 'flex',
+          flexDirection: isMobile ? 'column' : 'row',
+          alignItems: isMobile ? 'stretch' : 'center',
+          justifyContent: 'space-between',
+          gap: isMobile ? '0.5rem' : '0.85rem',
+        }}
+      >
+        {/* Left: Icon + Title + Count Badge */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: isMobile ? 'space-between' : 'flex-start', gap: '0.65rem', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+            <div
+              style={{
+                width: isMobile ? 28 : 32,
+                height: isMobile ? 28 : 32,
+                borderRadius: '8px',
+                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#ffffff',
+                flexShrink: 0,
+                boxShadow: '0 2px 6px rgba(99, 102, 241, 0.22)',
+              }}
+            >
+              <PackageCheck size={isMobile ? 15 : 17} strokeWidth={2.3} />
             </div>
-          )}
+            <h2
+              style={{
+                margin: 0,
+                fontSize: isMobile ? '0.925rem' : '1.025rem',
+                fontWeight: 800,
+                color: '#0f172a',
+                letterSpacing: '-0.02em',
+              }}
+            >
+              Pengembalian
+            </h2>
+          </div>
+          <span
+            style={{
+              fontSize: isMobile ? '0.675rem' : '0.725rem',
+              fontWeight: 600,
+              color: '#475569',
+              background: '#f1f5f9',
+              border: '1px solid #e2e8f0',
+              padding: '2px 8px',
+              borderRadius: '9999px',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {displayData.length.toLocaleString('id-ID')} data
+          </span>
         </div>
 
-        {/* Status Filter */}
-        <select value={filterStatus} onChange={e => { setFilterStatus(e.target.value); setCurrentPage(1); }}
-          style={{
-            padding: '0.5rem 0.75rem', fontSize: '0.75rem', fontWeight: 600,
-            borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)',
-            background: filterStatus !== 'all' ? 'rgba(124,58,237,0.15)' : 'var(--bg-glass)',
-            color: filterStatus !== 'all' ? '#a78bfa' : 'var(--text-secondary)', cursor: 'pointer',
-          }}>
-          <option value="all">Semua Status ({statusCounts.all})</option>
-          <option value="retur_pembeli">Retur Pembeli ({statusCounts.retur_pembeli})</option>
-          <option value="cancel">Cancel ({statusCounts.cancel})</option>
-          <option value="retur_refund">Retur/Refund ({statusCounts.retur_refund})</option>
-          <option value="pengembalian">Pengembalian Paket ({statusCounts.pengembalian})</option>
-          <option value="unknown">Tidak Dikenal ({statusCounts.unknown})</option>
-        </select>
+        {/* Right: Search Box (Pepet Kanan) + Filters + Actions */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.45rem',
+          flexWrap: isMobile ? 'wrap' : 'nowrap',
+          width: isMobile ? '100%' : 'auto',
+          justifyContent: isMobile ? 'stretch' : 'flex-end',
+        }}>
+          {/* Search Input */}
+          <div style={{ position: 'relative', width: isMobile ? '100%' : '180px', flexShrink: 0 }}>
+            <Search size={14} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: search ? '#6366f1' : '#94a3b8', pointerEvents: 'none' }} />
+            <input
+              type="text"
+              placeholder="Cari resi..."
+              value={search}
+              onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
+              style={{
+                width: '100%',
+                height: '34px',
+                padding: '0 1.8rem 0 2.2rem',
+                borderRadius: '8px',
+                border: search ? '1px solid #6366f1' : '1px solid #e2e8f0',
+                background: search ? '#f5f3ff' : '#f8fafc',
+                color: '#0f172a',
+                fontSize: '0.775rem',
+                fontWeight: 500,
+                outline: 'none',
+                transition: 'all 0.15s ease',
+              }}
+            />
+            {search && (
+              <button type="button" onClick={() => { setSearch(''); setCurrentPage(1); }}
+                style={{ position: 'absolute', right: '0.55rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: '0.15rem', display: 'flex' }}>
+                <X size={13} />
+              </button>
+            )}
+          </div>
 
-        {/* Download */}
-        <button onClick={handleDownloadExcel} type="button" className="btn-primary"
-          style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', padding: '0.5rem 0.75rem', fontSize: '0.75rem' }}>
-          <Download size={13} /> Download
-        </button>
+          {/* Date Range Picker */}
+          <div style={{ position: 'relative', flex: isMobile ? 1 : 'none' }} ref={datePickerRef}>
+            <button
+              type="button"
+              onClick={() => setShowDateRangePicker(!showDateRangePicker)}
+              style={{
+                width: isMobile ? '100%' : 'auto',
+                height: '34px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.4rem',
+                padding: '0 0.75rem',
+                borderRadius: '8px',
+                border: (filterStartDate || filterEndDate) ? '1px solid #6366f1' : '1px solid #e2e8f0',
+                background: (filterStartDate || filterEndDate) ? '#f5f3ff' : '#ffffff',
+                color: (filterStartDate || filterEndDate) ? '#6366f1' : '#334155',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <Calendar size={13} style={{ color: (filterStartDate || filterEndDate) ? '#6366f1' : '#64748b' }} />
+              <span>{(filterStartDate && filterEndDate) ? (`${filterStartDate} — ${filterEndDate}`) : 'Tanggal'}</span>
+              {(filterStartDate || filterEndDate) && (
+                <span
+                  onClick={(e) => { e.stopPropagation(); setFilterStartDate(''); setFilterEndDate(''); setCurrentPage(1); }}
+                  title="Hapus filter tanggal"
+                  style={{ marginLeft: '2px', display: 'inline-flex', color: '#6366f1', padding: '1px' }}
+                >
+                  <X size={11} />
+                </span>
+              )}
+            </button>
+            {showDateRangePicker && (
+              <div style={{ position: 'absolute', top: '105%', left: isMobile ? 0 : 'auto', right: isMobile ? 'auto' : 0, zIndex: 120 }}>
+                <DateRangePicker startDate={filterStartDate || null} endDate={filterEndDate || null} onChange={({ startDate, endDate }) => {
+                  setFilterStartDate(startDate); setFilterEndDate(endDate); setCurrentPage(1);
+                }} onClose={() => setShowDateRangePicker(false)} />
+              </div>
+            )}
+          </div>
 
-        {/* Scan Button */}
-        <button onClick={() => setShowScanner(true)} type="button"
-          style={{
-            display: 'flex', alignItems: 'center', gap: '0.375rem', padding: '0.5rem 0.75rem', fontSize: '0.75rem',
-            fontWeight: 700, borderRadius: 'var(--radius-md)', border: '2px solid #7c3aed',
-            background: 'linear-gradient(135deg, #7c3aed 0%, #a855f7 100%)', color: '#fff',
-            cursor: 'pointer', boxShadow: '0 2px 8px rgba(124,58,237,0.3)',
-          }}>
-          <Camera size={13} /> Scan Resi
-        </button>
+          {/* Status Filter */}
+          <select value={filterStatus} onChange={e => { setFilterStatus(e.target.value); setCurrentPage(1); }}
+            style={{
+              height: '34px',
+              padding: '0 0.65rem',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              borderRadius: '8px',
+              border: filterStatus !== 'all' ? '1px solid #6366f1' : '1px solid #e2e8f0',
+              background: filterStatus !== 'all' ? '#f5f3ff' : '#ffffff',
+              color: filterStatus !== 'all' ? '#6366f1' : '#334155',
+              cursor: 'pointer',
+              outline: 'none',
+            }}>
+            <option value="all">Semua Status ({statusCounts.all})</option>
+            <option value="retur_pembeli">Retur Pembeli ({statusCounts.retur_pembeli})</option>
+            <option value="cancel">Cancel ({statusCounts.cancel})</option>
+            <option value="retur_refund">Retur/Refund ({statusCounts.retur_refund})</option>
+            <option value="pengembalian">Pengembalian Paket ({statusCounts.pengembalian})</option>
+            <option value="unknown">Tidak Dikenal ({statusCounts.unknown})</option>
+          </select>
 
-        {/* Remove Duplicate */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-          <input type="checkbox" id="removeDuplicateResi" checked={removeDuplicateResi}
-            onChange={e => setRemoveDuplicateResi(e.target.checked)}
-            style={{ accentColor: 'var(--accent-primary)', width: '0.875rem', height: '0.875rem' }} />
-          <label htmlFor="removeDuplicateResi" style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }}>
-            Hapus Ganda
+          {/* Remove Duplicate Checkbox */}
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontSize: '0.75rem', color: '#475569', fontWeight: 500, margin: '0 0.2rem', whiteSpace: 'nowrap' }}>
+            <input type="checkbox" id="removeDuplicateResi" checked={removeDuplicateResi}
+              onChange={e => setRemoveDuplicateResi(e.target.checked)}
+              style={{ accentColor: '#6366f1', width: '0.85rem', height: '0.85rem' }} />
+            <span>Hapus Ganda</span>
           </label>
+
+          {/* Reset Button */}
+          {hasAnyFilter && (
+            <button
+              type="button"
+              onClick={handleResetAllFilters}
+              title="Reset semua filter"
+              style={{
+                height: '34px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                padding: '0 0.65rem',
+                borderRadius: '8px',
+                border: '1px solid #fecaca',
+                background: '#fff1f2',
+                color: '#e11d48',
+                fontSize: '0.725rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <RotateCcw size={12} />
+              <span>Reset</span>
+            </button>
+          )}
+
+          {!isMobile && <div style={{ height: '20px', width: '1px', background: '#e2e8f0', margin: '0 2px' }} />}
+
+          {/* Scan Button */}
+          <button onClick={() => setShowScanner(true)} type="button"
+            style={{
+              height: '34px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              padding: '0 0.75rem',
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              borderRadius: '8px',
+              border: 'none',
+              background: '#0f172a',
+              color: '#ffffff',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}>
+            <Camera size={13} />
+            <span>Scan Resi</span>
+          </button>
+
+          {/* Download Button */}
+          <button onClick={handleDownloadExcel} type="button"
+            style={{
+              height: '34px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              padding: '0 0.85rem',
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              borderRadius: '8px',
+              border: 'none',
+              background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
+              color: '#ffffff',
+              cursor: 'pointer',
+              boxShadow: '0 2px 6px rgba(79, 70, 229, 0.28)',
+              whiteSpace: 'nowrap',
+            }}>
+            <Download size={13} />
+            <span>Download</span>
+          </button>
         </div>
       </div>
 
-      {/* ── Table ────────────────────────────────────────────────── */}
-      <div className="modern-table-wrapper">
-        <div style={{ overflowX: 'auto' }}>
-          <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
-            <table className="modern-table">
+      {/* ── Table Container (Separate Card Filling All Remaining Space) ── */}
+      <div
+        className="modern-table-wrapper"
+        style={{
+          flex: 1,
+          minHeight: 0,
+          background: '#ffffff',
+          borderRadius: '12px',
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02)',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+          <table className="modern-table compact-table" style={{ width: '100%', minWidth: isMobile ? '700px' : '100%' }}>
               <thead>
                 <tr>
                   <th style={{ width: '3rem' }}>No</th>
@@ -446,56 +648,94 @@ function PengembalianTable() {
               </tbody>
             </table>
           </div>
-        </div>
-      </div>
 
-      {/* ── Pagination ───────────────────────────────────────────── */}
-      {(() => {
-        const totalPages = Math.max(1, Math.ceil(displayData.length / rowsPerPage));
-        const safePage = Math.min(currentPage, totalPages);
-        const startIdx = (safePage - 1) * rowsPerPage;
-        const endIdx = Math.min(startIdx + rowsPerPage, displayData.length);
-        const maxButtons = 7;
-        let startPage = Math.max(1, safePage - Math.floor(maxButtons / 2));
-        let endPage = Math.min(totalPages, startPage + maxButtons - 1);
-        if (endPage - startPage + 1 < maxButtons) startPage = Math.max(1, endPage - maxButtons + 1);
-        const pageButtons = [];
-        for (let p = startPage; p <= endPage; p++) pageButtons.push(p);
-        const pageBtn = (label, page, disabled) => (
-          <button key={label} type="button" disabled={disabled} onClick={() => setCurrentPage(page)}
-            style={{ padding: '0.375rem 0.625rem', fontSize: '0.75rem', fontWeight: 600, borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)', background: 'var(--bg-glass)', color: disabled ? 'var(--text-tertiary)' : 'var(--text-secondary)', cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.5 : 1 }}>
-            {label}
-          </button>
-        );
-        return (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginTop: '1rem', padding: '0.75rem 1rem', background: 'var(--bg-glass)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>Tampilkan</span>
-              <select value={rowsPerPage} onChange={e => { setRowsPerPage(Number(e.target.value)); setCurrentPage(1); }}
-                style={{ padding: '0.25rem 0.5rem', fontSize: '0.8125rem', fontWeight: 600, borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)', background: 'var(--bg-glass)', color: 'var(--text-secondary)', cursor: 'pointer' }}>
-                {[10, 20, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}
-              </select>
-              <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                | {displayData.length > 0 ? `${startIdx + 1}–${endIdx}` : '0'} dari {displayData.length.toLocaleString('id-ID')} data
-              </span>
-            </div>
-            {totalPages > 1 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                {pageBtn('«', 1, safePage <= 1)}
-                {pageBtn('‹', safePage - 1, safePage <= 1)}
-                {pageButtons.map(p => (
-                  <button key={p} type="button" onClick={() => setCurrentPage(p)}
-                    style={{ padding: '0.375rem 0.625rem', fontSize: '0.75rem', fontWeight: 600, borderRadius: 'var(--radius-sm)', border: p === safePage ? '1px solid var(--accent-primary)' : '1px solid var(--border-subtle)', background: p === safePage ? 'var(--accent-primary)' : 'var(--bg-glass)', color: p === safePage ? '#fff' : 'var(--text-secondary)', cursor: 'pointer' }}>
-                    {p}
-                  </button>
-                ))}
-                {pageBtn('›', safePage + 1, safePage >= totalPages)}
-                {pageBtn('»', totalPages, safePage >= totalPages)}
+          {/* ── Compact Pagination Integrated Footer ── */}
+          {(() => {
+            const totalPages = Math.max(1, Math.ceil(displayData.length / rowsPerPage));
+            const safePage = Math.min(currentPage, totalPages);
+            const startIdx = (safePage - 1) * rowsPerPage;
+            const endIdx = Math.min(startIdx + rowsPerPage, displayData.length);
+            const maxButtons = isMobile ? 3 : 7;
+            let startPage = Math.max(1, safePage - Math.floor(maxButtons / 2));
+            let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+            if (endPage - startPage + 1 < maxButtons) startPage = Math.max(1, endPage - maxButtons + 1);
+            const pageButtons = [];
+            for (let p = startPage; p <= endPage; p++) pageButtons.push(p);
+
+            return (
+              <div style={{
+                flexShrink: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '0.4rem',
+                padding: isMobile ? '0.35rem 0.6rem' : '0.4rem 0.85rem',
+                background: '#fcfdfe',
+                borderTop: '1px solid #eef0f6',
+                fontSize: isMobile ? '0.7rem' : '0.75rem',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Tampilkan</span>
+                  <select
+                    value={rowsPerPage}
+                    onChange={e => { setRowsPerPage(Number(e.target.value)); setCurrentPage(1); }}
+                    style={{
+                      padding: '2px 5px',
+                      height: '25px',
+                      fontSize: '0.735rem',
+                      fontWeight: 600,
+                      borderRadius: '6px',
+                      border: '1px solid #e2e8f0',
+                      background: '#ffffff',
+                      color: 'var(--text-primary)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {[10, 20, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}
+                  </select>
+                  <span style={{ color: 'var(--text-tertiary)' }}>
+                    | {displayData.length > 0 ? `${startIdx + 1}–${endIdx}` : '0'} dari <strong style={{ color: 'var(--text-primary)' }}>{displayData.length.toLocaleString('id-ID')}</strong>
+                  </span>
+                </div>
+
+                {totalPages > 1 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                    <button type="button" disabled={safePage <= 1} onClick={() => setCurrentPage(1)}
+                      style={{ height: 25, minWidth: 25, padding: '0 4px', fontSize: '0.7rem', fontWeight: 700, borderRadius: '5px', border: '1px solid #e2e8f0', background: '#ffffff', color: safePage <= 1 ? 'var(--text-tertiary)' : 'var(--text-secondary)', cursor: safePage <= 1 ? 'default' : 'pointer', opacity: safePage <= 1 ? 0.4 : 1 }}>
+                      «
+                    </button>
+                    <button type="button" disabled={safePage <= 1} onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      style={{ height: 25, minWidth: 25, padding: '0 4px', fontSize: '0.7rem', fontWeight: 700, borderRadius: '5px', border: '1px solid #e2e8f0', background: '#ffffff', color: safePage <= 1 ? 'var(--text-tertiary)' : 'var(--text-secondary)', cursor: safePage <= 1 ? 'default' : 'pointer', opacity: safePage <= 1 ? 0.4 : 1 }}>
+                      ‹
+                    </button>
+                    {pageButtons.map(p => (
+                      <button key={p} type="button" onClick={() => setCurrentPage(p)}
+                        style={{
+                          height: 25, minWidth: 25, padding: '0 5px', fontSize: '0.725rem', fontWeight: 700,
+                          borderRadius: '5px',
+                          border: p === safePage ? '1px solid #7c3aed' : '1px solid #e2e8f0',
+                          background: p === safePage ? '#7c3aed' : '#ffffff',
+                          color: p === safePage ? '#ffffff' : 'var(--text-secondary)',
+                          cursor: 'pointer',
+                        }}>
+                        {p}
+                      </button>
+                    ))}
+                    <button type="button" disabled={safePage >= totalPages} onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      style={{ height: 25, minWidth: 25, padding: '0 4px', fontSize: '0.7rem', fontWeight: 700, borderRadius: '5px', border: '1px solid #e2e8f0', background: '#ffffff', color: safePage >= totalPages ? 'var(--text-tertiary)' : 'var(--text-secondary)', cursor: safePage >= totalPages ? 'default' : 'pointer', opacity: safePage >= totalPages ? 0.4 : 1 }}>
+                      ›
+                    </button>
+                    <button type="button" disabled={safePage >= totalPages} onClick={() => setCurrentPage(totalPages)}
+                      style={{ height: 25, minWidth: 25, padding: '0 4px', fontSize: '0.7rem', fontWeight: 700, borderRadius: '5px', border: '1px solid #e2e8f0', background: '#ffffff', color: safePage >= totalPages ? 'var(--text-tertiary)' : 'var(--text-secondary)', cursor: safePage >= totalPages ? 'default' : 'pointer', opacity: safePage >= totalPages ? 0.4 : 1 }}>
+                      »
+                    </button>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        );
-      })()}
+            );
+          })()}
+        </div>
 
       {/* ── Order Detail Popup Modal ──────────────────────────────── */}
       {selectedResi && (() => {

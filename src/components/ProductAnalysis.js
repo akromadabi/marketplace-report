@@ -1,5 +1,5 @@
-import React, { useMemo, useState, useCallback } from 'react';
-import { BarChart3, ChevronUp, ChevronDown, ArrowUpDown, MapPin, Package, X, Copy, Check } from 'lucide-react';
+import React, { useMemo, useState, useCallback, useEffect } from 'react';
+import { BarChart3, ChevronUp, ChevronDown, ArrowUpDown, MapPin, Package, X, Copy, Check, Search, RotateCcw } from 'lucide-react';
 import { useProcessedOrders } from '../hooks/useProcessedOrders';
 import { useDataCache } from '../contexts/DataContext';
 
@@ -62,6 +62,16 @@ function ProductAnalysis() {
   // Popup for order IDs
   const [popup, setPopup] = useState(null); // { title, orderIds }
   const [copiedId, setCopiedId] = useState(null);
+
+  const [windowWidth, setWindowWidth] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : 1200));
+  useEffect(() => {
+    function handleResize() { setWindowWidth(window.innerWidth); }
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  const isMobile = windowWidth < 768;
+
+  const [searchQuery, setSearchQuery] = useState('');
 
   const openPopup = useCallback((title, orders) => setPopup({ title, orders }), []);
   const closePopup = useCallback(() => setPopup(null), []);
@@ -313,6 +323,56 @@ function ProductAnalysis() {
     });
   }, [regionalAggregated, regionalSort]);
 
+  const filteredFlatSku = useMemo(() => {
+    if (!searchQuery.trim()) return sortedFlatSku;
+    const q = searchQuery.toLowerCase().trim();
+    return sortedFlatSku.filter(item =>
+      (item.parentSku && item.parentSku.toLowerCase().includes(q)) ||
+      (item.variation && item.variation.toLowerCase().includes(q)) ||
+      (item.skuId && item.skuId.toLowerCase().includes(q)) ||
+      (item.productName && item.productName.toLowerCase().includes(q))
+    );
+  }, [sortedFlatSku, searchQuery]);
+
+  const filteredSku = useMemo(() => {
+    if (!searchQuery.trim()) return sortedSkuAggregated;
+    const q = searchQuery.toLowerCase().trim();
+    return sortedSkuAggregated.filter(skuObj => {
+      if (skuObj.sku && skuObj.sku.toLowerCase().includes(q)) return true;
+      if (skuObj.productName && skuObj.productName.toLowerCase().includes(q)) return true;
+      for (const v of skuObj.variations.values()) {
+        if (v.variation && v.variation.toLowerCase().includes(q)) return true;
+        if (v.skuId && v.skuId.toLowerCase().includes(q)) return true;
+      }
+      return false;
+    });
+  }, [sortedSkuAggregated, searchQuery]);
+
+  const totalQuantityFiltered = useMemo(() => {
+    return filteredSku.reduce((sum, s) => sum + s.totalQuantity, 0);
+  }, [filteredSku]);
+
+  const filteredFlatRegional = useMemo(() => {
+    if (!searchQuery.trim()) return sortedFlatRegional;
+    const q = searchQuery.toLowerCase().trim();
+    return sortedFlatRegional.filter(item =>
+      (item.parentProvince && item.parentProvince.toLowerCase().includes(q)) ||
+      (item.city && item.city.toLowerCase().includes(q))
+    );
+  }, [sortedFlatRegional, searchQuery]);
+
+  const filteredRegional = useMemo(() => {
+    if (!searchQuery.trim()) return sortedRegional;
+    const q = searchQuery.toLowerCase().trim();
+    return sortedRegional.filter(provObj => {
+      if (provObj.province && provObj.province.toLowerCase().includes(q)) return true;
+      for (const c of provObj.cities.values()) {
+        if (c.city && c.city.toLowerCase().includes(q)) return true;
+      }
+      return false;
+    });
+  }, [sortedRegional, searchQuery]);
+
   function RegSortIcon({ column }) {
     if (regionalSort.column !== column) return <ArrowUpDown size={12} style={{ opacity: 0.3, marginLeft: '4px' }} />;
     return regionalSort.direction === 'asc'
@@ -435,336 +495,581 @@ function ProductAnalysis() {
   }
 
   return (
-
-    <div>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: isMobile ? 'calc(100vh - 8.35rem)' : 'calc(100vh - 1.3rem)',
+        overflow: 'hidden',
+      }}
+    >
       <OrderPopup />
-      <div className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
-        <div>
-          <h2 className="gradient-text" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <BarChart3 size={24} style={{ color: '#7c3aed' }} />
-            Wawasan
-          </h2>
-          <p>{viewMode === 'sku' ? `${skuAggregated.length} SKU • ${totalQuantityAllSkus.toLocaleString('id-ID')} total terjual` : `${regionalAggregated.length} Provinsi`}</p>
+
+      {/* ── Top Header Toolbar (Separate Card) ── */}
+      <div
+        style={{
+          flexShrink: 0,
+          background: '#ffffff',
+          borderRadius: '12px',
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02)',
+          padding: isMobile ? '0.55rem 0.65rem' : '0.55rem 0.85rem',
+          marginBottom: '0.5rem',
+          display: 'flex',
+          flexDirection: isMobile ? 'column' : 'row',
+          alignItems: isMobile ? 'stretch' : 'center',
+          justifyContent: 'space-between',
+          gap: isMobile ? '0.5rem' : '0.85rem',
+        }}
+      >
+        {/* Left: Icon + Title + Count Badge */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: isMobile ? 'space-between' : 'flex-start', gap: '0.65rem', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+            <div
+              style={{
+                width: isMobile ? 28 : 32,
+                height: isMobile ? 28 : 32,
+                borderRadius: '8px',
+                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#ffffff',
+                flexShrink: 0,
+                boxShadow: '0 2px 6px rgba(99, 102, 241, 0.22)',
+              }}
+            >
+              <BarChart3 size={isMobile ? 15 : 17} strokeWidth={2.3} />
+            </div>
+            <h2
+              style={{
+                margin: 0,
+                fontSize: isMobile ? '0.925rem' : '1.025rem',
+                fontWeight: 800,
+                color: '#0f172a',
+                letterSpacing: '-0.02em',
+              }}
+            >
+              Analisis Produk
+            </h2>
+          </div>
+          <span
+            style={{
+              fontSize: isMobile ? '0.675rem' : '0.725rem',
+              fontWeight: 600,
+              color: '#475569',
+              background: '#f1f5f9',
+              border: '1px solid #e2e8f0',
+              padding: '2px 8px',
+              borderRadius: '9999px',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {viewMode === 'sku' ? (
+              isFlatView ? `${filteredFlatSku.length} variasi` : `${filteredSku.length} SKU • ${totalQuantityFiltered.toLocaleString('id-ID')} terjual`
+            ) : (
+              isFlatView ? `${filteredFlatRegional.length} kota` : `${filteredRegional.length} provinsi`
+            )}
+          </span>
         </div>
 
-        {/* Controls */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '1rem' }}>
-          {/* Flat List Toggle (Checkbox) */}
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.8125rem', fontWeight: 600, color: isFlatView ? '#a78bfa' : 'var(--text-secondary)', background: isFlatView ? 'rgba(124,58,237,0.1)' : 'var(--bg-glass)', padding: '0.4rem 0.8rem', borderRadius: 'var(--radius-md)', border: isFlatView ? '1px solid rgba(167,139,250,0.4)' : '1px solid var(--border-subtle)', transition: 'all 0.2s' }}>
-            <input type="checkbox" checked={isFlatView} onChange={() => setIsFlatView(!isFlatView)} style={{ accentColor: '#7c3aed', width: '1rem', height: '1rem', cursor: 'pointer', margin: 0 }} />
+        {/* Right: Search Box (Pepet Kanan) + View Mode + Flat List Toggle + Reset */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.45rem',
+            flexWrap: isMobile ? 'wrap' : 'nowrap',
+            width: isMobile ? '100%' : 'auto',
+            justifyContent: isMobile ? 'stretch' : 'flex-end',
+          }}
+        >
+          {/* Search Input */}
+          <div style={{ position: 'relative', width: isMobile ? '100%' : '220px', flexShrink: 0 }}>
+            <Search size={14} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: searchQuery ? '#6366f1' : '#94a3b8', pointerEvents: 'none' }} />
+            <input
+              type="text"
+              placeholder={viewMode === 'sku' ? 'Cari SKU / variasi...' : 'Cari provinsi / kota...'}
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              style={{
+                width: '100%',
+                height: '34px',
+                padding: '0 1.8rem 0 2.2rem',
+                borderRadius: '8px',
+                border: searchQuery ? '1px solid #6366f1' : '1px solid #e2e8f0',
+                background: searchQuery ? '#f5f3ff' : '#f8fafc',
+                color: '#0f172a',
+                fontSize: '0.775rem',
+                fontWeight: 500,
+                outline: 'none',
+                transition: 'all 0.15s ease',
+              }}
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                style={{ position: 'absolute', right: '0.55rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: '0.15rem', display: 'flex' }}
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
+
+          {/* View Mode Toggle Dropdown */}
+          <div style={{ position: 'relative' }}>
+            <select
+              value={viewMode}
+              onChange={e => setViewMode(e.target.value)}
+              style={{
+                height: '34px',
+                padding: '0 2rem 0 0.75rem',
+                borderRadius: '8px',
+                border: '1px solid #e2e8f0',
+                background: '#f8fafc',
+                color: '#0f172a',
+                fontSize: '0.775rem',
+                fontWeight: 600,
+                outline: 'none',
+                cursor: 'pointer',
+                WebkitAppearance: 'none',
+                appearance: 'none',
+              }}
+            >
+              <option value="sku">📦 Per Produk</option>
+              <option value="regional">📍 Per Wilayah</option>
+            </select>
+            <ChevronDown size={13} style={{ position: 'absolute', right: '0.65rem', top: '50%', transform: 'translateY(-50%)', color: '#64748b', pointerEvents: 'none' }} />
+          </div>
+
+          {/* Flat List Toggle Checkbox */}
+          <label
+            style={{
+              height: '34px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              padding: '0 0.75rem',
+              borderRadius: '8px',
+              border: isFlatView ? '1px solid #c7d2fe' : '1px solid #e2e8f0',
+              background: isFlatView ? '#eef2ff' : '#f8fafc',
+              color: isFlatView ? '#4f46e5' : '#475569',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              userSelect: 'none',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={isFlatView}
+              onChange={e => setIsFlatView(e.target.checked)}
+              style={{ accentColor: '#6366f1', width: '13px', height: '13px', cursor: 'pointer', margin: 0 }}
+            />
             Flat List
           </label>
 
-          {/* View Mode Toggle */}
-          <div style={{ display: 'flex', alignItems: 'center', position: 'relative' }}>
-            <select
-              value={viewMode}
-              onChange={(e) => setViewMode(e.target.value)}
-              style={{ ...btnBase, background: 'rgba(124, 58, 237, 0.1)', color: '#a78bfa', borderColor: 'rgba(124, 58, 237, 0.3)', WebkitAppearance: 'none', paddingRight: '2.5rem', cursor: 'pointer', minWidth: '130px' }}
+          {/* Reset Filter Button */}
+          {Boolean(searchQuery.trim()) && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              title="Reset pencarian"
+              style={{
+                height: '34px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                padding: '0 0.65rem',
+                borderRadius: '8px',
+                border: '1px solid #fecaca',
+                background: '#fff1f2',
+                color: '#e11d48',
+                fontSize: '0.725rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
             >
-              <option value="sku" style={{ background: '#1e1b2e', color: '#a78bfa' }}>📦 Per Produk</option>
-              <option value="regional" style={{ background: '#1e1b2e', color: '#a78bfa' }}>📍 Per Wilayah</option>
-            </select>
-            <div style={{ position: 'absolute', right: '0.8rem', pointerEvents: 'none', color: '#a78bfa', display: 'flex', alignItems: 'center' }}>
-              <ChevronDown size={14} />
-            </div>
-          </div>
-
+              <RotateCcw size={12} />
+              <span>Reset</span>
+            </button>
+          )}
         </div>
       </div>
 
       {/* ── SKU TABLE ─────────────────────────────────────────────────── */}
-      {
-        viewMode === 'sku' && (
-          <div className="modern-table-wrapper">
-            <div style={{ overflowX: 'auto' }}>
-              <table className="modern-table">
-                <thead>
-                  <tr>
-                    <th style={{ width: '3rem' }}>No</th>
-                    {(isFlatView ? varColumnsFlat : skuColumns).map((col) => (
-                      <th key={col} onClick={() => handleSkuSortClick(col)} style={{ cursor: 'pointer', textAlign: col === 'SKU Produk' || col === 'Variasi' ? 'left' : 'center' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: col === 'SKU Produk' || col === 'Variasi' ? 'flex-start' : 'center' }}>
-                          <span>{colText(col)}</span><SkuSortIcon column={col} />
-                        </div>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {isLoading ? Array.from({ length: 6 }).map((_, i) => (
-                    <tr key={i}><td><div className="skeleton" style={{ height: '1rem', width: '1.5rem' }}>&nbsp;</div></td>{skuColumns.map(c => <td key={c}><div className="skeleton" style={{ height: '1rem', width: '60%', margin: '0 auto' }}>&nbsp;</div></td>)}</tr>
-                  )) : skuAggregated.length === 0 ? (
-                    <tr><td colSpan={skuColumns.length + 1} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-tertiary)' }}>Tidak ada data untuk ditampilkan.</td></tr>
-                  ) : (isFlatView ? sortedFlatSku.map((varObj, idx) => {
-                    const totalVarQty = sortedFlatSku.reduce((s, v) => s + v.totalQuantity, 0);
-                    const varPct = totalQuantityAllSkus > 0 ? (varObj.totalQuantity / totalQuantityAllSkus) * 100 : 0;
-                    const varRetPct = varObj.totalQuantity > 0 ? (varObj.totalReturn / varObj.totalQuantity) * 100 : 0;
-                    const varGkPct = varObj.totalQuantity > 0 ? (varObj.totalGagalKirim / varObj.totalQuantity) * 100 : 0;
-                    return (
-                      <tr key={varObj.parentSku + ' ' + varObj.variation} style={{ background: idx % 2 === 0 ? 'rgba(124,58,237,0.02)' : 'transparent', borderBottom: '1px solid rgba(167,139,250,0.06)' }}>
-                        <td style={{ fontWeight: 600, color: 'var(--text-tertiary)' }}>{idx + 1}</td>
-                        <td style={{ fontWeight: 700, color: '#a78bfa' }}>{varObj.parentSku}</td>
-                        <td title={varObj.variation}>{varObj.variation}</td>
-                        <td style={{ color: 'var(--text-secondary)' }}>{varObj.skuId}</td>
-                        <td style={{ textAlign: 'center', fontWeight: 600 }}>{varObj.totalQuantity}</td>
-                        <td style={{ textAlign: 'center', fontWeight: 600 }}>{varPct.toFixed(2)}%</td>
+      {viewMode === 'sku' && (
+        <div
+          className="modern-table-wrapper"
+          style={{
+            flex: 1,
+            minHeight: 0,
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+            marginBottom: 0,
+            background: '#ffffff',
+            borderRadius: '12px',
+            border: '1px solid #e2e8f0',
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
+          }}
+        >
+          <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+            <table className="modern-table compact-table" style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0 }}>
+              <thead>
+                <tr>
+                  <th style={{ width: '3rem', textAlign: 'center' }}>No</th>
+                  {(isFlatView ? varColumnsFlat : skuColumns).map((col) => (
+                    <th key={col} onClick={() => handleSkuSortClick(col)} style={{ cursor: 'pointer', textAlign: col === 'SKU Produk' || col === 'Variasi' ? 'left' : 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: col === 'SKU Produk' || col === 'Variasi' ? 'flex-start' : 'center' }}>
+                        <span>{colText(col)}</span><SkuSortIcon column={col} />
+                      </div>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {isLoading ? Array.from({ length: 6 }).map((_, i) => (
+                  <tr key={i}><td><div className="skeleton" style={{ height: '1rem', width: '1.5rem' }}>&nbsp;</div></td>{skuColumns.map(c => <td key={c}><div className="skeleton" style={{ height: '1rem', width: '60%', margin: '0 auto' }}>&nbsp;</div></td>)}</tr>
+                )) : (isFlatView ? filteredFlatSku.length === 0 : filteredSku.length === 0) ? (
+                  <tr><td colSpan={(isFlatView ? varColumnsFlat : skuColumns).length + 1} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-tertiary)' }}>Tidak ada data untuk ditampilkan.</td></tr>
+                ) : (isFlatView ? filteredFlatSku.map((varObj, idx) => {
+                  const totalVarQty = filteredFlatSku.reduce((s, v) => s + v.totalQuantity, 0);
+                  const varPct = totalQuantityAllSkus > 0 ? (varObj.totalQuantity / totalQuantityAllSkus) * 100 : 0;
+                  const varRetPct = varObj.totalQuantity > 0 ? (varObj.totalReturn / varObj.totalQuantity) * 100 : 0;
+                  const varGkPct = varObj.totalQuantity > 0 ? (varObj.totalGagalKirim / varObj.totalQuantity) * 100 : 0;
+                  return (
+                    <tr key={varObj.parentSku + ' ' + varObj.variation} style={{ background: idx % 2 === 0 ? 'rgba(124,58,237,0.02)' : 'transparent', borderBottom: '1px solid rgba(167,139,250,0.06)' }}>
+                      <td style={{ fontWeight: 600, color: 'var(--text-tertiary)', textAlign: 'center' }}>{idx + 1}</td>
+                      <td style={{ fontWeight: 700, color: '#7c3aed' }}>{varObj.parentSku}</td>
+                      <td title={varObj.variation}>{varObj.variation}</td>
+                      <td style={{ color: 'var(--text-secondary)' }}>{varObj.skuId}</td>
+                      <td style={{ textAlign: 'center', fontWeight: 600 }}>{varObj.totalQuantity}</td>
+                      <td style={{ textAlign: 'center', fontWeight: 600 }}>{varPct.toFixed(2)}%</td>
+                      {showReturn && <>
+                        <td style={{ textAlign: 'center' }}><ClickableCount count={varObj.totalReturn} color="#fbbf24" orders={varObj.returnOrders} label={'Retur — ' + varObj.parentSku + ' / ' + varObj.variation} /></td>
+                        <td style={{ textAlign: 'center', fontWeight: 600, color: varRetPct > 5 ? '#f87171' : 'var(--text-primary)' }}>{varRetPct.toFixed(2)}%</td>
+                      </>}
+                      {showGagalKirim && <>
+                        <td style={{ textAlign: 'center' }}><ClickableCount count={varObj.totalGagalKirim} color="#fb923c" orders={varObj.gagalKirimOrders} label={'Gagal Kirim — ' + varObj.parentSku + ' / ' + varObj.variation} /></td>
+                        <td style={{ textAlign: 'center', fontWeight: 600, color: varGkPct > 5 ? '#f87171' : 'var(--text-primary)' }}>{varGkPct.toFixed(2)}%</td>
+                      </>}
+                      <td style={{ textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{formatRupiah(varObj.totalNilaiJual)}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{formatRupiah(varObj.totalNilaiJualAFF)}</td>
+                    </tr>
+                  );
+                }) : filteredSku.map((skuObj, i) => {
+                  const isExpanded = expandedSkus.has(skuObj.sku);
+                  const pct = totalQuantityAllSkus > 0 ? (skuObj.totalQuantity / totalQuantityAllSkus) * 100 : 0;
+                  const retPct = skuObj.totalQuantity > 0 ? (skuObj.totalReturn / skuObj.totalQuantity) * 100 : 0;
+                  const gkPct = skuObj.totalQuantity > 0 ? (skuObj.totalGagalKirim / skuObj.totalQuantity) * 100 : 0;
+
+                  return (
+                    <React.Fragment key={skuObj.sku}>
+                      <tr style={{ cursor: 'pointer' }} onClick={() => toggleSku(skuObj.sku)}>
+                        <td style={{ fontWeight: 600, color: 'var(--text-tertiary)', textAlign: 'center' }}>{i + 1}</td>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                            <div style={{ width: '1.85rem', height: '1.85rem', borderRadius: '50%', background: 'linear-gradient(135deg, #7c3aed, #a78bfa)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: '0.7rem', flexShrink: 0 }}>
+                              {skuObj.sku.slice(0, 2).toUpperCase()}
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                              <span style={{ fontWeight: 700, color: '#7c3aed' }}>{skuObj.sku}</span>
+                              <span style={{ fontSize: '0.6875rem', color: 'var(--text-tertiary)' }}>Klik untuk detail variasi</span>
+                            </div>
+                            <div style={{ marginLeft: 'auto', color: '#7c3aed' }}>{isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}</div>
+                          </div>
+                        </td>
+                        <td style={{ textAlign: 'center', fontWeight: 600 }}>{skuObj.totalQuantity}</td>
+                        <td style={{ textAlign: 'center', fontWeight: 600 }}>{pct.toFixed(2)}%</td>
                         {showReturn && <>
-                          <td style={{ textAlign: 'center' }}><ClickableCount count={varObj.totalReturn} color="#fbbf24" orders={varObj.returnOrders} label={'Retur — ' + varObj.parentSku + ' / ' + varObj.variation} /></td>
-                          <td style={{ textAlign: 'center', fontWeight: 600, color: varRetPct > 5 ? '#f87171' : 'var(--text-primary)' }}>{varRetPct.toFixed(2)}%</td>
+                          <td style={{ textAlign: 'center' }}><ClickableCount count={skuObj.totalReturn} color="#fbbf24" orders={skuObj.returnOrders} label={`Retur — ${skuObj.sku}`} /></td>
+                          <td style={{ textAlign: 'center', fontWeight: 600, color: retPct > 5 ? '#f87171' : 'var(--text-primary)' }}>{retPct.toFixed(2)}%</td>
                         </>}
                         {showGagalKirim && <>
-                          <td style={{ textAlign: 'center' }}><ClickableCount count={varObj.totalGagalKirim} color="#fb923c" orders={varObj.gagalKirimOrders} label={'Gagal Kirim — ' + varObj.parentSku + ' / ' + varObj.variation} /></td>
-                          <td style={{ textAlign: 'center', fontWeight: 600, color: varGkPct > 5 ? '#f87171' : 'var(--text-primary)' }}>{varGkPct.toFixed(2)}%</td>
+                          <td style={{ textAlign: 'center' }}><ClickableCount count={skuObj.totalGagalKirim} color="#fb923c" orders={skuObj.gagalKirimOrders} label={`Gagal Kirim — ${skuObj.sku}`} /></td>
+                          <td style={{ textAlign: 'center', fontWeight: 600, color: gkPct > 5 ? '#f87171' : 'var(--text-primary)' }}>{gkPct.toFixed(2)}%</td>
                         </>}
-                        <td style={{ textAlign: 'center', fontWeight: 600 }}>{formatRupiah(varObj.totalNilaiJual)}</td>
-                        <td style={{ textAlign: 'center', fontWeight: 600 }}>{formatRupiah(varObj.totalNilaiJualAFF)}</td>
+                        <td style={{ textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{formatRupiah(skuObj.totalNilaiJual)}</td>
+                        <td style={{ textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{formatRupiah(skuObj.totalNilaiJualAFF)}</td>
                       </tr>
-                    );
-                  }) : sortedSkuAggregated.map((skuObj, i) => {
-                    const isExpanded = expandedSkus.has(skuObj.sku);
-                    const pct = totalQuantityAllSkus > 0 ? (skuObj.totalQuantity / totalQuantityAllSkus) * 100 : 0;
-                    const retPct = skuObj.totalQuantity > 0 ? (skuObj.totalReturn / skuObj.totalQuantity) * 100 : 0;
-                    const gkPct = skuObj.totalQuantity > 0 ? (skuObj.totalGagalKirim / skuObj.totalQuantity) * 100 : 0;
 
-                    return (
-                      <React.Fragment key={skuObj.sku}>
-                        <tr style={{ cursor: 'pointer' }} onClick={() => toggleSku(skuObj.sku)}>
-                          <td style={{ fontWeight: 600, color: 'var(--text-tertiary)' }}>{i + 1}</td>
-                          <td>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                              <div style={{ width: '2rem', height: '2rem', borderRadius: '50%', background: 'linear-gradient(135deg, #7c3aed, #a78bfa)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: '0.75rem', flexShrink: 0 }}>
-                                {skuObj.sku.slice(0, 2).toUpperCase()}
-                              </div>
-                              <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                                <span style={{ fontWeight: 700, color: '#a78bfa' }}>{skuObj.sku}</span>
-                                <span style={{ fontSize: '0.6875rem', color: 'var(--text-tertiary)' }}>Klik untuk detail variasi</span>
-                              </div>
-                              <div style={{ marginLeft: 'auto', color: '#a78bfa' }}>{isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}</div>
-                            </div>
-                          </td>
-                          <td style={{ textAlign: 'center', fontWeight: 600 }}>{skuObj.totalQuantity}</td>
-                          <td style={{ textAlign: 'center', fontWeight: 600 }}>{pct.toFixed(2)}%</td>
-                          {showReturn && <>
-                            <td style={{ textAlign: 'center' }}><ClickableCount count={skuObj.totalReturn} color="#fbbf24" orders={skuObj.returnOrders} label={`Retur — ${skuObj.sku}`} /></td>
-                            <td style={{ textAlign: 'center', fontWeight: 600, color: retPct > 5 ? '#f87171' : 'var(--text-primary)' }}>{retPct.toFixed(2)}%</td>
-                          </>}
-                          {showGagalKirim && <>
-                            <td style={{ textAlign: 'center' }}><ClickableCount count={skuObj.totalGagalKirim} color="#fb923c" orders={skuObj.gagalKirimOrders} label={`Gagal Kirim — ${skuObj.sku}`} /></td>
-                            <td style={{ textAlign: 'center', fontWeight: 600, color: gkPct > 5 ? '#f87171' : 'var(--text-primary)' }}>{gkPct.toFixed(2)}%</td>
-                          </>}
-                          <td style={{ textAlign: 'center', fontWeight: 600 }}>{formatRupiah(skuObj.totalNilaiJual)}</td>
-                          <td style={{ textAlign: 'center', fontWeight: 600 }}>{formatRupiah(skuObj.totalNilaiJualAFF)}</td>
-                        </tr>
-
-                        {isExpanded && (
-                          <tr>
-                            <td colSpan={skuColumns.length + 1} style={{ padding: 0, background: 'rgba(124,58,237,0.05)' }}>
-                              <div style={{ overflowX: 'auto', borderTop: '1px solid rgba(167,139,250,0.2)' }}>
-                                <table className="modern-table" style={{ margin: 0, borderRadius: 0 }}>
-                                  <thead>
-                                    <tr>
-                                      <th style={{ width: '3rem' }}>No</th>
-                                      {varColumns.map((col) => (
-                                        <th key={col} onClick={() => handleVariationSortClick(skuObj.sku, col)} style={{ cursor: 'pointer' }}>
-                                          <div style={{ display: 'flex', alignItems: 'center' }}><span>{colText(col)}</span><VarSortIcon sku={skuObj.sku} column={col} /></div>
-                                        </th>
-                                      ))}
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {(() => {
-                                      const sorted = sortVariations(Array.from(skuObj.variations.values()), variationSorts[skuObj.sku]);
-                                      if (sorted.length === 0) return <tr><td colSpan={varColumns.length + 1} style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--text-tertiary)' }}>Tidak ada variasi.</td></tr>;
-                                      const totalVarQty = sorted.reduce((s, v) => s + v.totalQuantity, 0);
-                                      return sorted.map((varObj, idx) => {
-                                        const varPct = totalVarQty > 0 ? (varObj.totalQuantity / totalVarQty) * 100 : 0;
-                                        const varRetPct = varObj.totalQuantity > 0 ? (varObj.totalReturn / varObj.totalQuantity) * 100 : 0;
-                                        const varGkPct = varObj.totalQuantity > 0 ? (varObj.totalGagalKirim / varObj.totalQuantity) * 100 : 0;
-                                        return (
-                                          <tr key={varObj.variation}>
-                                            <td style={{ fontWeight: 600, color: 'var(--text-tertiary)', fontSize: '0.75rem' }}>{idx + 1}</td>
-                                            <td style={{ fontSize: '0.75rem' }} title={varObj.variation}>{varObj.variation}</td>
-                                            <td style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{varObj.skuId}</td>
-                                            <td style={{ textAlign: 'center', fontWeight: 600, fontSize: '0.75rem' }}>{varObj.totalQuantity}</td>
-                                            <td style={{ textAlign: 'center', fontWeight: 600, fontSize: '0.75rem' }}>{varPct.toFixed(2)}%</td>
-                                            {showReturn && <>
-                                              <td style={{ textAlign: 'center', fontSize: '0.75rem' }}><ClickableCount count={varObj.totalReturn} color="#fbbf24" orders={varObj.returnOrders} label={`Retur — ${skuObj.sku} / ${varObj.variation}`} /></td>
-                                              <td style={{ textAlign: 'center', fontWeight: 600, fontSize: '0.75rem', color: varRetPct > 5 ? '#f87171' : 'var(--text-primary)' }}>{varRetPct.toFixed(2)}%</td>
-                                            </>}
-                                            {showGagalKirim && <>
-                                              <td style={{ textAlign: 'center', fontSize: '0.75rem' }}><ClickableCount count={varObj.totalGagalKirim} color="#fb923c" orders={varObj.gagalKirimOrders} label={`Gagal Kirim — ${skuObj.sku} / ${varObj.variation}`} /></td>
-                                              <td style={{ textAlign: 'center', fontWeight: 600, fontSize: '0.75rem', color: varGkPct > 5 ? '#f87171' : 'var(--text-primary)' }}>{varGkPct.toFixed(2)}%</td>
-                                            </>}
-                                            <td style={{ textAlign: 'center', fontWeight: 600, fontSize: '0.75rem' }}>{formatRupiah(varObj.totalNilaiJual)}</td>
-                                            <td style={{ textAlign: 'center', fontWeight: 600, fontSize: '0.75rem' }}>{formatRupiah(varObj.totalNilaiJualAFF)}</td>
-                                          </tr>
-                                        );
-                                      });
-                                    })()}
-                                  </tbody>
-                                </table>
-                              </div>
-                            </td>
-                          </tr>
-                        )}
-                      </React.Fragment>
-                    );
-                  }))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )
-      }
-
-      {/* ── REGIONAL TABLE ─────────────────────────────────────────────── */}
-      {
-        viewMode === 'regional' && (
-          <div className="modern-table-wrapper">
-            <div style={{ overflowX: 'auto' }}>
-              <table className="modern-table">
-                <thead>
-                  <tr>
-                    <th style={{ width: '3rem' }}>No</th>
-                    {(isFlatView ? regionalColumnsFlat : ["Provinsi", "Total Pesanan", ...(showReturn ? ["Total Return", "% Return"] : []), ...(showGagalKirim ? ["Gagal Kirim", "% Gagal Kirim"] : [])]).map(col => (
-                      <th key={col} onClick={() => handleRegionalSortClick(col)} style={{ cursor: 'pointer', textAlign: col === 'Provinsi' || col === 'Kota / Kabupaten' ? 'left' : 'center' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: col === 'Provinsi' || col === 'Kota / Kabupaten' ? 'flex-start' : 'center' }}>
-                          <span>{colText(col)}</span><RegSortIcon column={col} />
-                        </div>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {isLoading ? Array.from({ length: 5 }).map((_, i) => (
-                    <tr key={i}><td colSpan={8}><div className="skeleton" style={{ height: '1.5rem', width: '100%' }}>&nbsp;</div></td></tr>
-                  )) : sortedRegional.length === 0 ? (
-                    <tr><td colSpan={8} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-tertiary)' }}>Tidak ada data untuk ditampilkan.</td></tr>
-                  ) : (isFlatView ? sortedFlatRegional.map((cityObj, idx) => {
-                    const cRetPct = cityObj.totalOrders > 0 ? (cityObj.totalReturn / cityObj.totalOrders) * 100 : 0;
-                    const cGkPct = cityObj.totalOrders > 0 ? (cityObj.totalGagalKirim / cityObj.totalOrders) * 100 : 0;
-                    return (
-                      <tr key={cityObj.parentProvince + cityObj.city} style={{ background: idx % 2 === 0 ? 'rgba(124,58,237,0.02)' : 'transparent', borderBottom: '1px solid rgba(167,139,250,0.06)' }}>
-                        <td style={{ fontWeight: 600, color: 'var(--text-tertiary)' }}>{idx + 1}</td>
-                        <td style={{ fontWeight: 700, color: '#a78bfa' }}>{cityObj.parentProvince}</td>
-                        <td style={{ fontWeight: 600 }}>{cityObj.city}</td>
-                        <td style={{ textAlign: 'center', fontWeight: 600 }}>{cityObj.totalOrders}</td>
-                        {showReturn && <>
-                          <td style={{ textAlign: 'center' }}><ClickableCount count={cityObj.totalReturn} color="#fbbf24" orders={cityObj.returnOrders} label={'Retur — ' + cityObj.city} /></td>
-                          <td style={{ textAlign: 'center', fontWeight: 600, color: cRetPct > 5 ? '#f87171' : 'var(--text-secondary)' }}>{cRetPct.toFixed(1)}%</td>
-                        </>}
-                        {showGagalKirim && <>
-                          <td style={{ textAlign: 'center' }}><ClickableCount count={cityObj.totalGagalKirim} color="#fb923c" orders={cityObj.gagalKirimOrders} label={'Gagal Kirim — ' + cityObj.city} /></td>
-                          <td style={{ textAlign: 'center', fontWeight: 600, color: cGkPct > 5 ? '#f87171' : 'var(--text-secondary)' }}>{cGkPct.toFixed(1)}%</td>
-                        </>}
-                      </tr>
-                    );
-                  }) : sortedRegional.map((provObj, i) => {
-                    const isExpanded = expandedProvince === provObj.province;
-                    const retPct = provObj.totalOrders > 0 ? (provObj.totalReturn / provObj.totalOrders) * 100 : 0;
-                    const gkPct = provObj.totalOrders > 0 ? (provObj.totalGagalKirim / provObj.totalOrders) * 100 : 0;
-                    const totalMasalah = provObj.totalReturn + provObj.totalGagalKirim;
-                    const citySort = citySorts[provObj.province] || { column: 'Total Return', direction: 'desc' };
-                    const sortedCities = Array.from(provObj.cities.values()).sort((a, b) => {
-                      const { column, direction } = citySort;
-                      let aVal, bVal;
-                      switch (column) {
-                        case 'Kota / Kabupaten': return direction === 'asc' ? a.city.localeCompare(b.city) : b.city.localeCompare(a.city);
-                        case 'Total Pesanan': aVal = a.totalOrders; bVal = b.totalOrders; break;
-                        case 'Return': aVal = a.totalReturn; bVal = b.totalReturn; break;
-                        case '% Return': aVal = a.totalOrders > 0 ? a.totalReturn / a.totalOrders : 0; bVal = b.totalOrders > 0 ? b.totalReturn / b.totalOrders : 0; break;
-                        case 'Gagal Kirim': aVal = a.totalGagalKirim; bVal = b.totalGagalKirim; break;
-                        case '% Gagal Kirim': aVal = a.totalOrders > 0 ? a.totalGagalKirim / a.totalOrders : 0; bVal = b.totalOrders > 0 ? b.totalGagalKirim / b.totalOrders : 0; break;
-                        default: return 0;
-                      }
-                      return direction === 'asc' ? aVal - bVal : bVal - aVal;
-                    });
-
-                    return (
-                      <React.Fragment key={provObj.province}>
-                        <tr
-                          style={{ cursor: 'pointer', background: isExpanded ? 'rgba(124,58,237,0.07)' : undefined }}
-                          onClick={() => setExpandedProvince(isExpanded ? null : provObj.province)}
-                        >
-                          <td style={{ fontWeight: 600, color: 'var(--text-tertiary)' }}>{i + 1}</td>
-                          <td>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                              <div style={{ width: '2rem', height: '2rem', borderRadius: '50%', background: 'linear-gradient(135deg, #5b21b6, #7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: '0.65rem', flexShrink: 0 }}>
-                                {provObj.province.slice(0, 2)}
-                              </div>
-                              <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                                <span style={{ fontWeight: 700, color: '#a78bfa' }}>{provObj.province}</span>
-                                <span style={{ fontSize: '0.6875rem', color: 'var(--text-tertiary)' }}>Klik untuk detail kota</span>
-                              </div>
-                              <div style={{ marginLeft: 'auto', color: '#a78bfa' }}>{isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}</div>
-                            </div>
-                          </td>
-                          <td style={{ textAlign: 'center', fontWeight: 600 }}>{provObj.totalOrders}</td>
-                          {showReturn && <>
-                            <td style={{ textAlign: 'center' }}><ClickableCount count={provObj.totalReturn} color="#fbbf24" orders={provObj.returnOrders} label={`Retur — ${provObj.province}`} /></td>
-                            <td style={{ textAlign: 'center', fontWeight: 600, color: retPct > 5 ? '#f87171' : 'var(--text-secondary)' }}>{retPct.toFixed(1)}%</td>
-                          </>}
-                          {showGagalKirim && <>
-                            <td style={{ textAlign: 'center' }}><ClickableCount count={provObj.totalGagalKirim} color="#fb923c" orders={provObj.gagalKirimOrders} label={`Gagal Kirim — ${provObj.province}`} /></td>
-                            <td style={{ textAlign: 'center', fontWeight: 600, color: gkPct > 5 ? '#f87171' : 'var(--text-secondary)' }}>{gkPct.toFixed(1)}%</td>
-                          </>}
-                        </tr>
-
-                        {isExpanded && (
-                          <tr>
-                            <td colSpan={9} style={{ padding: 0, background: 'rgba(124,58,237,0.04)' }}>
-                              <div style={{ borderTop: '1px solid rgba(167,139,250,0.2)' }}>
-                                <table className="modern-table" style={{ margin: 0, borderRadius: 0 }}>
-                                  <thead>
-                                    <tr>
-                                      <th style={{ width: '3rem' }}>No</th>
-                                      {['Kota / Kabupaten', 'Total Pesanan', ...(showReturn ? ['Return', '% Return'] : []), ...(showGagalKirim ? ['Gagal Kirim', '% Gagal Kirim'] : [])].map(col => (
-                                        <th key={col} onClick={() => handleCitySortClick(provObj.province, col)} style={{ cursor: 'pointer', textAlign: col === 'Kota / Kabupaten' ? 'left' : 'center' }}>
-                                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: col === 'Kota / Kabupaten' ? 'flex-start' : 'center' }}>
-                                            <span>{colText(col)}</span><CitySortIcon province={provObj.province} column={col} />
-                                          </div>
-                                        </th>
-                                      ))}
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {sortedCities.map((cityObj, idx) => {
-                                      const cRetPct = cityObj.totalOrders > 0 ? (cityObj.totalReturn / cityObj.totalOrders) * 100 : 0;
-                                      const cGkPct = cityObj.totalOrders > 0 ? (cityObj.totalGagalKirim / cityObj.totalOrders) * 100 : 0;
-                                      const cMasalah = cityObj.totalReturn + cityObj.totalGagalKirim;
+                      {isExpanded && (
+                        <tr>
+                          <td colSpan={skuColumns.length + 1} style={{ padding: 0, background: 'rgba(124,58,237,0.05)' }}>
+                            <div style={{ overflowX: 'auto', borderTop: '1px solid rgba(167,139,250,0.2)' }}>
+                              <table className="modern-table compact-table" style={{ margin: 0, borderRadius: 0 }}>
+                                <thead>
+                                  <tr>
+                                    <th style={{ width: '3rem', textAlign: 'center' }}>No</th>
+                                    {varColumns.map((col) => (
+                                      <th key={col} onClick={() => handleVariationSortClick(skuObj.sku, col)} style={{ cursor: 'pointer' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center' }}><span>{colText(col)}</span><VarSortIcon sku={skuObj.sku} column={col} /></div>
+                                      </th>
+                                    ))}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {(() => {
+                                    const sorted = sortVariations(Array.from(skuObj.variations.values()), variationSorts[skuObj.sku]);
+                                    if (sorted.length === 0) return <tr><td colSpan={varColumns.length + 1} style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--text-tertiary)' }}>Tidak ada variasi.</td></tr>;
+                                    const totalVarQty = sorted.reduce((s, v) => s + v.totalQuantity, 0);
+                                    return sorted.map((varObj, idx) => {
+                                      const varPct = totalVarQty > 0 ? (varObj.totalQuantity / totalVarQty) * 100 : 0;
+                                      const varRetPct = varObj.totalQuantity > 0 ? (varObj.totalReturn / varObj.totalQuantity) * 100 : 0;
+                                      const varGkPct = varObj.totalQuantity > 0 ? (varObj.totalGagalKirim / varObj.totalQuantity) * 100 : 0;
                                       return (
-                                        <tr key={cityObj.city}>
-                                          <td style={{ fontWeight: 600, color: 'var(--text-tertiary)', fontSize: '0.75rem' }}>{idx + 1}</td>
-                                          <td style={{ fontSize: '0.8125rem', fontWeight: 600 }}>{cityObj.city}</td>
-                                          <td style={{ textAlign: 'center', fontSize: '0.8125rem' }}>{cityObj.totalOrders}</td>
+                                        <tr key={varObj.variation}>
+                                          <td style={{ fontWeight: 600, color: 'var(--text-tertiary)', fontSize: '0.75rem', textAlign: 'center' }}>{idx + 1}</td>
+                                          <td style={{ fontSize: '0.75rem' }} title={varObj.variation}>{varObj.variation}</td>
+                                          <td style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{varObj.skuId}</td>
+                                          <td style={{ textAlign: 'center', fontWeight: 600, fontSize: '0.75rem' }}>{varObj.totalQuantity}</td>
+                                          <td style={{ textAlign: 'center', fontWeight: 600, fontSize: '0.75rem' }}>{varPct.toFixed(2)}%</td>
                                           {showReturn && <>
-                                            <td style={{ textAlign: 'center', fontSize: '0.8125rem' }}><ClickableCount count={cityObj.totalReturn} color="#fbbf24" orders={cityObj.returnOrders} label={`Retur — ${provObj.province} / ${cityObj.city}`} /></td>
-                                            <td style={{ textAlign: 'center', fontSize: '0.8125rem', color: cRetPct > 5 ? '#f87171' : 'var(--text-tertiary)' }}>{cRetPct.toFixed(1)}%</td>
+                                            <td style={{ textAlign: 'center', fontSize: '0.75rem' }}><ClickableCount count={varObj.totalReturn} color="#fbbf24" orders={varObj.returnOrders} label={`Retur — ${skuObj.sku} / ${varObj.variation}`} /></td>
+                                            <td style={{ textAlign: 'center', fontWeight: 600, fontSize: '0.75rem', color: varRetPct > 5 ? '#f87171' : 'var(--text-primary)' }}>{varRetPct.toFixed(2)}%</td>
                                           </>}
                                           {showGagalKirim && <>
-                                            <td style={{ textAlign: 'center', fontSize: '0.8125rem' }}><ClickableCount count={cityObj.totalGagalKirim} color="#fb923c" orders={cityObj.gagalKirimOrders} label={`Gagal Kirim — ${provObj.province} / ${cityObj.city}`} /></td>
-                                            <td style={{ textAlign: 'center', fontSize: '0.8125rem', color: cGkPct > 5 ? '#f87171' : 'var(--text-tertiary)' }}>{cGkPct.toFixed(1)}%</td>
+                                            <td style={{ textAlign: 'center', fontSize: '0.75rem' }}><ClickableCount count={varObj.totalGagalKirim} color="#fb923c" orders={varObj.gagalKirimOrders} label={`Gagal Kirim — ${skuObj.sku} / ${varObj.variation}`} /></td>
+                                            <td style={{ textAlign: 'center', fontWeight: 600, fontSize: '0.75rem', color: varGkPct > 5 ? '#f87171' : 'var(--text-primary)' }}>{varGkPct.toFixed(2)}%</td>
                                           </>}
+                                          <td style={{ textAlign: 'right', fontWeight: 600, fontSize: '0.75rem', fontVariantNumeric: 'tabular-nums' }}>{formatRupiah(varObj.totalNilaiJual)}</td>
+                                          <td style={{ textAlign: 'right', fontWeight: 600, fontSize: '0.75rem', fontVariantNumeric: 'tabular-nums' }}>{formatRupiah(varObj.totalNilaiJualAFF)}</td>
                                         </tr>
                                       );
-                                    })}
-                                  </tbody>
-                                </table>
-                              </div>
-                            </td>
-                          </tr>
-                        )}
-                      </React.Fragment>
-                    );
-                  }))}
-                </tbody>
-              </table>
-            </div>
+                                    });
+                                  })()}
+                                </tbody>
+                              </table>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                }))}
+              </tbody>
+            </table>
           </div>
-        )
-      }
-    </div >
+
+          {/* Footer Info Bar */}
+          <div
+            style={{
+              flexShrink: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '0.4rem',
+              padding: isMobile ? '0.35rem 0.6rem' : '0.4rem 0.85rem',
+              background: '#fcfdfe',
+              borderTop: '1px solid #eef0f6',
+              fontSize: isMobile ? '0.7rem' : '0.75rem',
+            }}
+          >
+            <span style={{ color: '#64748b', fontWeight: 500 }}>
+              {isFlatView
+                ? `Menampilkan ${filteredFlatSku.length} variasi produk`
+                : `Menampilkan ${filteredSku.length} SKU (${totalQuantityFiltered.toLocaleString('id-ID')} unit terjual)`}
+            </span>
+            {searchQuery && (
+              <span style={{ color: '#6366f1', fontWeight: 600, fontSize: '0.725rem' }}>
+                Filter aktif: "{searchQuery}"
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── REGIONAL TABLE ─────────────────────────────────────────────── */}
+      {viewMode === 'regional' && (
+        <div
+          className="modern-table-wrapper"
+          style={{
+            flex: 1,
+            minHeight: 0,
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+            marginBottom: 0,
+            background: '#ffffff',
+            borderRadius: '12px',
+            border: '1px solid #e2e8f0',
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
+          }}
+        >
+          <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+            <table className="modern-table compact-table" style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0 }}>
+              <thead>
+                <tr>
+                  <th style={{ width: '3rem', textAlign: 'center' }}>No</th>
+                  {(isFlatView ? regionalColumnsFlat : ["Provinsi", "Total Pesanan", ...(showReturn ? ["Total Return", "% Return"] : []), ...(showGagalKirim ? ["Gagal Kirim", "% Gagal Kirim"] : [])]).map(col => (
+                    <th key={col} onClick={() => handleRegionalSortClick(col)} style={{ cursor: 'pointer', textAlign: col === 'Provinsi' || col === 'Kota / Kabupaten' ? 'left' : 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: col === 'Provinsi' || col === 'Kota / Kabupaten' ? 'flex-start' : 'center' }}>
+                        <span>{colText(col)}</span><RegSortIcon column={col} />
+                      </div>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {isLoading ? Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i}><td colSpan={8}><div className="skeleton" style={{ height: '1.5rem', width: '100%' }}>&nbsp;</div></td></tr>
+                )) : (isFlatView ? filteredFlatRegional.length === 0 : filteredRegional.length === 0) ? (
+                  <tr><td colSpan={(isFlatView ? regionalColumnsFlat : ["Provinsi", "Total Pesanan", ...(showReturn ? ["Total Return", "% Return"] : []), ...(showGagalKirim ? ["Gagal Kirim", "% Gagal Kirim"] : [])]).length + 1} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-tertiary)' }}>Tidak ada data untuk ditampilkan.</td></tr>
+                ) : (isFlatView ? filteredFlatRegional.map((cityObj, idx) => {
+                  const cRetPct = cityObj.totalOrders > 0 ? (cityObj.totalReturn / cityObj.totalOrders) * 100 : 0;
+                  const cGkPct = cityObj.totalOrders > 0 ? (cityObj.totalGagalKirim / cityObj.totalOrders) * 100 : 0;
+                  return (
+                    <tr key={cityObj.parentProvince + cityObj.city} style={{ background: idx % 2 === 0 ? 'rgba(124,58,237,0.02)' : 'transparent', borderBottom: '1px solid rgba(167,139,250,0.06)' }}>
+                      <td style={{ fontWeight: 600, color: 'var(--text-tertiary)', textAlign: 'center' }}>{idx + 1}</td>
+                      <td style={{ fontWeight: 700, color: '#7c3aed' }}>{cityObj.parentProvince}</td>
+                      <td style={{ fontWeight: 600 }}>{cityObj.city}</td>
+                      <td style={{ textAlign: 'center', fontWeight: 600 }}>{cityObj.totalOrders}</td>
+                      {showReturn && <>
+                        <td style={{ textAlign: 'center' }}><ClickableCount count={cityObj.totalReturn} color="#fbbf24" orders={cityObj.returnOrders} label={'Retur — ' + cityObj.city} /></td>
+                        <td style={{ textAlign: 'center', fontWeight: 600, color: cRetPct > 5 ? '#f87171' : 'var(--text-secondary)' }}>{cRetPct.toFixed(1)}%</td>
+                      </>}
+                      {showGagalKirim && <>
+                        <td style={{ textAlign: 'center' }}><ClickableCount count={cityObj.totalGagalKirim} color="#fb923c" orders={cityObj.gagalKirimOrders} label={'Gagal Kirim — ' + cityObj.city} /></td>
+                        <td style={{ textAlign: 'center', fontWeight: 600, color: cGkPct > 5 ? '#f87171' : 'var(--text-secondary)' }}>{cGkPct.toFixed(1)}%</td>
+                      </>}
+                    </tr>
+                  );
+                }) : filteredRegional.map((provObj, i) => {
+                  const isExpanded = expandedProvince === provObj.province;
+                  const retPct = provObj.totalOrders > 0 ? (provObj.totalReturn / provObj.totalOrders) * 100 : 0;
+                  const gkPct = provObj.totalOrders > 0 ? (provObj.totalGagalKirim / provObj.totalOrders) * 100 : 0;
+                  const totalMasalah = provObj.totalReturn + provObj.totalGagalKirim;
+                  const citySort = citySorts[provObj.province] || { column: 'Total Return', direction: 'desc' };
+                  const sortedCities = Array.from(provObj.cities.values()).sort((a, b) => {
+                    const { column, direction } = citySort;
+                    let aVal, bVal;
+                    switch (column) {
+                      case 'Kota / Kabupaten': return direction === 'asc' ? a.city.localeCompare(b.city) : b.city.localeCompare(a.city);
+                      case 'Total Pesanan': aVal = a.totalOrders; bVal = b.totalOrders; break;
+                      case 'Return': aVal = a.totalReturn; bVal = b.totalReturn; break;
+                      case '% Return': aVal = a.totalOrders > 0 ? a.totalReturn / a.totalOrders : 0; bVal = b.totalOrders > 0 ? b.totalReturn / b.totalOrders : 0; break;
+                      case 'Gagal Kirim': aVal = a.totalGagalKirim; bVal = b.totalGagalKirim; break;
+                      case '% Gagal Kirim': aVal = a.totalOrders > 0 ? a.totalGagalKirim / a.totalOrders : 0; bVal = b.totalOrders > 0 ? b.totalGagalKirim / b.totalOrders : 0; break;
+                      default: return 0;
+                    }
+                    return direction === 'asc' ? aVal - bVal : bVal - aVal;
+                  });
+
+                  return (
+                    <React.Fragment key={provObj.province}>
+                      <tr
+                        style={{ cursor: 'pointer', background: isExpanded ? 'rgba(124,58,237,0.07)' : undefined }}
+                        onClick={() => setExpandedProvince(isExpanded ? null : provObj.province)}
+                      >
+                        <td style={{ fontWeight: 600, color: 'var(--text-tertiary)', textAlign: 'center' }}>{i + 1}</td>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                            <div style={{ width: '1.85rem', height: '1.85rem', borderRadius: '50%', background: 'linear-gradient(135deg, #5b21b6, #7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: '0.65rem', flexShrink: 0 }}>
+                              {provObj.province.slice(0, 2)}
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                              <span style={{ fontWeight: 700, color: '#7c3aed' }}>{provObj.province}</span>
+                              <span style={{ fontSize: '0.6875rem', color: 'var(--text-tertiary)' }}>Klik untuk detail kota</span>
+                            </div>
+                            <div style={{ marginLeft: 'auto', color: '#7c3aed' }}>{isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}</div>
+                          </div>
+                        </td>
+                        <td style={{ textAlign: 'center', fontWeight: 600 }}>{provObj.totalOrders}</td>
+                        {showReturn && <>
+                          <td style={{ textAlign: 'center' }}><ClickableCount count={provObj.totalReturn} color="#fbbf24" orders={provObj.returnOrders} label={`Retur — ${provObj.province}`} /></td>
+                          <td style={{ textAlign: 'center', fontWeight: 600, color: retPct > 5 ? '#f87171' : 'var(--text-secondary)' }}>{retPct.toFixed(1)}%</td>
+                        </>}
+                        {showGagalKirim && <>
+                          <td style={{ textAlign: 'center' }}><ClickableCount count={provObj.totalGagalKirim} color="#fb923c" orders={provObj.gagalKirimOrders} label={`Gagal Kirim — ${provObj.province}`} /></td>
+                          <td style={{ textAlign: 'center', fontWeight: 600, color: gkPct > 5 ? '#f87171' : 'var(--text-secondary)' }}>{gkPct.toFixed(1)}%</td>
+                        </>}
+                      </tr>
+
+                      {isExpanded && (
+                        <tr>
+                          <td colSpan={9} style={{ padding: 0, background: 'rgba(124,58,237,0.04)' }}>
+                            <div style={{ borderTop: '1px solid rgba(167,139,250,0.2)' }}>
+                              <table className="modern-table compact-table" style={{ margin: 0, borderRadius: 0 }}>
+                                <thead>
+                                  <tr>
+                                    <th style={{ width: '3rem', textAlign: 'center' }}>No</th>
+                                    {['Kota / Kabupaten', 'Total Pesanan', ...(showReturn ? ['Return', '% Return'] : []), ...(showGagalKirim ? ['Gagal Kirim', '% Gagal Kirim'] : [])].map(col => (
+                                      <th key={col} onClick={() => handleCitySortClick(provObj.province, col)} style={{ cursor: 'pointer', textAlign: col === 'Kota / Kabupaten' ? 'left' : 'center' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: col === 'Kota / Kabupaten' ? 'flex-start' : 'center' }}>
+                                          <span>{colText(col)}</span><CitySortIcon province={provObj.province} column={col} />
+                                        </div>
+                                      </th>
+                                    ))}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {sortedCities.map((cityObj, idx) => {
+                                    const cRetPct = cityObj.totalOrders > 0 ? (cityObj.totalReturn / cityObj.totalOrders) * 100 : 0;
+                                    const cGkPct = cityObj.totalOrders > 0 ? (cityObj.totalGagalKirim / cityObj.totalOrders) * 100 : 0;
+                                    return (
+                                      <tr key={cityObj.city}>
+                                        <td style={{ fontWeight: 600, color: 'var(--text-tertiary)', fontSize: '0.75rem', textAlign: 'center' }}>{idx + 1}</td>
+                                        <td style={{ fontSize: '0.8125rem', fontWeight: 600 }}>{cityObj.city}</td>
+                                        <td style={{ textAlign: 'center', fontSize: '0.8125rem' }}>{cityObj.totalOrders}</td>
+                                        {showReturn && <>
+                                          <td style={{ textAlign: 'center', fontSize: '0.8125rem' }}><ClickableCount count={cityObj.totalReturn} color="#fbbf24" orders={cityObj.returnOrders} label={`Retur — ${provObj.province} / ${cityObj.city}`} /></td>
+                                          <td style={{ textAlign: 'center', fontSize: '0.8125rem', color: cRetPct > 5 ? '#f87171' : 'var(--text-tertiary)' }}>{cRetPct.toFixed(1)}%</td>
+                                        </>}
+                                        {showGagalKirim && <>
+                                          <td style={{ textAlign: 'center', fontSize: '0.8125rem' }}><ClickableCount count={cityObj.totalGagalKirim} color="#fb923c" orders={cityObj.gagalKirimOrders} label={`Gagal Kirim — ${provObj.province} / ${cityObj.city}`} /></td>
+                                          <td style={{ textAlign: 'center', fontSize: '0.8125rem', color: cGkPct > 5 ? '#f87171' : 'var(--text-tertiary)' }}>{cGkPct.toFixed(1)}%</td>
+                                        </>}
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                }))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Footer Info Bar */}
+          <div
+            style={{
+              flexShrink: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '0.4rem',
+              padding: isMobile ? '0.35rem 0.6rem' : '0.4rem 0.85rem',
+              background: '#fcfdfe',
+              borderTop: '1px solid #eef0f6',
+              fontSize: isMobile ? '0.7rem' : '0.75rem',
+            }}
+          >
+            <span style={{ color: '#64748b', fontWeight: 500 }}>
+              {isFlatView
+                ? `Menampilkan ${filteredFlatRegional.length} kota / kabupaten`
+                : `Menampilkan ${filteredRegional.length} provinsi`}
+            </span>
+            {searchQuery && (
+              <span style={{ color: '#6366f1', fontWeight: 600, fontSize: '0.725rem' }}>
+                Filter aktif: "{searchQuery}"
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
