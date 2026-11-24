@@ -89,22 +89,70 @@ function StoreManagement() {
 
     return (
         <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
-                <div>
-                    <h2 className="gradient-text" style={{ margin: 0 }}>Kelola Toko</h2>
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', margin: '0.25rem 0 0' }}>
-                        Kelola toko marketplace Anda. Pilih toko aktif untuk melihat data yang sesuai.
-                    </p>
+            {/* Standard Header Card */}
+            <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '0.75rem',
+                padding: '0.65rem 1rem',
+                background: 'var(--bg-card)',
+                borderRadius: 'var(--radius-lg)',
+                border: '1px solid var(--border-color)',
+                boxShadow: 'var(--shadow-xs)',
+                marginBottom: '1rem',
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                    <div style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '8px',
+                        background: 'linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'white',
+                        flexShrink: 0
+                    }}>
+                        <Store size={18} />
+                    </div>
+                    <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <h2 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+                                Kelola Toko
+                            </h2>
+                            <span style={{
+                                fontSize: '0.6875rem',
+                                padding: '0.125rem 0.5rem',
+                                borderRadius: '12px',
+                                background: 'rgba(124, 58, 237, 0.1)',
+                                color: '#7c3aed',
+                                fontWeight: 600,
+                            }}>
+                                {stores.length} toko
+                            </span>
+                        </div>
+                        <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                            Pilih toko aktif untuk melihat data yang sesuai
+                        </p>
+                    </div>
                 </div>
                 <button onClick={() => { if (limitReached) return; resetForm(); setShowForm(true); }} disabled={limitReached} style={{
-                    display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.625rem 1.25rem',
-                    background: limitReached ? 'var(--bg-secondary)' : 'var(--accent-primary)', border: 'none', borderRadius: 'var(--radius-full)',
-                    cursor: limitReached ? 'not-allowed' : 'pointer', fontSize: '0.8125rem', fontWeight: 600,
+                    display: 'flex', alignItems: 'center', gap: '0.375rem',
+                    padding: '0.45rem 0.85rem',
+                    background: limitReached ? 'var(--bg-secondary)' : 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
+                    border: 'none',
+                    borderRadius: 'var(--radius-md)',
+                    cursor: limitReached ? 'not-allowed' : 'pointer',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
                     color: limitReached ? 'var(--text-tertiary)' : 'white',
-                    boxShadow: limitReached ? 'none' : 'var(--shadow-sm)', transition: 'all var(--transition-fast)',
+                    boxShadow: limitReached ? 'none' : '0 2px 4px rgba(124, 58, 237, 0.25)',
+                    transition: 'all var(--transition-fast)',
                     opacity: limitReached ? 0.7 : 1,
                 }}>
-                    <Plus size={16} /> {limitReached ? `Limit ${maxStores} Toko` : 'Tambah Toko'}
+                    <Plus size={14} /> {limitReached ? `Limit ${maxStores} Toko` : 'Tambah Toko'}
                 </button>
             </div>
 

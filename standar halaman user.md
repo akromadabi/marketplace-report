@@ -265,11 +265,13 @@ Terdapat 3 variasi struktur isi tabel yang didukung, seluruhnya wajib dibungkus 
 
 ## 3. Konfigurasi Padding pada `src/App.js`
 
-Agar kartu tabel pas membentang ke bawah tanpa memicu scrollbar ganda, `<main>` di `src/App.js` harus memiliki padding:
+Agar seluruh halaman memanfaatkan 100% lebar layar dan kartu pas membentang ke bawah tanpa menyisakan ruang kosong atau scrollbar ganda:
 ```javascript
-padding: isDesktop ? (['/rangkuman', '/olahan', '/return', '/pengembalian', '/analisis'].includes(location.pathname) ? '0.65rem 1rem' : '1.5rem') : '0.5rem',
-paddingTop: isDesktop ? (['/rangkuman', '/olahan', '/return', '/pengembalian', '/analisis'].includes(location.pathname) ? '0.65rem' : '1.5rem') : '3.65rem',
-paddingBottom: isDesktop ? (['/rangkuman', '/olahan', '/return', '/pengembalian', '/analisis'].includes(location.pathname) ? '0.65rem' : '1.5rem') : '4.5rem',
+// Konfigurasi container <main> di src/App.js untuk SELURUH halaman aplikasi
+padding: isDesktop ? '0.65rem 1rem' : '0.5rem',
+paddingTop: isDesktop ? '0.65rem' : '3.65rem',
+paddingBottom: isDesktop ? '0.65rem' : '4.5rem',
+maxWidth: '100%', // Bebas dari batasan 1400px agar tidak ada sisa ruang kosong di sisi kiri/kanan monitor desktop
 ```
 
 ---
@@ -284,13 +286,18 @@ paddingBottom: isDesktop ? (['/rangkuman', '/olahan', '/return', '/pengembalian'
 
 ---
 
-## 5. Daftar Halaman yang Telah Menerapkan Standar
+## 5. Daftar Halaman yang Telah Menerapkan Standar Penuh
 
-1. `/rangkuman` — **Rekap Transaksi** (`RangkumanTransaksi.js`) — `[SELESAI & TERUJI]`
-2. `/olahan` — **Analisis Pesanan** (`OlahanDataPesanan.js`) — `[SELESAI & TERUJI]`
-3. `/return` — **Retur Penjualan** (`ReturnTable.js`) — `[SELESAI & TERUJI]`
-4. `/pengembalian` — **Pengembalian Dana** (`PengembalianTable.js`) — `[SELESAI & TERUJI]`
-5. `/analisis` — **Analisis Produk** (`ProductAnalysis.js`) — `[SELESAI & TERUJI]`
+1. `/` — **Dashboard Utama** (`Dashboard.js`) — `[SELESAI - 100% Full Width & Compact]`
+2. `/upload` — **Upload File** (`UploadFile.js`) — `[SELESAI - Separate Card & Full Width]`
+3. `/rangkuman` — **Rekap Transaksi** (`RangkumanTransaksi.js`) — `[SELESAI & TERUJI]`
+4. `/olahan` — **Analisis Pesanan** (`OlahanDataPesanan.js`) — `[SELESAI & TERUJI]`
+5. `/return` — **Retur Penjualan** (`ReturnTable.js`) — `[SELESAI & TERUJI]`
+6. `/pengembalian` — **Pengembalian Dana** (`PengembalianTable.js`) — `[SELESAI & TERUJI]`
+7. `/analisis` — **Analisis Produk** (`ProductAnalysis.js`) — `[SELESAI & TERUJI]`
+8. `/aset` — **Aset Barang** (`AsetTable.js`) — `[SELESAI - Standard Card & Viewport Table]`
+9. `/operasional` — **Biaya Operasional** (`OperasionalTable.js`) — `[SELESAI - Standard Card & Viewport Table]`
+10. `/stores` — **Kelola Toko** (`StoreManagement.js`) — `[SELESAI - Standard Card Header]`
 
 ---
 

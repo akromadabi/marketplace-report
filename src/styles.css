@@ -1806,4 +1806,667 @@ h6 {
     font-size: 0.75rem;
     white-space: normal;
   }
+}
+
+/* ==========================================
+   UPLOAD FILE PAGE & COMPACT HISTORY CARDS
+   ========================================== */
+.upload-page-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  width: 100%;
+}
+
+/* ── Main Two-Column Layout on Large Screens ── */
+.upload-main-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.65rem;
+  width: 100%;
+  align-items: start;
+}
+
+.upload-side-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+.upload-history-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+@media (min-width: 1024px) {
+  .upload-main-grid {
+    grid-template-columns: 360px 1fr;
+    gap: 0.85rem;
+  }
+
+  .upload-side-panel {
+    position: sticky;
+    top: 0.65rem;
+    z-index: 10;
+  }
+
+  .upload-side-panel .upload-dropzone {
+    flex-direction: column;
+    text-align: center;
+    padding: 1.5rem 1.25rem;
+    gap: 0.75rem;
+  }
+
+  .upload-side-panel .upload-dropzone-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+  }
+
+  .upload-side-panel .upload-dropzone-title {
+    font-size: 0.875rem;
+  }
+
+  .upload-side-panel .upload-browse-btn {
+    display: none;
+  }
+
+  .upload-history-bar {
+    margin-top: 0;
+  }
+}
+
+@media (min-width: 1440px) {
+  .upload-main-grid {
+    grid-template-columns: 400px 1fr;
+    gap: 1.15rem;
+  }
+}
+
+/* ── Top Header Toolbar ── */
+.upload-header-bar {
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  padding: 0.55rem 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.upload-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+.upload-header-icon-box {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(99, 102, 241, 0.22);
+}
+
+.upload-header-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.upload-header-subtitle {
+  margin: 0;
+  font-size: 0.72rem;
+  color: #64748b;
+  line-height: 1.25;
+}
+
+.upload-header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.upload-store-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 3px 9px;
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  font-size: 0.725rem;
+  font-weight: 600;
+  color: #4f46e5;
+  white-space: nowrap;
+}
+
+.upload-count-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.725rem;
+  font-weight: 600;
+  color: #475569;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  padding: 3px 9px;
+  border-radius: 9999px;
+  white-space: nowrap;
+}
+
+/* ── Compact Dropzone ── */
+.upload-dropzone {
+  border: 1.5px dashed #cbd5e1;
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  background: #ffffff;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.85rem;
+  text-align: left;
+}
+
+.upload-dropzone:hover,
+.upload-dropzone.active {
+  border-color: #6366f1;
+  background: rgba(99, 102, 241, 0.03);
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.08);
+}
+
+.upload-dropzone-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(139, 92, 246, 0.18));
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6366f1;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.upload-dropzone:hover .upload-dropzone-icon {
+  transform: scale(1.05);
+}
+
+.upload-dropzone-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.upload-dropzone-title {
+  margin: 0 0 2px 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #1e293b;
+  line-height: 1.3;
+}
+
+.upload-browse-link {
+  color: #6366f1;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.upload-dropzone-desc {
+  margin: 0;
+  font-size: 0.72rem;
+  color: #64748b;
+  line-height: 1.3;
+}
+
+.upload-browse-btn {
+  flex-shrink: 0;
+  padding: 0.35rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  color: #334155;
+  transition: all 0.15s ease;
+}
+
+.upload-dropzone:hover .upload-browse-btn {
+  background: #6366f1;
+  border-color: #6366f1;
+  color: #ffffff;
+}
+
+/* ── Submit Button ── */
+.upload-submit-btn {
+  width: 100%;
+  padding: 0.55rem 1rem;
+  border-radius: 9px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  border: none;
+}
+
+/* ── History Header & Toolbar ── */
+.upload-history-bar {
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  padding: 0.5rem 0.85rem;
+  margin-top: 0.5rem;
+  margin-bottom: 0.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.upload-history-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.upload-history-icon-box {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background: linear-gradient(135deg, #10b981, #059669);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  flex-shrink: 0;
+}
+
+.upload-history-heading {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.upload-history-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.upload-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.upload-search-input {
+  padding: 0.3rem 0.6rem 0.3rem 1.65rem;
+  font-size: 0.725rem;
+  border-radius: 7px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #0f172a;
+  outline: none;
+  width: 130px;
+  transition: all 0.15s ease;
+}
+
+.upload-search-input:focus {
+  border-color: #6366f1;
+  background: #ffffff;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.12);
+  width: 170px;
+}
+
+.upload-filter-tab {
+  padding: 0.22rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.upload-filter-tab.active {
+  background: #6366f1;
+  border-color: #6366f1;
+  color: #ffffff;
+}
+
+/* ── History Card ── */
+.upload-history-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 0.55rem 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.upload-history-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.04);
+  transform: translateY(-1px);
+}
+
+.upload-card-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.upload-card-icon img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+
+.upload-card-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.upload-card-top-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.upload-card-filename {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #0f172a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 480px;
+  line-height: 1.3;
+}
+
+.upload-card-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.upload-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1.5px 7px;
+  border-radius: 9999px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+}
+
+.upload-badge-orders {
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  color: #4338ca;
+}
+
+.upload-badge-payments {
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #047857;
+}
+
+.upload-badge-return {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #b45309;
+}
+
+.upload-badge-pengembalian {
+  background: #fdf2f8;
+  border: 1px solid #fbcfe8;
+  color: #be185d;
+}
+
+.upload-badge-platform {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #334155;
+}
+
+.upload-badge-platform.tiktok {
+  background: #0f172a;
+  border: 1px solid #0f172a;
+  color: #ffffff;
+}
+
+.upload-badge-platform.shopee {
+  background: #fff7ed;
+  border: 1px solid #ffedd5;
+  color: #c2410c;
+}
+
+.upload-card-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  font-size: 0.72rem;
+  color: #64748b;
+  line-height: 1.3;
+}
+
+.upload-meta-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.upload-meta-chip.warn {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #b45309;
+  font-weight: 700;
+}
+
+.upload-card-del-btn {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  border: 1px solid #fee2e2;
+  background: #fef2f2;
+  color: #ef4444;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.upload-card-del-btn:hover:not(:disabled) {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #dc2626;
+  transform: scale(1.04);
+}
+
+.upload-card-del-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ==========================================
+   MOBILE RESPONSIVENESS (≤ 640px)
+   Ultra Compact & Super Clear (Jelas)
+   ========================================== */
+@media (max-width: 640px) {
+  .upload-header-bar {
+    padding: 0.45rem 0.65rem;
+    gap: 0.35rem;
+  }
+
+  .upload-header-icon-box {
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+  }
+
+  .upload-header-title {
+    font-size: 0.875rem;
+  }
+
+  .upload-header-subtitle {
+    display: none;
+  }
+
+  .upload-header-right {
+    width: 100%;
+    justifyContent: space-between;
+    padding-top: 0.25rem;
+    border-top: 1px solid #f1f5f9;
+  }
+
+  .upload-dropzone {
+    padding: 0.75rem 0.85rem;
+    gap: 0.65rem;
+  }
+
+  .upload-dropzone-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+  }
+
+  .upload-dropzone-title {
+    font-size: 0.78rem;
+  }
+
+  .upload-dropzone-desc {
+    font-size: 0.65rem;
+  }
+
+  .upload-browse-btn {
+    display: none;
+  }
+
+  .upload-history-bar {
+    padding: 0.45rem 0.65rem;
+    gap: 0.35rem;
+  }
+
+  .upload-history-tools {
+    width: 100%;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .upload-search-input {
+    width: 105px;
+    font-size: 0.675rem;
+  }
+
+  .upload-search-input:focus {
+    width: 135px;
+  }
+
+  /* ── Mobile History Card: Compact & Jelas ── */
+  .upload-history-card {
+    padding: 0.5rem 0.6rem;
+    gap: 0.5rem;
+    border-radius: 8px;
+    align-items: flex-start;
+  }
+
+  .upload-card-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    margin-top: 1px;
+  }
+
+  .upload-card-icon img {
+    width: 17px;
+    height: 17px;
+  }
+
+  .upload-card-content {
+    gap: 0.2rem;
+  }
+
+  .upload-card-top-row {
+    gap: 0.3rem;
+  }
+
+  .upload-card-filename {
+    font-size: 0.78rem;
+    max-width: 190px;
+  }
+
+  .upload-badge {
+    font-size: 0.625rem;
+    padding: 1px 5px;
+  }
+
+  .upload-card-meta-row {
+    font-size: 0.68rem;
+    gap: 0.25rem;
+  }
+
+  .upload-meta-chip {
+    font-size: 0.65rem;
+    padding: 1px 4.5px;
+  }
+
+  .upload-card-del-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+  }
 }
