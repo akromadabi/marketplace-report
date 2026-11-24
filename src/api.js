@@ -170,8 +170,97 @@ export async function apiUpdateProfile(userId, { name, currentPassword, newPassw
 }
 
 // ─── Upload ──────────────────────────────────────────────────────
+export async function apiUploadFilesSequentially(
+    files,
+    platformMap,
+    categoryMap,
+    parseFn,
+    userId,
+    storeId,
+    onProgress
+) {
+    const CHUNK_SIZE = 2500;
+    const aggregatedResults = { orders: 0, payments: 0, returns: 0, pengembalian: 0 };
+    const aggregatedSkipped = { orders: 0, payments: 0, returns: 0, pengembalian: 0 };
+    let totalSkipped = 0;
+
+    for (let fileIdx = 0; fileIdx < files.length; fileIdx++) {
+        const file = files[fileIdx];
+        const key = file.name + file.size;
+        const platform = platformMap[key] || 'unknown';
+        const category = categoryMap[key] || 'unknown';
+
+        if (onProgress) onProgress({ fileIdx, fileName: file.name, pct: 0, done: false, stage: 'parsing' });
+
+        // Parse file just-in-time
+        let jsonData = await parseFn(file, platform, category);
+        const totalRows = jsonData ? jsonData.length : 0;
+        const totalChunks = Math.ceil(totalRows / CHUNK_SIZE) || 1;
+
+        if (totalRows === 0) {
+            if (onProgress) onProgress({ fileIdx, fileName: file.name, pct: 100, done: true, stage: 'done' });
+            continue;
+        }
+
+        for (let chunkIdx = 0; chunkIdx < totalChunks; chunkIdx++) {
+            const start = chunkIdx * CHUNK_SIZE;
+            const chunk = jsonData.slice(start, start + CHUNK_SIZE);
+            const singleFilePayload = [{
+                filename: file.name,
+                platform,
+                category,
+                jsonData: chunk
+            }];
+
+            const res = await fetch(`${API_BASE}/upload/parsed`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ files_data: singleFilePayload, user_id: userId, store_id: storeId }),
+            });
+
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({ error: 'Upload gagal' }));
+                throw new Error(err.error || `HTTP ${res.status}`);
+            }
+
+            const jsonResponse = await res.json();
+
+            // Aggregate
+            if (jsonResponse.results) {
+                aggregatedResults.orders += (jsonResponse.results.orders || 0);
+                aggregatedResults.payments += (jsonResponse.results.payments || 0);
+                aggregatedResults.returns += (jsonResponse.results.returns || 0);
+                aggregatedResults.pengembalian += (jsonResponse.results.pengembalian || 0);
+            }
+            if (jsonResponse.skipped) {
+                aggregatedSkipped.orders += (jsonResponse.skipped.orders || 0);
+                aggregatedSkipped.payments += (jsonResponse.skipped.payments || 0);
+                aggregatedSkipped.returns += (jsonResponse.skipped.returns || 0);
+                aggregatedSkipped.pengembalian += (jsonResponse.skipped.pengembalian || 0);
+            }
+            totalSkipped += (jsonResponse.totalSkipped || 0);
+
+            // Report progress for this file
+            const pct = Math.round(((chunkIdx + 1) / totalChunks) * 100);
+            if (onProgress) onProgress({ fileIdx, fileName: file.name, pct, done: pct >= 100, stage: 'uploading' });
+
+            if (totalChunks > 1) await new Promise(r => setTimeout(r, 10));
+        }
+
+        // Release memory
+        jsonData = null;
+    }
+
+    return {
+        success: true,
+        results: aggregatedResults,
+        skipped: aggregatedSkipped,
+        totalSkipped: totalSkipped
+    };
+}
+
 export async function apiUploadParsedFiles(filesData, userId, storeId, onProgress) {
-    const CHUNK_SIZE = 1000;
+    const CHUNK_SIZE = 2500;
     const aggregatedResults = { orders: 0, payments: 0, returns: 0, pengembalian: 0 };
     const aggregatedSkipped = { orders: 0, payments: 0, returns: 0, pengembalian: 0 };
     let totalSkipped = 0;

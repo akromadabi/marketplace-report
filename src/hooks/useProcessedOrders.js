@@ -190,7 +190,7 @@ function buildBaseSnapshot({ ordersData, paymentsMap, returnData, pengembalianDa
 
         const sellerSku = intern((rawOrder['Seller SKU'] || '').toString().trim());
         const skuId = intern((rawOrder['SKU ID'] || '').toString().trim());
-        const variation = intern((rawOrder['Variation'] || '').toString().trim());
+        const variation = intern((rawOrder['Variation'] || rawOrder['SKU Name'] || '').toString().trim());
         const productName = intern((rawOrder['Product Name'] || '').toString().trim());
         const qRaw = rawOrder['Quantity'];
         const q = typeof qRaw === 'string' ? parseInt(qRaw.replace(/\D/g, ''), 10) : Number(qRaw);
@@ -426,10 +426,25 @@ function buildBaseSnapshot({ ordersData, paymentsMap, returnData, pengembalianDa
         });
     }
 
+    // Filter out phantom empty variations if named variations exist for the same skuId
+    const skusWithNamedVars = new Set();
+    for (const item of skuCatalogMap.values()) {
+        if (item['SKU ID'] && item['Variation']) {
+            skusWithNamedVars.add(`${item['Seller SKU']}||${item['SKU ID']}`);
+        }
+    }
+    const filteredSkuCatalog = [];
+    for (const item of skuCatalogMap.values()) {
+        if (item['SKU ID'] && !item['Variation'] && skusWithNamedVars.has(`${item['Seller SKU']}||${item['SKU ID']}`)) {
+            continue;
+        }
+        filteredSkuCatalog.push(item);
+    }
+
     return {
         uploadVersion,
         baseOrders,
-        skuCatalog: Array.from(skuCatalogMap.values()),
+        skuCatalog: filteredSkuCatalog,
         returnData,
         pengembalianData,
         excelPengembalianResiList: Array.from(excelPengembalianResiSet),

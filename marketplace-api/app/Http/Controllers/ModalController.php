@@ -37,7 +37,7 @@ class ModalController extends Controller
 
         $maxUploadId = $uploadIds ? max($uploadIds) : (DB::table('uploads')->max('id') ?? 0);
         $cntUploads  = $uploadIds ? count($uploadIds) : (DB::table('uploads')->count() ?? 0);
-        $cacheKey    = "sku_catalog_v2_{$storeId}_{$userId}_{$cntUploads}_{$maxUploadId}";
+        $cacheKey    = "sku_catalog_v3_{$storeId}_{$userId}_{$cntUploads}_{$maxUploadId}";
 
         $catalog = Cache::store('file')->remember($cacheKey, 86400, function () use ($uploadIds) {
             $query = DB::table('orders')->select('id', 'data', 'channel');
@@ -52,7 +52,7 @@ class ModalController extends Controller
                     if (!is_array($d)) continue;
                     $sellerSku   = trim((string) ($d['Seller SKU'] ?? ''));
                     $skuId       = trim((string) ($d['SKU ID'] ?? ''));
-                    $variation   = trim((string) ($d['Variation'] ?? ''));
+                    $variation   = trim((string) ($d['Variation'] ?? $d['SKU Name'] ?? ''));
                     $productName = trim((string) ($d['Product Name'] ?? ''));
                     if ($sellerSku === '' && $productName === '') continue;
 
@@ -71,6 +71,24 @@ class ModalController extends Controller
                     }
                 }
             });
+
+            // Filter out phantom empty variations if named variations exist for the same skuId
+            $skuWithNamedVar = [];
+            foreach ($uniqueMap as $item) {
+                if ($item['SKU ID'] !== '' && $item['Variation'] !== '') {
+                    $skuWithNamedVar[$item['Seller SKU'] . '||' . $item['SKU ID']] = true;
+                }
+            }
+            if (!empty($skuWithNamedVar)) {
+                foreach ($uniqueMap as $k => $item) {
+                    if ($item['SKU ID'] !== '' && $item['Variation'] === '') {
+                        $skuPrefix = $item['Seller SKU'] . '||' . $item['SKU ID'];
+                        if (isset($skuWithNamedVar[$skuPrefix])) {
+                            unset($uniqueMap[$k]);
+                        }
+                    }
+                }
+            }
 
             return array_values($uniqueMap);
         });

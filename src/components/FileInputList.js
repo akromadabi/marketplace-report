@@ -131,7 +131,7 @@ function FileInputList({ label, files, onRemove, iconSrcGetter, fileCategoryMap,
                                         }} />
                                     </div>
                                     <p style={{ fontSize: '0.5625rem', color: isDone ? '#10b981' : isActive ? 'var(--accent-primary)' : 'var(--text-tertiary)', marginTop: '0.2rem' }}>
-                                        {isDone ? 'Selesai ✓' : isActive ? `Mengupload... ${pct}%` : 'Menunggu giliran...'}
+                                        {isDone ? 'Selesai ✓' : isActive ? (progress?.stage === 'parsing' ? 'Membaca data file...' : `Mengupload... ${pct}%`) : 'Menunggu giliran...'}
                                     </p>
                                 </div>
                             )}

@@ -45,7 +45,7 @@ function InputModal() {
     ordersData.forEach((order) => {
       const sellerSkuRaw = order['Seller SKU'];
       const skuIdRaw = order['SKU ID'];
-      const variationRaw = order['Variation'];
+      const variationRaw = order['Variation'] || order['SKU Name'];
       const productName = order['Product Name'] || '';
       const sellerSku = sellerSkuRaw ? sellerSkuRaw.toString().trim() : '';
       const skuId = skuIdRaw !== undefined && skuIdRaw !== null ? skuIdRaw.toString().trim() : '';
@@ -62,6 +62,17 @@ function InputModal() {
       }
     });
     for (const val of map.values()) {
+      // Remove phantom empty variations if named variations exist for the same skuId
+      const skusWithNamedVars = new Set();
+      val.variations.forEach(v => {
+        if (v.skuId && v.variation) {
+          skusWithNamedVars.add(v.skuId);
+        }
+      });
+      if (skusWithNamedVars.size > 0) {
+        val.variations = val.variations.filter(v => !(v.skuId && !v.variation && skusWithNamedVars.has(v.skuId)));
+      }
+
       val.variations.sort((a, b) => {
         const skuCompare = a.skuId.localeCompare(b.skuId);
         if (skuCompare !== 0) return skuCompare;
@@ -81,6 +92,7 @@ function InputModal() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterMode, setFilterMode] = useState('all'); // all | filled | unfilled
   const [flashSaved, setFlashSaved] = useState(null);
+  const [recentlyFilledKeys, setRecentlyFilledKeys] = useState(() => new Set());
   const [isDirty, setIsDirty] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -133,12 +145,40 @@ function InputModal() {
     return [];
   }
 
+  function getFilteredVariationTypes(allVariations, activeVariations) {
+    if (!activeVariations || activeVariations.length === 0) return [];
+    const baseTypes = getVariationTypes(allVariations);
+    if (baseTypes.length === 0) return [];
+
+    const activeVarStrings = activeVariations.map(v => v.variation);
+    return baseTypes.map(({ index, values }) => {
+      const activeVals = new Set();
+      activeVarStrings.forEach(v => {
+        let parts = v.split(' / ');
+        if (parts.length === 1) parts = v.split(',');
+        parts = parts.map(p => p.trim());
+        if (parts[index]) activeVals.add(parts[index]);
+      });
+      return {
+        index,
+        values: values.filter(val => activeVals.has(val)),
+      };
+    }).filter(dim => dim.values.length > 0);
+  }
+
   function toggleExpand(sku) {
     setExpandedSkus((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(sku)) {
         newSet.delete(sku);
         setBulkInputs((prevBulk) => { const newBulk = { ...prevBulk }; delete newBulk[sku]; return newBulk; });
+        setRecentlyFilledKeys(prevKeys => {
+          const next = new Set(prevKeys);
+          for (const k of next) {
+            if (k.startsWith(sku + '||')) next.delete(k);
+          }
+          return next;
+        });
       } else {
         newSet.add(sku);
         setBulkInputs((prevBulk) => {
@@ -184,6 +224,11 @@ function InputModal() {
       newObj[key] = formatted;
       if (newObj[sellerSku]) delete newObj[sellerSku];
       return newObj;
+    });
+    setRecentlyFilledKeys((prev) => {
+      const next = new Set(prev);
+      next.add(key);
+      return next;
     });
     setIsDirty(true);
   }
@@ -238,11 +283,22 @@ function InputModal() {
     if (!bulk || !bulk.value) return;
     const variations = groupedBySellerSku.find(g => g.sellerSku === sellerSku)?.variations || [];
     if (variations.length === 0) return;
-    const variationTypes = getVariationTypes(variations);
+
+    // Filter target variations based on filterMode
+    const targetVariations = variations.filter(v => {
+      if (filterMode === 'all') return true;
+      const key = sellerSku + '||' + v.skuId + '||' + v.variation;
+      const isFilled = Boolean(modalValues[key]);
+      if (filterMode === 'filled') return isFilled;
+      if (filterMode === 'unfilled') return !isFilled || recentlyFilledKeys.has(key);
+      return true;
+    });
+
+    const variationTypes = getFilteredVariationTypes(variations, targetVariations);
     const selections = bulk.selections || [];
     const keysToUpdate = [];
 
-    variations.forEach(({ skuId, variation }) => {
+    targetVariations.forEach(({ skuId, variation }) => {
       if (variationTypes.length === 0) {
         keysToUpdate.push(sellerSku + '||' + skuId + '||' + variation);
       } else {
@@ -270,6 +326,11 @@ function InputModal() {
         newObj[key] = bulk.value;
       });
       return newObj;
+    });
+    setRecentlyFilledKeys((prev) => {
+      const next = new Set(prev);
+      keysToUpdate.forEach(k => next.add(k));
+      return next;
     });
     setIsDirty(true);
 
@@ -518,7 +579,10 @@ function InputModal() {
                 key={tab.key}
                 type="button"
                 className={`im-filter-tab ${filterMode === tab.key ? 'active' : ''}`}
-                onClick={() => setFilterMode(tab.key)}
+                onClick={() => {
+                  setFilterMode(tab.key);
+                  setRecentlyFilledKeys(new Set());
+                }}
               >
                 {tab.label}
                 <span className="im-filter-count">({tab.count})</span>
@@ -563,7 +627,7 @@ function InputModal() {
               <button
                 className="btn-secondary"
                 style={{ marginTop: '0.65rem', fontSize: '0.8125rem', padding: '0.4rem 0.85rem' }}
-                onClick={() => { setSearchQuery(''); setFilterMode('all'); }}
+                onClick={() => { setSearchQuery(''); setFilterMode('all'); setRecentlyFilledKeys(new Set()); }}
               >
                 Reset Pencarian & Filter
               </button>
@@ -577,7 +641,18 @@ function InputModal() {
             const anyVariationFilled = hasAnyVariationFilled(sellerSku);
             const filledCount = filledVariationCountBySku.get(sellerSku) || 0;
             const isInvalid = invalidSkus.has(sellerSku);
-            const variationTypes = getVariationTypes(variations);
+
+            // Filter variations based on filterMode
+            const targetVariations = variations.filter(v => {
+              if (filterMode === 'all') return true;
+              const key = sellerSku + '||' + v.skuId + '||' + v.variation;
+              const isFilled = Boolean(modalValues[key]);
+              if (filterMode === 'filled') return isFilled;
+              if (filterMode === 'unfilled') return !isFilled || recentlyFilledKeys.has(key);
+              return true;
+            });
+
+            const variationTypes = getFilteredVariationTypes(variations, targetVariations);
             const bulk = bulkInputs[sellerSku] || { selections: [], value: '' };
             const chInfo = getChannelIcon(sellerSku, variations);
             const fillStatus = getSkuFillStatus(sellerSku, variations);
@@ -638,7 +713,13 @@ function InputModal() {
                             title="Klik untuk melihat rincian variasi"
                           >
                             <Layers size={11} />
-                            <span>{variationCount} variasi</span>
+                            <span>
+                              {filterMode === 'unfilled'
+                                ? `${Math.max(0, variationCount - filledCount)} belum terisi`
+                                : filterMode === 'filled'
+                                ? `${filledCount} terisi`
+                                : `${variationCount} variasi`}
+                            </span>
                             {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                           </span>
                         )}
@@ -689,6 +770,13 @@ function InputModal() {
                 {/* Expanded Variations */}
                 {isExpanded && variationCount > 1 && (
                   <div className="im-variations">
+                    {filterMode === 'unfilled' && (
+                      <div style={{ fontSize: '0.72rem', color: '#4f46e5', fontWeight: 600, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.35rem', background: '#eef2ff', padding: '0.35rem 0.65rem', borderRadius: '6px' }}>
+                        <Filter size={12} />
+                        <span>Menampilkan {targetVariations.length} variasi belum terisi (dari {variationCount} total)</span>
+                      </div>
+                    )}
+
                     {/* Bulk Edit Bar */}
                     <div className="im-bulk-bar">
                       <Zap size={14} className="im-bulk-icon" />
@@ -732,45 +820,51 @@ function InputModal() {
                     </div>
 
                     {/* Variation Items */}
-                    <div className="im-var-list">
-                      {variations.filter(({ variation }) => {
-                        if (variationTypes.length === 0) return true;
-                        const selections = bulk.selections || [];
-                        let parts = variation.split(' / ');
-                        if (parts.length === 1) parts = variation.split(',');
-                        parts = parts.map(p => p.trim());
-                        if (parts.length !== variationTypes.length) return true;
-                        for (let i = 0; i < variationTypes.length; i++) {
-                          const sel = selections[i] || 'Semua Variasi';
-                          if (sel !== 'Semua Variasi' && sel !== parts[i]) return false;
-                        }
-                        return true;
-                      }).map(({ skuId, variation }) => {
-                        const key = sellerSku + '||' + skuId + '||' + variation;
-                        const val = modalValues[key] || '';
-                        return (
-                          <div key={key} className={`im-var-item ${val ? 'im-var-filled' : ''}`}>
-                            <div className="im-var-detail">
-                              <span className="im-var-name">{variation || 'Default'}</span>
-                              {skuId && <span className="im-var-skuid">{skuId}</span>}
+                    {targetVariations.length === 0 ? (
+                      <div style={{ padding: '0.75rem', textAlign: 'center', color: '#10b981', fontSize: '0.8rem', fontWeight: 600, background: 'rgba(16, 185, 129, 0.08)', borderRadius: '8px', margin: '0.5rem 0' }}>
+                        ✓ Seluruh variasi pada produk ini telah terisi
+                      </div>
+                    ) : (
+                      <div className="im-var-list">
+                        {targetVariations.filter(({ variation }) => {
+                          if (variationTypes.length === 0) return true;
+                          const selections = bulk.selections || [];
+                          let parts = variation.split(' / ');
+                          if (parts.length === 1) parts = variation.split(',');
+                          parts = parts.map(p => p.trim());
+                          if (parts.length !== variationTypes.length) return true;
+                          for (let i = 0; i < variationTypes.length; i++) {
+                            const sel = selections[i] || 'Semua Variasi';
+                            if (sel !== 'Semua Variasi' && sel !== parts[i]) return false;
+                          }
+                          return true;
+                        }).map(({ skuId, variation }) => {
+                          const key = sellerSku + '||' + skuId + '||' + variation;
+                          const val = modalValues[key] || '';
+                          return (
+                            <div key={key} className={`im-var-item ${val ? 'im-var-filled' : ''}`}>
+                              <div className="im-var-detail">
+                                <span className="im-var-name">{variation || 'Default'}</span>
+                                {skuId && <span className="im-var-skuid">{skuId}</span>}
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                                <input
+                                  type="text"
+                                  inputMode="numeric"
+                                  pattern="[0-9]*"
+                                  placeholder="Rp0"
+                                  className="im-input im-input-sm"
+                                  value={val}
+                                  onInput={(e) => handleVariationInputChange(sellerSku, skuId, variation, e)}
+                                  onKeyDown={handleInputKeyDown}
+                                />
+                                {val && <CheckCircle2 size={14} style={{ color: '#10b981', flexShrink: 0 }} />}
+                              </div>
                             </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                              <input
-                                type="text"
-                                inputMode="numeric"
-                                pattern="[0-9]*"
-                                placeholder="Rp0"
-                                className="im-input im-input-sm"
-                                value={val}
-                                onInput={(e) => handleVariationInputChange(sellerSku, skuId, variation, e)}
-                                onKeyDown={handleInputKeyDown}
-                              />
-                              {val && <CheckCircle2 size={14} style={{ color: '#10b981', flexShrink: 0 }} />}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

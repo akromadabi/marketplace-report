@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import * as XLSX from "xlsx";
 import FileInputList from "./FileInputList";
 import { Upload as UploadIcon, FileSpreadsheet, AlertCircle, Loader2, CheckCircle2, Trash2, Clock, Database, Store, Search, X, Layers, RefreshCw, Sparkles } from "lucide-react";
-import { apiUploadParsedFiles, apiGetUploadHistory, apiDeleteUpload, apiAssignOrphanUploads } from '../api';
+import { apiUploadFilesSequentially, apiGetUploadHistory, apiDeleteUpload, apiAssignOrphanUploads } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useStore } from '../contexts/StoreContext';
 import { useDataCache } from '../contexts/DataContext';
@@ -107,7 +107,6 @@ function UploadFile() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(null);
   const [fileCategoryMap, setFileCategoryMap] = useState({});
-  const [fileParsedDataMap, setFileParsedDataMap] = useState({});
   const [fileRowCountMap, setFileRowCountMap] = useState({});
   const [dragActive, setDragActive] = useState(false);
   const historyCacheKey = `marketplace_upload_history_${user?.id || '0'}_${activeStoreId || 'all'}`;
@@ -282,6 +281,8 @@ function UploadFile() {
     "nama produk": "Product Name",
     "variation": "Variation",
     "variasi": "Variation",
+    "sku name": "Variation",
+    "nama sku": "Variation",
     "quantity": "Quantity",
     "jumlah": "Quantity",
     "kuantitas": "Quantity",
@@ -515,18 +516,148 @@ function UploadFile() {
     });
   }
 
-  function parseFile(file) {
+  function quickDetectFile(file) {
+    return new Promise((resolve, reject) => {
+      // Fast path for CSV files
+      if (file.name.toLowerCase().endsWith('.csv')) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const text = e.target.result;
+            let rowCount = 0;
+            let firstLine = '';
+            for (let i = 0; i < text.length; i++) {
+              if (text.charCodeAt(i) === 10) {
+                if (!firstLine) firstLine = text.slice(0, i).trim();
+                rowCount++;
+              }
+            }
+            if (!firstLine && text.length > 0) firstLine = text.trim();
+            const headers = firstLine.split(',').map((h) => h.replace(/^["']|["']$/g, '').trim());
+            const { platform, category } = detectPlatformAndCategory(headers, ['Sheet1']);
+            resolve({ platform, category, rowCount: Math.max(0, rowCount) });
+          } catch (err) {
+            reject(err);
+          }
+        };
+        reader.onerror = () => reject(new Error('Gagal membaca file CSV.'));
+        reader.readAsText(file);
+        return;
+      }
+
+      // Fast path for Excel (.xlsx, .xls) files:
+      // sheetRows: 10 reads ONLY the first 10 rows into memory!
+      // This finishes in ~100ms even for 150k+ row workbooks.
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, {
+            type: 'array',
+            sheetRows: 10,
+            cellFormula: false,
+            cellHTML: false,
+            cellText: false,
+          });
+
+          const sheetNames = workbook.SheetNames || [];
+          const isShopeeIncome = sheetNames.includes('Income');
+          const isTiktokIncome = sheetNames.includes('Order details') || sheetNames.includes('Detail pesanan');
+
+          let targetSheetName = sheetNames[0];
+          let headerRowIdx = 0;
+
+          if (isShopeeIncome) {
+            targetSheetName = 'Income';
+            headerRowIdx = 5;
+          } else if (isTiktokIncome) {
+            targetSheetName = sheetNames.includes('Order details') ? 'Order details' : 'Detail pesanan';
+            headerRowIdx = 0;
+          }
+
+          const ws = workbook.Sheets[targetSheetName] || workbook.Sheets[sheetNames[0]];
+          const headers = [];
+          let rowCount = 0;
+
+          if (ws) {
+            const fullRef = ws['!fullref'] || ws['!ref'];
+            if (fullRef) {
+              const range = XLSX.utils.decode_range(fullRef);
+              for (let C = range.s.c; C <= range.e.c; ++C) {
+                const cellRef = XLSX.utils.encode_cell({ c: C, r: headerRowIdx });
+                const cell = ws[cellRef];
+                if (cell && cell.v !== undefined) headers.push(cell.v.toString().trim());
+              }
+
+              // Fallback: if row 0 was blank, inspect row 1..4
+              if (headers.length === 0) {
+                for (let r = 1; r <= Math.min(4, range.e.r); r++) {
+                  const fallbackHeaders = [];
+                  for (let C = range.s.c; C <= range.e.c; ++C) {
+                    const cRef = XLSX.utils.encode_cell({ c: C, r });
+                    const cCell = ws[cRef];
+                    if (cCell && cCell.v !== undefined) fallbackHeaders.push(cCell.v.toString().trim());
+                  }
+                  if (fallbackHeaders.length > 0) {
+                    headers.push(...fallbackHeaders);
+                    headerRowIdx = r;
+                    break;
+                  }
+                }
+              }
+            }
+          }
+
+          const detected = detectPlatformAndCategory(headers, sheetNames);
+          const platform = detected.platform;
+          const category = detected.category;
+
+          if (ws) {
+            const fullRef = ws['!fullref'] || ws['!ref'];
+            if (fullRef) {
+              const range = XLSX.utils.decode_range(fullRef);
+              if (platform === 'shopee' && category === 'payments') {
+                rowCount = Math.max(0, range.e.r - 5);
+              } else if (platform === 'tiktok' && category === 'orders') {
+                rowCount = Math.max(0, range.e.r - 1);
+              } else {
+                rowCount = Math.max(0, range.e.r - range.s.r);
+              }
+            }
+          }
+
+          resolve({ platform, category, rowCount });
+        } catch (err) {
+          reject(err);
+        }
+      };
+      reader.onerror = () => reject(new Error('Gagal membaca file.'));
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  function parseFullFile(file, platform, category) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = (e) => {
         try {
           const data = new Uint8Array(e.target.result);
-          const workbook = XLSX.read(data, { type: "array" });
+          const workbook = XLSX.read(data, {
+            type: 'array',
+            cellFormula: false,
+            cellHTML: false,
+            cellText: false,
+          });
           const firstSheetName = workbook.SheetNames[0];
           const worksheet = workbook.Sheets[firstSheetName];
-          // Fix incorrect !ref in xlsx sheets by scanning actual cell keys
-          const fixRange = (ws) => {
-            if (!ws || !ws['!ref']) return;
+
+          // Quick ref fix only if !ref is missing or indicates single cell
+          const fixRangeIfNeeded = (ws) => {
+            if (!ws) return;
+            if (ws['!ref']) {
+              const cur = XLSX.utils.decode_range(ws['!ref']);
+              if (cur.e.r > 2) return; // Already has multi-row valid range!
+            }
             let maxR = 0, maxC = 0;
             for (const key of Object.keys(ws)) {
               if (key.startsWith('!')) continue;
@@ -539,37 +670,23 @@ function UploadFile() {
               if (c > maxC) maxC = c;
             }
             if (maxR > 0) {
-              const cur = XLSX.utils.decode_range(ws['!ref']);
-              if (maxR - 1 > cur.e.r || maxC - 1 > cur.e.c) {
-                ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: maxR - 1, c: Math.max(maxC - 1, cur.e.c) } });
-              }
+              const cur = ws['!ref'] ? XLSX.utils.decode_range(ws['!ref']) : { e: { c: 0 } };
+              ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: maxR - 1, c: Math.max(maxC - 1, cur.e.c || 0) } });
             }
           };
-          fixRange(worksheet);
-          const headers = [];
-          const range = XLSX.utils.decode_range(worksheet["!ref"]);
-          const firstRow = range.s.r;
-          for (let C = range.s.c; C <= range.e.c; ++C) {
-            const cellRef = XLSX.utils.encode_cell({ c: C, r: firstRow });
-            const cell = worksheet[cellRef];
-            if (cell && cell.v !== undefined) headers.push(cell.v.toString());
-          }
-          const { platform, category } = detectPlatformAndCategory(headers, workbook.SheetNames);
+          fixRangeIfNeeded(worksheet);
+
           let jsonData;
-          // Special handling for TikTok Income format baru (sheet: "Order details" or "Detail pesanan")
+          // Special handling for TikTok Income format baru
           if (platform === 'tiktok' && category === 'payments' && (workbook.SheetNames.includes('Order details') || workbook.SheetNames.includes('Detail pesanan'))) {
             const targetSheetName = workbook.SheetNames.includes('Order details') ? 'Order details' : 'Detail pesanan';
             const orderDetailsSheet = workbook.Sheets[targetSheetName];
-            if (orderDetailsSheet) {
-              // Read directly — format baru sudah punya header di baris pertama
-              jsonData = XLSX.utils.sheet_to_json(orderDetailsSheet, { defval: '' });
-            } else {
-              jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
-            }
-          // Special handling for Shopee Income (payments)
+            jsonData = XLSX.utils.sheet_to_json(orderDetailsSheet || worksheet, { defval: '' });
+          // Special handling for Shopee Income
           } else if (platform === 'shopee' && category === 'payments') {
             const incomeSheet = workbook.Sheets['Income'];
             if (incomeSheet) {
+              fixRangeIfNeeded(incomeSheet);
               const incomeRange = XLSX.utils.decode_range(incomeSheet['!ref']);
               const incomeHeaders = [];
               for (let C = incomeRange.s.c; C <= incomeRange.e.c; ++C) {
@@ -590,13 +707,15 @@ function UploadFile() {
               }
               jsonData = rows;
             } else {
-              jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+              jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
             }
           } else {
-            jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+            jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
           }
-          if (category === "orders" && platform === "tiktok") jsonData = jsonData.slice(1);
-          if (category === "pengembalian") {
+
+          if (category === 'orders' && platform === 'tiktok') jsonData = jsonData.slice(1);
+
+          if (category === 'pengembalian') {
             jsonData = jsonData.map((row) => {
               const newRow = { ...row };
               Object.keys(newRow).forEach((key) => {
@@ -605,10 +724,10 @@ function UploadFile() {
                   if (val) {
                     let dateObj = null;
                     if (val instanceof Date) dateObj = val;
-                    else if (typeof val === "number") {
+                    else if (typeof val === 'number') {
                       const d = XLSX.SSF.parse_date_code(val);
                       if (d) dateObj = new Date(Date.UTC(d.y, d.m - 1, d.d, d.H, d.M, d.S));
-                    } else if (typeof val === "string") {
+                    } else if (typeof val === 'string') {
                       let parsedDate = new Date(val);
                       if (!isNaN(parsedDate)) dateObj = parsedDate;
                       else {
@@ -631,23 +750,25 @@ function UploadFile() {
               return newRow;
             });
           }
-          if (platform === "shopee" && category === "orders") jsonData = mapShopeeHeadersToStandard(jsonData);
-          if (platform === "shopee" && category === "payments") jsonData = mapShopeeIncomeToStandard(jsonData);
-          if (platform === "shopee" && category === "return") jsonData = mapShopeeReturnToStandard(jsonData);
-          if (platform === "tiktok") jsonData = mapTiktokHeadersToStandard(jsonData);
+
+          if (platform === 'shopee' && category === 'orders') jsonData = mapShopeeHeadersToStandard(jsonData);
+          if (platform === 'shopee' && category === 'payments') jsonData = mapShopeeIncomeToStandard(jsonData);
+          if (platform === 'shopee' && category === 'return') jsonData = mapShopeeReturnToStandard(jsonData);
+          if (platform === 'tiktok') jsonData = mapTiktokHeadersToStandard(jsonData);
+
           jsonData = pruneClientData(jsonData, category);
-          resolve({ file, platform, category, data: jsonData });
-        } catch {
-          reject("Gagal membaca salah satu file. Pastikan file valid.");
+          resolve(jsonData);
+        } catch (err) {
+          reject(new Error('Gagal membaca file: ' + (err.message || 'Pastikan file valid.')));
         }
       };
-      reader.onerror = () => reject("Gagal membaca salah satu file. Pastikan file valid.");
+      reader.onerror = () => reject(new Error('Gagal membaca file dari penyimpanan.'));
       reader.readAsArrayBuffer(file);
     });
   }
 
   function addFiles(newFiles) {
-    setError("");
+    setError('');
     setAllFiles((prev) => {
       const existingKeys = new Set(prev.map((f) => f.name + f.size));
       const filteredNew = newFiles.filter((f) => !existingKeys.has(f.name + f.size));
@@ -666,7 +787,6 @@ function UploadFile() {
       const keyToRemove = prev[index].name + prev[index].size;
       newArr.splice(index, 1);
       setFileCategoryMap((p) => { const m = { ...p }; delete m[keyToRemove]; return m; });
-      setFileParsedDataMap((p) => { const m = { ...p }; delete m[keyToRemove]; return m; });
       setFileRowCountMap((p) => { const m = { ...p }; delete m[keyToRemove]; return m; });
       return newArr;
     });
@@ -678,7 +798,6 @@ function UploadFile() {
     async function detectAll() {
       const newCache = { ...filePlatformCache };
       const newCategoryMap = { ...fileCategoryMap };
-      const newParsedDataMap = { ...fileParsedDataMap };
       const newRowCountMap = { ...fileRowCountMap };
       let changed = false;
       for (const file of allFiles) {
@@ -686,15 +805,13 @@ function UploadFile() {
         if (!(key in newCache)) {
           changed = true;
           try {
-            const { platform, category, data } = await parseFile(file);
+            const { platform, category, rowCount } = await quickDetectFile(file);
             newCache[key] = platform;
             newCategoryMap[key] = category;
-            newParsedDataMap[key] = data;
-            newRowCountMap[key] = data.length;
+            newRowCountMap[key] = rowCount;
           } catch {
-            newCache[key] = "unknown";
-            newCategoryMap[key] = "unknown";
-            newParsedDataMap[key] = [];
+            newCache[key] = 'unknown';
+            newCategoryMap[key] = 'unknown';
             newRowCountMap[key] = 0;
           }
         }
@@ -702,7 +819,6 @@ function UploadFile() {
       if (changed) {
         setFilePlatformCache(newCache);
         setFileCategoryMap(newCategoryMap);
-        setFileParsedDataMap(newParsedDataMap);
         setFileRowCountMap(newRowCountMap);
       }
     }
@@ -710,9 +826,9 @@ function UploadFile() {
     else {
       setFilePlatformCache({});
       setFileCategoryMap({});
-      setFileParsedDataMap({});
       setFileRowCountMap({});
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allFiles]);
 
   function getIconForFile(file, category) {
@@ -724,49 +840,52 @@ function UploadFile() {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    setError("");
+    setError('');
     setSuccess(null);
-    if (allFiles.length === 0) { setError("Harap unggah minimal satu file."); return; }
+    if (allFiles.length === 0) { setError('Harap unggah minimal satu file.'); return; }
     setUploading(true);
+
     // Initialise progress entries for all files
-    const payloadData = allFiles.map((file) => {
-      const key = file.name + file.size;
-      return {
-        filename: file.name,
-        platform: filePlatformCache[key],
-        category: fileCategoryMap[key],
-        jsonData: fileParsedDataMap[key] || [],
-      };
-    });
-    setUploadProgress(payloadData.map(f => ({ fileName: f.filename, pct: 0, done: false, active: false })));
+    setUploadProgress(allFiles.map((f) => ({ fileName: f.name, pct: 0, done: false, active: false, stage: 'waiting' })));
     const notifId = addNotification({
       type: 'loading',
       message: `Memproses ${allFiles.length} file... Anda bisa berpindah halaman, proses tetap berjalan.`,
       persistent: true,
     });
+
     try {
-      const result = await apiUploadParsedFiles(payloadData, user?.id, activeStoreId, ({ fileIdx, pct, done }) => {
-        setUploadProgress(prev => prev.map((entry, idx) => {
-          if (idx === fileIdx) return { ...entry, pct, done, active: !done };
-          if (idx < fileIdx) return { ...entry, done: true, pct: 100, active: false };
-          return entry;
-        }));
-      });
+      const result = await apiUploadFilesSequentially(
+        allFiles,
+        filePlatformCache,
+        fileCategoryMap,
+        parseFullFile,
+        user?.id,
+        activeStoreId,
+        ({ fileIdx, pct, done, stage }) => {
+          setUploadProgress((prev) => prev.map((entry, idx) => {
+            if (idx === fileIdx) return { ...entry, pct, done, active: !done, stage };
+            if (idx < fileIdx) return { ...entry, done: true, pct: 100, active: false, stage: 'done' };
+            return entry;
+          }));
+        }
+      );
+
       setSuccess({ ...result.results, skipped: result.skipped, totalSkipped: result.totalSkipped || 0 });
       setAllFiles([]);
       setFileCategoryMap({});
-      setFileParsedDataMap({});
       setFileRowCountMap({});
       setFilePlatformCache({});
       setUploadProgress([]);
       fetchHistory();
       invalidateAll();
+
       const parts = [];
-      if (result.results.orders > 0) parts.push(`${result.results.orders} pesanan`);
-      if (result.results.payments > 0) parts.push(`${result.results.payments} pembayaran`);
-      if (result.results.returns > 0) parts.push(`${result.results.returns} retur`);
-      if (result.results.pengembalian > 0) parts.push(`${result.results.pengembalian} pengembalian`);
-      const skipText = (result.totalSkipped || 0) > 0 ? ` (${result.totalSkipped} duplikat dilewati)` : '';
+      if (result.results.orders > 0) parts.push(`${result.results.orders.toLocaleString('id-ID')} pesanan`);
+      if (result.results.payments > 0) parts.push(`${result.results.payments.toLocaleString('id-ID')} pembayaran`);
+      if (result.results.returns > 0) parts.push(`${result.results.returns.toLocaleString('id-ID')} retur`);
+      if (result.results.pengembalian > 0) parts.push(`${result.results.pengembalian.toLocaleString('id-ID')} pengembalian`);
+      const skipText = (result.totalSkipped || 0) > 0 ? ` (${result.totalSkipped.toLocaleString('id-ID')} duplikat dilewati)` : '';
+
       updateNotification(notifId, {
         type: 'success',
         message: `Upload selesai! ${parts.join(', ')} tersimpan.${skipText}`,
@@ -781,8 +900,9 @@ function UploadFile() {
         persistent: false,
         duration: 8000,
       });
+    } finally {
+      setUploading(false);
     }
-    setUploading(false);
   }
 
   // Drag and drop handlers
