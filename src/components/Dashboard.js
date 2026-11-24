@@ -15,6 +15,7 @@ import {
     TrendingUp, RotateCcw,
     ArrowUpRight, Package, Calendar, ChevronLeft, ChevronRight,
     HourglassIcon, Handshake, Truck, Landmark, Info, Search, CreditCard, Clock, Store,
+    Filter, Check,
 } from 'lucide-react';
 
 function formatRupiah(number) {
@@ -644,6 +645,28 @@ function Dashboard() {
     const [selectedBarIndex, setSelectedBarIndex] = useState(null);
     const [rightPanelTab, setRightPanelTab] = useState('operasional');
 
+    const [windowWidth, setWindowWidth] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : 1200));
+    useEffect(() => {
+        function handleResize() {
+            setWindowWidth(window.innerWidth);
+        }
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
+    const [mobileCardMenu, setMobileCardMenu] = useState(null); // null | 'earning' | 'breakdown' | 'cashflow'
+
+    useEffect(() => {
+        if (!mobileCardMenu) return;
+        function handleOutside(e) {
+            if (!e.target.closest('[data-mobile-card-menu]')) {
+                setMobileCardMenu(null);
+            }
+        }
+        document.addEventListener('pointerdown', handleOutside);
+        return () => document.removeEventListener('pointerdown', handleOutside);
+    }, [mobileCardMenu]);
+
     useEffect(() => {
         function handleClickOutside(e) {
             if (datePickerRef.current && !datePickerRef.current.contains(e.target)) setShowDatePicker(false);
@@ -943,7 +966,7 @@ function Dashboard() {
         );
     }
 
-    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+    const isMobile = windowWidth < 768;
 
     const profitMarginPct = sums.labaKotor > 0 ? ((sums.labaBersih / sums.labaKotor) * 100).toFixed(1) : '0.0';
     const orderSuccessPct = sums.pesananOrder > 0 ? ((sums.fixTerbeliOrder / sums.pesananOrder) * 100).toFixed(1) : '0.0';
@@ -1625,41 +1648,114 @@ function Dashboard() {
                                 <Info size={13} color="var(--text-tertiary)" title="Ringkasan tren penerimaan bersih dan margin kontribusi toko Anda" />
                             </div>
 
-                            <div
-                                style={{
-                                    display: 'flex',
-                                    background: '#f4f5f9',
-                                    padding: '2px',
-                                    borderRadius: '9999px',
-                                    border: '1px solid #e5e7f0',
-                                }}
-                            >
-                                {[
-                                    { id: 'labaBersih', label: isMobile ? 'Margin' : 'Margin Kontribusi' },
-                                    { id: 'labaKotor', label: isMobile ? 'Penerimaan' : 'Penerimaan Bersih' },
-                                    { id: 'aset', label: isMobile ? '+ Persediaan' : 'Margin + Persediaan' },
-                                ].map((tab) => (
+                            {isMobile ? (
+                                <div style={{ position: 'relative' }} data-mobile-card-menu="earning">
                                     <button
-                                        key={tab.id}
                                         type="button"
-                                        onClick={() => setEarningMode(tab.id)}
+                                        title="Pilih Mode Earning"
+                                        onClick={() => setMobileCardMenu(mobileCardMenu === 'earning' ? null : 'earning')}
                                         style={{
-                                            padding: isMobile ? '3px 8px' : '4px 11px',
-                                            borderRadius: '9999px',
-                                            border: 'none',
-                                            fontSize: isMobile ? '0.65rem' : '0.7rem',
-                                            fontWeight: 700,
+                                            width: 28,
+                                            height: 28,
+                                            borderRadius: '50%',
+                                            background: earningMode !== 'labaBersih' ? 'rgba(124, 58, 237, 0.12)' : '#f4f5f9',
+                                            border: earningMode !== 'labaBersih' ? '1px solid #7c3aed' : '1px solid #e5e7f0',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
                                             cursor: 'pointer',
-                                            background: earningMode === tab.id ? '#ffffff' : 'transparent',
-                                            color: earningMode === tab.id ? '#7c3aed' : 'var(--text-secondary)',
-                                            boxShadow: earningMode === tab.id ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                                            transition: 'background 0.15s ease, color 0.15s ease',
+                                            color: earningMode !== 'labaBersih' ? '#7c3aed' : 'var(--text-secondary)',
+                                            transition: 'all 0.15s ease',
                                         }}
                                     >
-                                        {tab.label}
+                                        <Filter size={13} />
                                     </button>
-                                ))}
-                            </div>
+                                    {mobileCardMenu === 'earning' && (
+                                        <div
+                                            style={{
+                                                position: 'absolute',
+                                                top: '120%',
+                                                right: 0,
+                                                width: '185px',
+                                                background: '#ffffff',
+                                                borderRadius: '12px',
+                                                padding: '0.4rem',
+                                                boxShadow: '0 10px 28px rgba(0,0,0,0.15)',
+                                                border: '1px solid #e5e7f0',
+                                                zIndex: 100,
+                                            }}
+                                        >
+                                            <div style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', fontWeight: 700, padding: '0.2rem 0.5rem', textTransform: 'uppercase' }}>
+                                                Mode Tampilan
+                                            </div>
+                                            {[
+                                                { id: 'labaBersih', label: 'Margin Kontribusi' },
+                                                { id: 'labaKotor', label: 'Penerimaan Bersih' },
+                                                { id: 'aset', label: 'Margin + Persediaan' },
+                                            ].map((tab) => (
+                                                <button
+                                                    key={tab.id}
+                                                    type="button"
+                                                    onClick={() => { setEarningMode(tab.id); setMobileCardMenu(null); }}
+                                                    style={{
+                                                        width: '100%',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'space-between',
+                                                        padding: '0.45rem 0.55rem',
+                                                        background: earningMode === tab.id ? 'rgba(124, 58, 237, 0.08)' : 'transparent',
+                                                        border: 'none',
+                                                        color: earningMode === tab.id ? '#7c3aed' : 'var(--text-primary)',
+                                                        borderRadius: '8px',
+                                                        fontSize: '0.75rem',
+                                                        fontWeight: 600,
+                                                        cursor: 'pointer',
+                                                    }}
+                                                >
+                                                    <span>{tab.label}</span>
+                                                    {earningMode === tab.id && <Check size={14} color="#7c3aed" />}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div
+                                    style={{
+                                        display: 'flex',
+                                        background: '#f4f5f9',
+                                        padding: '2px',
+                                        borderRadius: '9999px',
+                                        border: '1px solid #e5e7f0',
+                                    }}
+                                >
+                                    {[
+                                        { id: 'labaBersih', label: 'Margin Kontribusi' },
+                                        { id: 'labaKotor', label: 'Penerimaan Bersih' },
+                                        { id: 'aset', label: 'Margin + Persediaan' },
+                                    ].map((tab) => (
+                                        <button
+                                            key={tab.id}
+                                            type="button"
+                                            onClick={() => setEarningMode(tab.id)}
+                                            style={{
+                                                padding: '4px 11px',
+                                                borderRadius: '9999px',
+                                                border: 'none',
+                                                fontSize: '0.7rem',
+                                                fontWeight: 700,
+                                                cursor: 'pointer',
+                                                background: earningMode === tab.id ? '#ffffff' : 'transparent',
+                                                color: earningMode === tab.id ? '#7c3aed' : 'var(--text-secondary)',
+                                                boxShadow: earningMode === tab.id ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                                                transition: 'background 0.15s ease, color 0.15s ease',
+                                            }}
+                                        >
+                                            {tab.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
 
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.6rem', flexWrap: 'wrap', marginBottom: '0.2rem' }}>
@@ -1776,41 +1872,114 @@ function Dashboard() {
                                 <Info size={13} color="var(--text-tertiary)" title="Proporsi status pesanan, penerimaan dana, dan alokasi HPP" />
                             </div>
 
-                            <div
-                                style={{
-                                    display: 'flex',
-                                    background: '#f4f5f9',
-                                    padding: '2px',
-                                    borderRadius: '9999px',
-                                    border: '1px solid #e5e7f0',
-                                }}
-                            >
-                                {[
-                                    { id: 'status', label: 'Status' },
-                                    { id: 'keuangan', label: isMobile ? 'HPP' : 'HPP & Margin' },
-                                    { id: 'pencairan', label: isMobile ? 'Pencairan' : 'Penerimaan Dana' },
-                                ].map((tab) => (
+                            {isMobile ? (
+                                <div style={{ position: 'relative' }} data-mobile-card-menu="breakdown">
                                     <button
-                                        key={tab.id}
                                         type="button"
-                                        onClick={() => setBreakdownMode(tab.id)}
+                                        title="Pilih Proporsi Breakdown"
+                                        onClick={() => setMobileCardMenu(mobileCardMenu === 'breakdown' ? null : 'breakdown')}
                                         style={{
-                                            padding: isMobile ? '3px 8px' : '4px 11px',
-                                            borderRadius: '9999px',
-                                            border: 'none',
-                                            fontSize: isMobile ? '0.65rem' : '0.7rem',
-                                            fontWeight: 700,
+                                            width: 28,
+                                            height: 28,
+                                            borderRadius: '50%',
+                                            background: breakdownMode !== 'status' ? 'rgba(124, 58, 237, 0.12)' : '#f4f5f9',
+                                            border: breakdownMode !== 'status' ? '1px solid #7c3aed' : '1px solid #e5e7f0',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
                                             cursor: 'pointer',
-                                            background: breakdownMode === tab.id ? '#ffffff' : 'transparent',
-                                            color: breakdownMode === tab.id ? '#7c3aed' : 'var(--text-secondary)',
-                                            boxShadow: breakdownMode === tab.id ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                                            transition: 'background 0.15s ease, color 0.15s ease',
+                                            color: breakdownMode !== 'status' ? '#7c3aed' : 'var(--text-secondary)',
+                                            transition: 'all 0.15s ease',
                                         }}
                                     >
-                                        {tab.label}
+                                        <Filter size={13} />
                                     </button>
-                                ))}
-                            </div>
+                                    {mobileCardMenu === 'breakdown' && (
+                                        <div
+                                            style={{
+                                                position: 'absolute',
+                                                top: '120%',
+                                                right: 0,
+                                                width: '185px',
+                                                background: '#ffffff',
+                                                borderRadius: '12px',
+                                                padding: '0.4rem',
+                                                boxShadow: '0 10px 28px rgba(0,0,0,0.15)',
+                                                border: '1px solid #e5e7f0',
+                                                zIndex: 100,
+                                            }}
+                                        >
+                                            <div style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', fontWeight: 700, padding: '0.2rem 0.5rem', textTransform: 'uppercase' }}>
+                                                Mode Proporsi
+                                            </div>
+                                            {[
+                                                { id: 'status', label: 'Status Pesanan' },
+                                                { id: 'keuangan', label: 'HPP & Margin' },
+                                                { id: 'pencairan', label: 'Penerimaan Dana' },
+                                            ].map((tab) => (
+                                                <button
+                                                    key={tab.id}
+                                                    type="button"
+                                                    onClick={() => { setBreakdownMode(tab.id); setMobileCardMenu(null); }}
+                                                    style={{
+                                                        width: '100%',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'space-between',
+                                                        padding: '0.45rem 0.55rem',
+                                                        background: breakdownMode === tab.id ? 'rgba(124, 58, 237, 0.08)' : 'transparent',
+                                                        border: 'none',
+                                                        color: breakdownMode === tab.id ? '#7c3aed' : 'var(--text-primary)',
+                                                        borderRadius: '8px',
+                                                        fontSize: '0.75rem',
+                                                        fontWeight: 600,
+                                                        cursor: 'pointer',
+                                                    }}
+                                                >
+                                                    <span>{tab.label}</span>
+                                                    {breakdownMode === tab.id && <Check size={14} color="#7c3aed" />}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div
+                                    style={{
+                                        display: 'flex',
+                                        background: '#f4f5f9',
+                                        padding: '2px',
+                                        borderRadius: '9999px',
+                                        border: '1px solid #e5e7f0',
+                                    }}
+                                >
+                                    {[
+                                        { id: 'status', label: 'Status' },
+                                        { id: 'keuangan', label: 'HPP & Margin' },
+                                        { id: 'pencairan', label: 'Penerimaan Dana' },
+                                    ].map((tab) => (
+                                        <button
+                                            key={tab.id}
+                                            type="button"
+                                            onClick={() => setBreakdownMode(tab.id)}
+                                            style={{
+                                                padding: '4px 11px',
+                                                borderRadius: '9999px',
+                                                border: 'none',
+                                                fontSize: '0.7rem',
+                                                fontWeight: 700,
+                                                cursor: 'pointer',
+                                                background: breakdownMode === tab.id ? '#ffffff' : 'transparent',
+                                                color: breakdownMode === tab.id ? '#7c3aed' : 'var(--text-secondary)',
+                                                boxShadow: breakdownMode === tab.id ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                                                transition: 'background 0.15s ease, color 0.15s ease',
+                                            }}
+                                        >
+                                            {tab.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
 
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.6rem', flexWrap: 'wrap', marginBottom: '0.2rem' }}>
@@ -1938,50 +2107,126 @@ function Dashboard() {
                                 <Info size={13} color="var(--text-tertiary)" title="Klik batang grafik untuk menginspeksi rincian bulan/tanggal tertentu" />
                             </div>
 
-                            <div
-                                style={{
-                                    display: 'flex',
-                                    background: '#f4f5f9',
-                                    padding: '2px',
-                                    borderRadius: '9999px',
-                                    border: '1px solid #e5e7f0',
-                                }}
-                            >
-                                <button
-                                    type="button"
-                                    onClick={() => { setGranularityOverride('monthly'); setSelectedBarIndex(null); }}
+                            {isMobile ? (
+                                <div style={{ position: 'relative' }} data-mobile-card-menu="cashflow">
+                                    <button
+                                        type="button"
+                                        title="Pilih Periode Grafik"
+                                        onClick={() => setMobileCardMenu(mobileCardMenu === 'cashflow' ? null : 'cashflow')}
+                                        style={{
+                                            width: 28,
+                                            height: 28,
+                                            borderRadius: '50%',
+                                            background: !isMonthly ? 'rgba(124, 58, 237, 0.12)' : '#f4f5f9',
+                                            border: !isMonthly ? '1px solid #7c3aed' : '1px solid #e5e7f0',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            cursor: 'pointer',
+                                            color: !isMonthly ? '#7c3aed' : 'var(--text-secondary)',
+                                            transition: 'all 0.15s ease',
+                                        }}
+                                    >
+                                        <Filter size={13} />
+                                    </button>
+                                    {mobileCardMenu === 'cashflow' && (
+                                        <div
+                                            style={{
+                                                position: 'absolute',
+                                                top: '120%',
+                                                right: 0,
+                                                width: '175px',
+                                                background: '#ffffff',
+                                                borderRadius: '12px',
+                                                padding: '0.4rem',
+                                                boxShadow: '0 10px 28px rgba(0,0,0,0.15)',
+                                                border: '1px solid #e5e7f0',
+                                                zIndex: 100,
+                                            }}
+                                        >
+                                            <div style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', fontWeight: 700, padding: '0.2rem 0.5rem', textTransform: 'uppercase' }}>
+                                                Periode Grafik
+                                            </div>
+                                            {[
+                                                { id: 'monthly', label: 'Tampilan Bulanan' },
+                                                { id: 'daily', label: 'Tampilan Harian' },
+                                            ].map((opt) => (
+                                                <button
+                                                    key={opt.id}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setGranularityOverride(opt.id);
+                                                        setSelectedBarIndex(null);
+                                                        setMobileCardMenu(null);
+                                                    }}
+                                                    style={{
+                                                        width: '100%',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'space-between',
+                                                        padding: '0.45rem 0.55rem',
+                                                        background: ((opt.id === 'monthly' && isMonthly) || (opt.id === 'daily' && !isMonthly)) ? 'rgba(124, 58, 237, 0.08)' : 'transparent',
+                                                        border: 'none',
+                                                        color: ((opt.id === 'monthly' && isMonthly) || (opt.id === 'daily' && !isMonthly)) ? '#7c3aed' : 'var(--text-primary)',
+                                                        borderRadius: '8px',
+                                                        fontSize: '0.75rem',
+                                                        fontWeight: 600,
+                                                        cursor: 'pointer',
+                                                    }}
+                                                >
+                                                    <span>{opt.label}</span>
+                                                    {((opt.id === 'monthly' && isMonthly) || (opt.id === 'daily' && !isMonthly)) && <Check size={14} color="#7c3aed" />}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div
                                     style={{
-                                        padding: isMobile ? '3px 8px' : '4px 12px',
+                                        display: 'flex',
+                                        background: '#f4f5f9',
+                                        padding: '2px',
                                         borderRadius: '9999px',
-                                        border: 'none',
-                                        fontSize: isMobile ? '0.68rem' : '0.725rem',
-                                        fontWeight: 700,
-                                        cursor: 'pointer',
-                                        background: isMonthly ? '#ffffff' : 'transparent',
-                                        color: isMonthly ? '#7c3aed' : 'var(--text-secondary)',
-                                        boxShadow: isMonthly ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                                        border: '1px solid #e5e7f0',
                                     }}
                                 >
-                                    Bulanan
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => { setGranularityOverride('daily'); setSelectedBarIndex(null); }}
-                                    style={{
-                                        padding: isMobile ? '3px 8px' : '4px 12px',
-                                        borderRadius: '9999px',
-                                        border: 'none',
-                                        fontSize: isMobile ? '0.68rem' : '0.725rem',
-                                        fontWeight: 700,
-                                        cursor: 'pointer',
-                                        background: !isMonthly ? '#ffffff' : 'transparent',
-                                        color: !isMonthly ? '#7c3aed' : 'var(--text-secondary)',
-                                        boxShadow: !isMonthly ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                                    }}
-                                >
-                                    Harian
-                                </button>
-                            </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => { setGranularityOverride('monthly'); setSelectedBarIndex(null); }}
+                                        style={{
+                                            padding: '4px 12px',
+                                            borderRadius: '9999px',
+                                            border: 'none',
+                                            fontSize: '0.725rem',
+                                            fontWeight: 700,
+                                            cursor: 'pointer',
+                                            background: isMonthly ? '#ffffff' : 'transparent',
+                                            color: isMonthly ? '#7c3aed' : 'var(--text-secondary)',
+                                            boxShadow: isMonthly ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                                        }}
+                                    >
+                                        Bulanan
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => { setGranularityOverride('daily'); setSelectedBarIndex(null); }}
+                                        style={{
+                                            padding: '4px 12px',
+                                            borderRadius: '9999px',
+                                            border: 'none',
+                                            fontSize: '0.725rem',
+                                            fontWeight: 700,
+                                            cursor: 'pointer',
+                                            background: !isMonthly ? '#ffffff' : 'transparent',
+                                            color: !isMonthly ? '#7c3aed' : 'var(--text-secondary)',
+                                            boxShadow: !isMonthly ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                                        }}
+                                    >
+                                        Harian
+                                    </button>
+                                </div>
+                            )}
                         </div>
 
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.6rem', marginBottom: '0.75rem' }}>

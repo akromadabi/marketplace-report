@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useRef, useEffect } from "react";
 import * as XLSX from "xlsx";
-import { Calendar, Download, ChevronLeft, ChevronRight, X, Copy, Check, MapPin, Package, ArrowUp, ArrowDown, ArrowUpDown, RotateCcw, BarChart3, Search } from 'lucide-react';
+import { Calendar, Download, ChevronLeft, ChevronRight, X, Copy, Check, MapPin, Package, ArrowUp, ArrowDown, ArrowUpDown, RotateCcw, BarChart3, Search, Filter } from 'lucide-react';
 import { useProcessedOrders, formatDateKey, formatIndonesianDateFromDateObj } from '../hooks/useProcessedOrders';
 import { useDataCache } from '../contexts/DataContext';
 
@@ -134,6 +134,19 @@ function OlahanDataPesanan() {
     // Analysis mode: 'waktu', 'provinsi', 'provinsi_kota', 'produk', 'produk_var'
     const [analysisMode, setAnalysisMode] = useState('waktu');
     const [copiedField, setCopiedField] = useState(null); // for copy button feedback
+    const [showMobileFilter, setShowMobileFilter] = useState(false);
+    const mobileFilterRef = useRef(null);
+
+    useEffect(() => {
+        if (!showMobileFilter) return;
+        function handleOutside(e) {
+            if (mobileFilterRef.current && !mobileFilterRef.current.contains(e.target)) {
+                setShowMobileFilter(false);
+            }
+        }
+        document.addEventListener('pointerdown', handleOutside);
+        return () => document.removeEventListener('pointerdown', handleOutside);
+    }, [showMobileFilter]);
 
     useEffect(() => {
         function handleClickOutside(event) {
@@ -465,214 +478,475 @@ function OlahanDataPesanan() {
                     gap: isMobile ? '0.5rem' : '0.85rem',
                 }}
             >
-                {/* Left: Icon + Title + Count Badge */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: isMobile ? 'space-between' : 'flex-start', gap: '0.65rem', flexShrink: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                        <div
-                            style={{
-                                width: isMobile ? 28 : 32,
-                                height: isMobile ? 28 : 32,
-                                borderRadius: '8px',
-                                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                color: '#ffffff',
-                                flexShrink: 0,
-                                boxShadow: '0 2px 6px rgba(99, 102, 241, 0.22)',
-                            }}
-                        >
-                            <BarChart3 size={isMobile ? 15 : 17} strokeWidth={2.3} />
-                        </div>
-                        <h2
-                            style={{
-                                margin: 0,
-                                fontSize: isMobile ? '0.925rem' : '1.025rem',
-                                fontWeight: 800,
-                                color: '#0f172a',
-                                letterSpacing: '-0.02em',
-                            }}
-                        >
-                            Analisis Pesanan
-                        </h2>
-                    </div>
-                    <span
-                        style={{
-                            fontSize: isMobile ? '0.675rem' : '0.725rem',
-                            fontWeight: 600,
-                            color: '#475569',
-                            background: '#f1f5f9',
-                            border: '1px solid #e2e8f0',
-                            padding: '2px 8px',
-                            borderRadius: '9999px',
-                            whiteSpace: 'nowrap',
-                        }}
-                    >
-                        {filteredSortedTableData.length} {analysisMode === 'waktu' ? 'hari' : analysisMode.startsWith('provinsi') ? 'lokasi' : 'produk'}
-                    </span>
-                </div>
-
-                {/* Right: Search Box (Pepet Kanan) + Dimension Selector + Date Filter + Reset + Export */}
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.45rem',
-                    flexWrap: isMobile ? 'wrap' : 'nowrap',
-                    width: isMobile ? '100%' : 'auto',
-                    justifyContent: isMobile ? 'stretch' : 'flex-end',
-                }}>
-                    {/* Search Box */}
-                    <div style={{ position: 'relative', width: isMobile ? '100%' : '180px', flexShrink: 0 }}>
-                        <Search size={14} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: searchQuery ? '#6366f1' : '#94a3b8', pointerEvents: 'none' }} />
-                        <input
-                            type="text"
-                            placeholder="Cari..."
-                            value={searchQuery}
-                            onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-                            style={{
-                                width: '100%',
-                                height: '34px',
-                                padding: '0 1.8rem 0 2.2rem',
-                                borderRadius: '8px',
-                                border: searchQuery ? '1px solid #6366f1' : '1px solid #e2e8f0',
-                                background: searchQuery ? '#f5f3ff' : '#f8fafc',
-                                color: '#0f172a',
-                                fontSize: '0.775rem',
-                                fontWeight: 500,
-                                outline: 'none',
-                                transition: 'all 0.15s ease',
-                            }}
-                        />
-                        {searchQuery && (
-                            <button type="button" onClick={() => { setSearchQuery(''); setCurrentPage(1); }}
-                                style={{ position: 'absolute', right: '0.55rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: '0.15rem', display: 'flex' }}>
-                                <X size={13} />
-                            </button>
-                        )}
-                    </div>
-
-                    {/* Dimension Selector */}
-                    <select
-                        value={analysisMode}
-                        onChange={(e) => { setAnalysisMode(e.target.value); setCurrentPage(1); }}
-                        style={{
-                            height: '34px',
-                            padding: '0 0.65rem',
-                            fontSize: '0.75rem',
-                            fontWeight: 600,
-                            borderRadius: '8px',
-                            border: '1px solid #e2e8f0',
-                            background: '#ffffff',
-                            color: '#334155',
-                            cursor: 'pointer',
-                            outline: 'none',
-                        }}
-                    >
-                        <option value="waktu">Waktu</option>
-                        <option value="provinsi">Provinsi</option>
-                        <option value="provinsi_kota">Provinsi + Kota</option>
-                        <option value="produk">Produk</option>
-                        <option value="produk_var">Produk + Variasi</option>
-                    </select>
-
-                    {/* Date Range Picker */}
-                    <div style={{ position: 'relative', flex: isMobile ? 1 : 'none' }} ref={popupRef}>
-                        <button
-                            type="button"
-                            onClick={() => setShowDateRangePicker(!showDateRangePicker)}
-                            style={{
-                                width: isMobile ? '100%' : 'auto',
-                                height: '34px',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '0.4rem',
-                                padding: '0 0.75rem',
-                                borderRadius: '8px',
-                                border: (filterStartDate || filterEndDate) ? '1px solid #6366f1' : '1px solid #e2e8f0',
-                                background: (filterStartDate || filterEndDate) ? '#f5f3ff' : '#ffffff',
-                                color: (filterStartDate || filterEndDate) ? '#6366f1' : '#334155',
-                                fontSize: '0.75rem',
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                                whiteSpace: 'nowrap',
-                            }}
-                        >
-                            <Calendar size={13} style={{ color: (filterStartDate || filterEndDate) ? '#6366f1' : '#64748b' }} />
-                            <span>{(filterStartDate && filterEndDate) ? (`${filterStartDate} — ${filterEndDate}`) : 'Tanggal'}</span>
-                            {(filterStartDate || filterEndDate) && (
-                                <span
-                                    onClick={(e) => { e.stopPropagation(); setFilterStartDate(''); setFilterEndDate(''); setCurrentPage(1); }}
-                                    title="Hapus filter tanggal"
-                                    style={{ marginLeft: '2px', display: 'inline-flex', color: '#6366f1', padding: '1px' }}
+                {isMobile ? (
+                    /* ── Mobile Header: Row 1 (Title + Icons) + Row 2 (Search) ── */
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', width: '100%' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                            {/* Left: Icon + Title + Count Badge */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                                <div
+                                    style={{
+                                        width: 28,
+                                        height: 28,
+                                        borderRadius: '8px',
+                                        background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        color: '#ffffff',
+                                        flexShrink: 0,
+                                        boxShadow: '0 2px 6px rgba(99, 102, 241, 0.22)',
+                                    }}
                                 >
-                                    <X size={11} />
+                                    <BarChart3 size={15} strokeWidth={2.3} />
+                                </div>
+                                <h2
+                                    style={{
+                                        margin: 0,
+                                        fontSize: '0.925rem',
+                                        fontWeight: 800,
+                                        color: '#0f172a',
+                                        letterSpacing: '-0.02em',
+                                    }}
+                                >
+                                    Analisis Pesanan
+                                </h2>
+                                <span
+                                    style={{
+                                        fontSize: '0.675rem',
+                                        fontWeight: 600,
+                                        color: '#475569',
+                                        background: '#f1f5f9',
+                                        border: '1px solid #e2e8f0',
+                                        padding: '2px 7px',
+                                        borderRadius: '9999px',
+                                        whiteSpace: 'nowrap',
+                                    }}
+                                >
+                                    {filteredSortedTableData.length} {analysisMode === 'waktu' ? 'hari' : analysisMode.startsWith('provinsi') ? 'lokasi' : 'produk'}
                                 </span>
-                            )}
-                        </button>
-                        {showDateRangePicker && (
-                            <div style={{ position: 'absolute', top: '105%', left: isMobile ? 0 : 'auto', right: isMobile ? 'auto' : 0, zIndex: 120 }}>
-                                <DateRangePicker startDate={filterStartDate || null} endDate={filterEndDate || null} onChange={({ startDate, endDate }) => {
-                                    setFilterStartDate(startDate); setFilterEndDate(endDate); setCurrentPage(1);
-                                }} onClose={() => setShowDateRangePicker(false)} />
                             </div>
-                        )}
+
+                            {/* Right: Round Filter Icon & Round Download Icon */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', position: 'relative' }} ref={mobileFilterRef}>
+                                <button
+                                    type="button"
+                                    title="Filter Dimensi & Tanggal"
+                                    onClick={() => setShowMobileFilter(!showMobileFilter)}
+                                    style={{
+                                        width: 30,
+                                        height: 30,
+                                        borderRadius: '50%',
+                                        background: (hasAnyFilter || analysisMode !== 'waktu') ? 'rgba(99, 102, 241, 0.12)' : '#f4f5f9',
+                                        border: (hasAnyFilter || analysisMode !== 'waktu') ? '1px solid #6366f1' : '1px solid #e5e7f0',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        cursor: 'pointer',
+                                        color: (hasAnyFilter || analysisMode !== 'waktu') ? '#6366f1' : '#64748b',
+                                        position: 'relative',
+                                        transition: 'all 0.15s ease',
+                                    }}
+                                >
+                                    <Filter size={13} />
+                                    {(hasAnyFilter || analysisMode !== 'waktu') && (
+                                        <span style={{ position: 'absolute', top: -1, right: -1, width: 7, height: 7, borderRadius: '50%', background: '#6366f1', border: '1.5px solid #ffffff' }} />
+                                    )}
+                                </button>
+
+                                <button
+                                    type="button"
+                                    title="Download Data Excel"
+                                    onClick={handleDownloadExcel}
+                                    style={{
+                                        width: 30,
+                                        height: 30,
+                                        borderRadius: '50%',
+                                        background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
+                                        border: 'none',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        cursor: 'pointer',
+                                        color: '#ffffff',
+                                        boxShadow: '0 2px 6px rgba(79, 70, 229, 0.28)',
+                                    }}
+                                >
+                                    <Download size={13} />
+                                </button>
+
+                                {/* Mobile Filter Popover */}
+                                {showMobileFilter && (
+                                    <div
+                                        style={{
+                                            position: 'absolute',
+                                            top: '115%',
+                                            right: 0,
+                                            width: '230px',
+                                            background: '#ffffff',
+                                            borderRadius: '14px',
+                                            padding: '0.55rem',
+                                            boxShadow: '0 12px 32px rgba(0,0,0,0.18)',
+                                            border: '1px solid #e2e8f0',
+                                            zIndex: 200,
+                                        }}
+                                    >
+                                        <div style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 700, padding: '0.2rem 0.5rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                            Dimensi Analisis
+                                        </div>
+                                        {[
+                                            { id: 'waktu', label: 'Waktu (Harian)' },
+                                            { id: 'provinsi', label: 'Provinsi' },
+                                            { id: 'provinsi_kota', label: 'Provinsi + Kota' },
+                                            { id: 'produk', label: 'Produk' },
+                                            { id: 'produk_var', label: 'Produk + Variasi' },
+                                        ].map((opt) => (
+                                            <button
+                                                key={opt.id}
+                                                type="button"
+                                                onClick={() => { setAnalysisMode(opt.id); setCurrentPage(1); setShowMobileFilter(false); }}
+                                                style={{
+                                                    width: '100%',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'space-between',
+                                                    padding: '0.4rem 0.55rem',
+                                                    background: analysisMode === opt.id ? 'rgba(99, 102, 241, 0.08)' : 'transparent',
+                                                    border: 'none',
+                                                    color: analysisMode === opt.id ? '#6366f1' : '#1e293b',
+                                                    borderRadius: '8px',
+                                                    fontSize: '0.75rem',
+                                                    fontWeight: 600,
+                                                    cursor: 'pointer',
+                                                }}
+                                            >
+                                                <span>{opt.label}</span>
+                                                {analysisMode === opt.id && <Check size={14} color="#6366f1" />}
+                                            </button>
+                                        ))}
+
+                                        <div style={{ height: 1, background: '#eef0f6', margin: '0.45rem 0' }} />
+
+                                        <div style={{ fontSize: '0.65rem', color: '#64748b', fontWeight: 700, padding: '0.2rem 0.5rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                            Rentang Tanggal
+                                        </div>
+                                        <div style={{ position: 'relative', marginTop: '0.25rem' }} ref={popupRef}>
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowDateRangePicker(!showDateRangePicker)}
+                                                style={{
+                                                    width: '100%',
+                                                    height: '32px',
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'space-between',
+                                                    padding: '0 0.65rem',
+                                                    borderRadius: '8px',
+                                                    border: (filterStartDate || filterEndDate) ? '1px solid #6366f1' : '1px solid #e2e8f0',
+                                                    background: (filterStartDate || filterEndDate) ? '#f5f3ff' : '#f8fafc',
+                                                    color: (filterStartDate || filterEndDate) ? '#6366f1' : '#334155',
+                                                    fontSize: '0.725rem',
+                                                    fontWeight: 600,
+                                                    cursor: 'pointer',
+                                                }}
+                                            >
+                                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                    <Calendar size={12} style={{ color: (filterStartDate || filterEndDate) ? '#6366f1' : '#64748b', flexShrink: 0 }} />
+                                                    <span>{(filterStartDate && filterEndDate) ? (`${filterStartDate} — ${filterEndDate}`) : 'Pilih Tanggal'}</span>
+                                                </span>
+                                                {(filterStartDate || filterEndDate) && (
+                                                    <span
+                                                        onClick={(e) => { e.stopPropagation(); setFilterStartDate(''); setFilterEndDate(''); setCurrentPage(1); }}
+                                                        title="Hapus filter tanggal"
+                                                        style={{ color: '#6366f1', padding: '2px', display: 'inline-flex', flexShrink: 0 }}
+                                                    >
+                                                        <X size={12} />
+                                                    </span>
+                                                )}
+                                            </button>
+                                            {showDateRangePicker && (
+                                                <div style={{ position: 'absolute', top: '105%', right: 0, zIndex: 250 }}>
+                                                    <DateRangePicker startDate={filterStartDate || null} endDate={filterEndDate || null} onChange={({ startDate, endDate }) => {
+                                                        setFilterStartDate(startDate); setFilterEndDate(endDate); setCurrentPage(1);
+                                                    }} onClose={() => setShowDateRangePicker(false)} />
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {hasAnyFilter && (
+                                            <div style={{ marginTop: '0.5rem' }}>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { handleResetAllFilters(); setShowMobileFilter(false); }}
+                                                    style={{
+                                                        width: '100%',
+                                                        height: '30px',
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        gap: '0.35rem',
+                                                        borderRadius: '8px',
+                                                        border: '1px solid #fecaca',
+                                                        background: '#fff1f2',
+                                                        color: '#e11d48',
+                                                        fontSize: '0.725rem',
+                                                        fontWeight: 700,
+                                                        cursor: 'pointer',
+                                                    }}
+                                                >
+                                                    <RotateCcw size={12} />
+                                                    <span>Reset Filter</span>
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Search Input Full Width on Mobile */}
+                        <div style={{ position: 'relative', width: '100%' }}>
+                            <Search size={14} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: searchQuery ? '#6366f1' : '#94a3b8', pointerEvents: 'none' }} />
+                            <input
+                                type="text"
+                                placeholder="Cari data..."
+                                value={searchQuery}
+                                onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                                style={{
+                                    width: '100%',
+                                    height: '32px',
+                                    padding: '0 1.8rem 0 2.2rem',
+                                    borderRadius: '8px',
+                                    border: searchQuery ? '1px solid #6366f1' : '1px solid #e2e8f0',
+                                    background: searchQuery ? '#f5f3ff' : '#f8fafc',
+                                    color: '#0f172a',
+                                    fontSize: '0.775rem',
+                                    fontWeight: 500,
+                                    outline: 'none',
+                                    boxSizing: 'border-box',
+                                }}
+                            />
+                            {searchQuery && (
+                                <button type="button" onClick={() => { setSearchQuery(''); setCurrentPage(1); }}
+                                    style={{ position: 'absolute', right: '0.55rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: '0.15rem', display: 'flex' }}>
+                                    <X size={13} />
+                                </button>
+                            )}
+                        </div>
                     </div>
+                ) : (
+                    /* ── Desktop Header ── */
+                    <>
+                        {/* Left: Icon + Title + Count Badge */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '0.65rem', flexShrink: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                                <div
+                                    style={{
+                                        width: 32,
+                                        height: 32,
+                                        borderRadius: '8px',
+                                        background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        color: '#ffffff',
+                                        flexShrink: 0,
+                                        boxShadow: '0 2px 6px rgba(99, 102, 241, 0.22)',
+                                    }}
+                                >
+                                    <BarChart3 size={17} strokeWidth={2.3} />
+                                </div>
+                                <h2
+                                    style={{
+                                        margin: 0,
+                                        fontSize: '1.025rem',
+                                        fontWeight: 800,
+                                        color: '#0f172a',
+                                        letterSpacing: '-0.02em',
+                                    }}
+                                >
+                                    Analisis Pesanan
+                                </h2>
+                            </div>
+                            <span
+                                style={{
+                                    fontSize: '0.725rem',
+                                    fontWeight: 600,
+                                    color: '#475569',
+                                    background: '#f1f5f9',
+                                    border: '1px solid #e2e8f0',
+                                    padding: '2px 8px',
+                                    borderRadius: '9999px',
+                                    whiteSpace: 'nowrap',
+                                }}
+                            >
+                                {filteredSortedTableData.length} {analysisMode === 'waktu' ? 'hari' : analysisMode.startsWith('provinsi') ? 'lokasi' : 'produk'}
+                            </span>
+                        </div>
 
-                    {/* Reset Filters Button */}
-                    {hasAnyFilter && (
-                        <button
-                            type="button"
-                            onClick={handleResetAllFilters}
-                            title="Reset semua filter"
-                            style={{
-                                height: '34px',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '0.35rem',
-                                padding: '0 0.65rem',
-                                borderRadius: '8px',
-                                border: '1px solid #fecaca',
-                                background: '#fff1f2',
-                                color: '#e11d48',
-                                fontSize: '0.725rem',
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                                whiteSpace: 'nowrap',
-                            }}
-                        >
-                            <RotateCcw size={12} />
-                            <span>Reset</span>
-                        </button>
-                    )}
-
-                    {!isMobile && <div style={{ height: '20px', width: '1px', background: '#e2e8f0', margin: '0 2px' }} />}
-
-                    {/* Export Button */}
-                    <button
-                        onClick={handleDownloadExcel}
-                        type="button"
-                        style={{
-                            height: '34px',
-                            display: 'inline-flex',
+                        {/* Right: Search Box (Pepet Kanan) + Dimension Selector + Date Filter + Reset + Export */}
+                        <div style={{
+                            display: 'flex',
                             alignItems: 'center',
-                            gap: '0.4rem',
-                            padding: '0 0.85rem',
-                            fontSize: '0.75rem',
-                            fontWeight: 700,
-                            borderRadius: '8px',
-                            border: 'none',
-                            background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
-                            color: '#ffffff',
-                            cursor: 'pointer',
-                            boxShadow: '0 2px 6px rgba(79, 70, 229, 0.28)',
-                            whiteSpace: 'nowrap',
-                        }}
-                    >
-                        <Download size={13} />
-                        <span>Download</span>
-                    </button>
-                </div>
+                            gap: '0.45rem',
+                            flexWrap: 'nowrap',
+                            width: 'auto',
+                            justifyContent: 'flex-end',
+                        }}>
+                            {/* Search Box */}
+                            <div style={{ position: 'relative', width: '180px', flexShrink: 0 }}>
+                                <Search size={14} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: searchQuery ? '#6366f1' : '#94a3b8', pointerEvents: 'none' }} />
+                                <input
+                                    type="text"
+                                    placeholder="Cari data..."
+                                    value={searchQuery}
+                                    onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                                    style={{
+                                        width: '100%',
+                                        height: '34px',
+                                        padding: '0 1.8rem 0 2.2rem',
+                                        borderRadius: '8px',
+                                        border: searchQuery ? '1px solid #6366f1' : '1px solid #e2e8f0',
+                                        background: searchQuery ? '#f5f3ff' : '#f8fafc',
+                                        color: '#0f172a',
+                                        fontSize: '0.775rem',
+                                        fontWeight: 500,
+                                        outline: 'none',
+                                        transition: 'all 0.15s ease',
+                                    }}
+                                />
+                                {searchQuery && (
+                                    <button type="button" onClick={() => { setSearchQuery(''); setCurrentPage(1); }}
+                                        style={{ position: 'absolute', right: '0.55rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: '0.15rem', display: 'flex' }}>
+                                        <X size={13} />
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* Dimension Selector */}
+                            <select
+                                value={analysisMode}
+                                onChange={(e) => { setAnalysisMode(e.target.value); setCurrentPage(1); }}
+                                style={{
+                                    height: '34px',
+                                    padding: '0 0.65rem',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 600,
+                                    borderRadius: '8px',
+                                    border: '1px solid #e2e8f0',
+                                    background: '#ffffff',
+                                    color: '#334155',
+                                    cursor: 'pointer',
+                                    outline: 'none',
+                                }}
+                            >
+                                <option value="waktu">Waktu</option>
+                                <option value="provinsi">Provinsi</option>
+                                <option value="provinsi_kota">Provinsi + Kota</option>
+                                <option value="produk">Produk</option>
+                                <option value="produk_var">Produk + Variasi</option>
+                            </select>
+
+                            {/* Date Range Picker */}
+                            <div style={{ position: 'relative', flex: 'none' }} ref={popupRef}>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowDateRangePicker(!showDateRangePicker)}
+                                    style={{
+                                        width: 'auto',
+                                        height: '34px',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '0.4rem',
+                                        padding: '0 0.75rem',
+                                        borderRadius: '8px',
+                                        border: (filterStartDate || filterEndDate) ? '1px solid #6366f1' : '1px solid #e2e8f0',
+                                        background: (filterStartDate || filterEndDate) ? '#f5f3ff' : '#ffffff',
+                                        color: (filterStartDate || filterEndDate) ? '#6366f1' : '#334155',
+                                        fontSize: '0.75rem',
+                                        fontWeight: 600,
+                                        cursor: 'pointer',
+                                        whiteSpace: 'nowrap',
+                                    }}
+                                >
+                                    <Calendar size={13} style={{ color: (filterStartDate || filterEndDate) ? '#6366f1' : '#64748b' }} />
+                                    <span>{(filterStartDate && filterEndDate) ? (`${filterStartDate} — ${filterEndDate}`) : 'Tanggal'}</span>
+                                    {(filterStartDate || filterEndDate) && (
+                                        <span
+                                            onClick={(e) => { e.stopPropagation(); setFilterStartDate(''); setFilterEndDate(''); setCurrentPage(1); }}
+                                            title="Hapus filter tanggal"
+                                            style={{ marginLeft: '2px', display: 'inline-flex', color: '#6366f1', padding: '1px' }}
+                                        >
+                                            <X size={11} />
+                                        </span>
+                                    )}
+                                </button>
+                                {showDateRangePicker && (
+                                    <div style={{ position: 'absolute', top: '105%', right: 0, zIndex: 120 }}>
+                                        <DateRangePicker startDate={filterStartDate || null} endDate={filterEndDate || null} onChange={({ startDate, endDate }) => {
+                                            setFilterStartDate(startDate); setFilterEndDate(endDate); setCurrentPage(1);
+                                        }} onClose={() => setShowDateRangePicker(false)} />
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Reset Filters Button */}
+                            {hasAnyFilter && (
+                                <button
+                                    type="button"
+                                    onClick={handleResetAllFilters}
+                                    title="Reset semua filter"
+                                    style={{
+                                        height: '34px',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '0.35rem',
+                                        padding: '0 0.65rem',
+                                        borderRadius: '8px',
+                                        border: '1px solid #fecaca',
+                                        background: '#fff1f2',
+                                        color: '#e11d48',
+                                        fontSize: '0.725rem',
+                                        fontWeight: 600,
+                                        cursor: 'pointer',
+                                        whiteSpace: 'nowrap',
+                                    }}
+                                >
+                                    <RotateCcw size={12} />
+                                    <span>Reset</span>
+                                </button>
+                            )}
+
+                            <div style={{ height: '20px', width: '1px', background: '#e2e8f0', margin: '0 2px' }} />
+
+                            {/* Export Button */}
+                            <button
+                                onClick={handleDownloadExcel}
+                                type="button"
+                                style={{
+                                    height: '34px',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.4rem',
+                                    padding: '0 0.85rem',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 700,
+                                    borderRadius: '8px',
+                                    border: 'none',
+                                    background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
+                                    color: '#ffffff',
+                                    cursor: 'pointer',
+                                    boxShadow: '0 2px 6px rgba(79, 70, 229, 0.28)',
+                                    whiteSpace: 'nowrap',
+                                }}
+                            >
+                                <Download size={13} />
+                                <span>Download</span>
+                            </button>
+                        </div>
+                    </>
+                )}
             </div>
 
             {/* ── Table Container (Separate Card Filling All Remaining Space) ── */}

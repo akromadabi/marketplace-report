@@ -197,6 +197,9 @@ Dokumen ini adalah pedoman dan acuan standar resmi untuk seluruh halaman tabel d
 ```
 
 ### C. Kartu Tabel Data (`modern-table-wrapper`)
+
+Terdapat 3 variasi struktur isi tabel yang didukung, seluruhnya wajib dibungkus dalam container standar berikut:
+
 ```jsx
 {/* ── Table Container (Separate Card Filling All Remaining Space) ── */}
 <div
@@ -225,7 +228,7 @@ Dokumen ini adalah pedoman dan acuan standar resmi untuk seluruh halaman tabel d
         </table>
     </div>
 
-    {/* Pagination Footer */}
+    {/* Integrated Footer (Paginasi atau Status Info) */}
     <div style={{
         flexShrink: 0,
         display: 'flex',
@@ -242,6 +245,21 @@ Dokumen ini adalah pedoman dan acuan standar resmi untuk seluruh halaman tabel d
     </div>
 </div>
 ```
+
+#### Variasi Tabel:
+1. **Tabel Flat Standar (Single-Tier Header):**
+   - Diterapkan pada `/rangkuman`, `/return`, `/pengembalian`.
+   - Satu baris `<th>` di `<thead>`, seluruh kolom dapat disortir langsung.
+2. **Tabel Matriks Berkelompok (Multi-Tier Header):**
+   - Diterapkan pada `/olahan` (Analisis Pesanan).
+   - Baris 1: Grup metrik utama (`PESANAN`, `DIBATALKAN`, dsb.) menggunakan `colSpan={2}`, atau metrik tunggal (`PENERIMAAN BERSIH`, `MARGIN KONTRIBUSI`) menggunakan `rowSpan={2}`.
+   - Baris 2: Sub-kolom rincian (`Order`, `PCS`).
+   - Baris 3 (Header/Awal Body): Baris rangkuman `Jumlah` dengan warna latar lembut (`#ede9fe` / `var(--bg-card)`).
+   - Sticky Kolom Kiri: Kolom `No` (`left: 0`) dan Dimensi/Tanggal (`left: 3rem`) terkunci saat scroll horizontal.
+3. **Tabel Hirarkis (Expandable Drill-down):**
+   - Diterapkan pada `/analisis` (Wawasan Produk).
+   - Baris induk (SKU / Provinsi) dapat diklik untuk membuka baris anak rincian (Variasi Produk / Daftar Kota).
+   - Memiliki toggle tampilan mode `Flat List` vs `Hierarchical`.
 
 ---
 
@@ -273,3 +291,11 @@ paddingBottom: isDesktop ? (['/rangkuman', '/olahan', '/return', '/pengembalian'
 3. `/return` — **Retur Penjualan** (`ReturnTable.js`) — `[SELESAI & TERUJI]`
 4. `/pengembalian` — **Pengembalian Dana** (`PengembalianTable.js`) — `[SELESAI & TERUJI]`
 5. `/analisis` — **Analisis Produk** (`ProductAnalysis.js`) — `[SELESAI & TERUJI]`
+
+---
+
+## 6. Penanganan Cache Browser (Anti-Cache)
+Karena aplikasi ini adalah Single Page Application (SPA), browser (Chrome/Edge) dapat menyimpan cache file JavaScript lama di memori saat berpindah halaman via navigasi internal:
+1. **Server Header HTTP:** `marketplace-api/routes/web.php` menyematkan header `Cache-Control: no-cache, no-store, must-revalidate` pada respons HTML agar browser selalu memeriksa versi bundle terbaru.
+2. **HTML Meta Tags:** `public/index.html` dilengkapi meta tag anti-cache (`<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />`).
+3. **Penyegaran Pengguna:** Jika pengguna masih melihat tampilan lama setelah kompilasi, lakukan **Hard Refresh** (`Ctrl + Shift + R` atau `Ctrl + F5`) untuk membersihkan cache chunk lama.
