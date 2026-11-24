@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import * as XLSX from "xlsx";
 import FileInputList from "./FileInputList";
-import { Upload as UploadIcon, FileSpreadsheet, AlertCircle, Loader2, CheckCircle2, Trash2, Clock, Database, Store, Search, X, Layers, RefreshCw } from "lucide-react";
+import { Upload as UploadIcon, FileSpreadsheet, AlertCircle, Loader2, CheckCircle2, Trash2, Clock, Database, Store, Search, X, Layers, RefreshCw, Table, LayoutGrid, Sparkles, FileCheck, Check } from "lucide-react";
 import { apiUploadParsedFiles, apiGetUploadHistory, apiDeleteUpload, apiAssignOrphanUploads } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useStore } from '../contexts/StoreContext';
@@ -124,6 +124,13 @@ function UploadFile() {
   });
   const [historySearch, setHistorySearch] = useState('');
   const [historyPlatform, setHistoryPlatform] = useState('all');
+  const [viewMode, setViewMode] = useState(() => {
+    try {
+      return localStorage.getItem('marketplace_upload_view_mode') || 'table';
+    } catch {
+      return 'table';
+    }
+  });
   const [deletingId, setDeletingId] = useState(null);
   const [migratingOrphans, setMigratingOrphans] = useState(false);
   const [orphanMigrated, setOrphanMigrated] = useState(null);

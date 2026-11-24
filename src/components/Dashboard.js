@@ -1246,136 +1246,175 @@ function Dashboard() {
                     display: 'flex',
                     flexDirection: 'column',
                     gap: isMobile ? '0' : '0.75rem',
-                    marginBottom: isMobile ? '0.65rem' : '1.35rem',
-                    background: '#ffffff',
-                    padding: isMobile ? '0.45rem 0.65rem' : '1rem 1.5rem',
-                    borderRadius: isMobile ? '12px' : '20px',
-                    border: '1px solid #eef0f6',
-                    boxShadow: '0 2px 10px rgba(0, 0, 0, 0.02)',
+                    marginBottom: isMobile ? '0.55rem' : '1.35rem',
+                    background: isMobile ? 'transparent' : '#ffffff',
+                    padding: isMobile ? '0 0.15rem 0.25rem' : '1rem 1.5rem',
+                    borderRadius: isMobile ? '0' : '20px',
+                    border: isMobile ? 'none' : '1px solid #eef0f6',
+                    boxShadow: isMobile ? 'none' : '0 2px 12px rgba(0, 0, 0, 0.025)',
                 }}
             >
                 {isMobile ? (
-                    /* ── Compact Mobile Date Filter (Semua + Kustom Utuh) ── */
+                    /* ── Sleek Mobile Segmented Filter Bar ── */
                     <div
                         style={{
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '0.45rem',
+                            justifyContent: 'space-between',
                             width: '100%',
-                            padding: '1px 0',
+                            gap: '0.5rem',
                         }}
                         ref={datePickerRef}
                     >
-                        {/* 1. Pill Semua */}
-                        <button
-                            type="button"
-                            onClick={() => {
-                                applyDatePreset('all');
-                                setFilterStartDate('');
-                                setFilterEndDate('');
-                            }}
+                        {/* Cohesive Segmented Capsule Track */}
+                        <div
                             style={{
-                                padding: '0.3rem 0.75rem',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                background: '#ffffff',
+                                padding: '3px',
                                 borderRadius: '9999px',
-                                border: (!filterStartDate && !filterEndDate) ? '1px solid #7c3aed' : '1px solid #e5e7f0',
-                                fontSize: '0.725rem',
-                                fontWeight: 700,
-                                cursor: 'pointer',
-                                background: (!filterStartDate && !filterEndDate) ? '#7c3aed' : '#f8f9fc',
-                                color: (!filterStartDate && !filterEndDate) ? '#ffffff' : 'var(--text-secondary)',
-                                boxShadow: (!filterStartDate && !filterEndDate) ? '0 2px 6px rgba(124, 58, 237, 0.25)' : 'none',
-                                whiteSpace: 'nowrap',
-                                flexShrink: 0,
-                                transition: 'all 0.15s ease',
+                                border: '1px solid #e2e8f0',
+                                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
                             }}
                         >
-                            Semua
-                        </button>
-
-                        {/* 2. Custom Date Range Pill (Utuh & Tidak Terpotong) */}
-                        <div style={{ position: 'relative', flexShrink: 0 }}>
+                            {/* Tab 1: Semua */}
                             <button
                                 type="button"
-                                onClick={() => setShowDatePicker(!showDatePicker)}
+                                onClick={() => {
+                                    applyDatePreset('all');
+                                    setFilterStartDate('');
+                                    setFilterEndDate('');
+                                }}
                                 style={{
-                                    padding: '0.3rem 0.75rem',
+                                    padding: '0.35rem 0.85rem',
                                     borderRadius: '9999px',
-                                    border: (filterStartDate || filterEndDate) ? '1px solid #7c3aed' : '1px solid #e5e7f0',
-                                    fontSize: '0.725rem',
-                                    fontWeight: 700,
+                                    border: 'none',
+                                    fontSize: '0.75rem',
+                                    fontWeight: (!filterStartDate && !filterEndDate) ? 700 : 500,
                                     cursor: 'pointer',
-                                    background: (filterStartDate || filterEndDate) ? 'rgba(124, 58, 237, 0.1)' : '#f8f9fc',
-                                    color: (filterStartDate || filterEndDate) ? '#7c3aed' : 'var(--text-secondary)',
+                                    background: (!filterStartDate && !filterEndDate) ? '#7c3aed' : 'transparent',
+                                    color: (!filterStartDate && !filterEndDate) ? '#ffffff' : '#64748b',
+                                    boxShadow: (!filterStartDate && !filterEndDate) ? '0 2px 6px rgba(124, 58, 237, 0.28)' : 'none',
                                     whiteSpace: 'nowrap',
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '0.35rem',
-                                    transition: 'all 0.15s ease',
+                                    transition: 'all 0.18s ease',
                                 }}
                             >
-                                <Calendar size={13} style={{ flexShrink: 0 }} color={filterStartDate || filterEndDate ? '#7c3aed' : '#64748b'} />
-                                <span>
-                                    {(filterStartDate && filterEndDate)
-                                        ? `${filterStartDate.slice(5).replace('-', '/')} - ${filterEndDate.slice(5).replace('-', '/')}`
-                                        : 'Kustom'}
-                                </span>
-                                {(filterStartDate || filterEndDate) && (
-                                    <span
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            setFilterStartDate('');
-                                            setFilterEndDate('');
-                                            setActiveDatePreset('all');
-                                        }}
-                                        title="Reset tanggal"
-                                        style={{ marginLeft: 2, display: 'inline-flex', color: '#7c3aed', flexShrink: 0 }}
-                                    >
-                                        <X size={12} />
-                                    </span>
-                                )}
+                                Semua
                             </button>
 
-                            {showDatePicker && (
-                                <>
-                                    <div
-                                        onClick={() => setShowDatePicker(false)}
-                                        style={{
-                                            position: 'fixed',
-                                            top: 0,
-                                            left: 0,
-                                            right: 0,
-                                            bottom: 0,
-                                            background: 'rgba(15, 23, 42, 0.45)',
-                                            zIndex: 9998,
-                                            backdropFilter: 'blur(2px)',
-                                        }}
+                            {/* Tab 2: Kustom */}
+                            <div style={{ position: 'relative' }}>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowDatePicker(!showDatePicker)}
+                                    style={{
+                                        padding: '0.35rem 0.85rem',
+                                        borderRadius: '9999px',
+                                        border: 'none',
+                                        fontSize: '0.75rem',
+                                        fontWeight: (filterStartDate || filterEndDate) ? 700 : 500,
+                                        cursor: 'pointer',
+                                        background: (filterStartDate || filterEndDate) ? '#7c3aed' : 'transparent',
+                                        color: (filterStartDate || filterEndDate) ? '#ffffff' : '#64748b',
+                                        boxShadow: (filterStartDate || filterEndDate) ? '0 2px 6px rgba(124, 58, 237, 0.28)' : 'none',
+                                        whiteSpace: 'nowrap',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '0.35rem',
+                                        transition: 'all 0.18s ease',
+                                    }}
+                                >
+                                    <Calendar
+                                        size={13}
+                                        style={{ flexShrink: 0 }}
+                                        color={(filterStartDate || filterEndDate) ? '#ffffff' : '#64748b'}
                                     />
-                                    <div
-                                        style={{
-                                            position: 'fixed',
-                                            top: '50%',
-                                            left: '50%',
-                                            transform: 'translate(-50%, -50%)',
-                                            zIndex: 9999,
-                                            maxWidth: 'calc(100vw - 20px)',
-                                            maxHeight: '90vh',
-                                            overflowY: 'auto',
-                                        }}
-                                    >
-                                        <DateRangePicker
-                                            startDate={filterStartDate}
-                                            endDate={filterEndDate}
-                                            onChange={({ startDate, endDate }) => {
-                                                setFilterStartDate(startDate);
-                                                setFilterEndDate(endDate);
-                                                setActiveDatePreset(!startDate && !endDate ? 'all' : 'custom');
-                                                setSelectedBarIndex(null);
+                                    <span>
+                                        {(filterStartDate && filterEndDate)
+                                            ? `${filterStartDate.slice(5).replace('-', '/')} - ${filterEndDate.slice(5).replace('-', '/')}`
+                                            : 'Kustom'}
+                                    </span>
+                                    {(filterStartDate || filterEndDate) && (
+                                        <span
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setFilterStartDate('');
+                                                setFilterEndDate('');
+                                                setActiveDatePreset('all');
                                             }}
-                                            onClose={() => setShowDatePicker(false)}
+                                            title="Reset tanggal"
+                                            style={{ marginLeft: 2, display: 'inline-flex', color: '#ffffff', flexShrink: 0 }}
+                                        >
+                                            <X size={12} />
+                                        </span>
+                                    )}
+                                </button>
+
+                                {showDatePicker && (
+                                    <>
+                                        <div
+                                            onClick={() => setShowDatePicker(false)}
+                                            style={{
+                                                position: 'fixed',
+                                                top: 0,
+                                                left: 0,
+                                                right: 0,
+                                                bottom: 0,
+                                                background: 'rgba(15, 23, 42, 0.45)',
+                                                zIndex: 9998,
+                                                backdropFilter: 'blur(2px)',
+                                            }}
                                         />
-                                    </div>
-                                </>
-                            )}
+                                        <div
+                                            style={{
+                                                position: 'fixed',
+                                                top: '50%',
+                                                left: '50%',
+                                                transform: 'translate(-50%, -50%)',
+                                                zIndex: 9999,
+                                                maxWidth: 'calc(100vw - 20px)',
+                                                maxHeight: '90vh',
+                                                overflowY: 'auto',
+                                            }}
+                                        >
+                                            <DateRangePicker
+                                                startDate={filterStartDate}
+                                                endDate={filterEndDate}
+                                                onChange={({ startDate, endDate }) => {
+                                                    setFilterStartDate(startDate);
+                                                    setFilterEndDate(endDate);
+                                                    setActiveDatePreset(!startDate && !endDate ? 'all' : 'custom');
+                                                    setSelectedBarIndex(null);
+                                                }}
+                                                onClose={() => setShowDatePicker(false)}
+                                            />
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Order Count Live Badge on the Right */}
+                        <div
+                            style={{
+                                fontSize: '0.72rem',
+                                fontWeight: 600,
+                                color: '#475569',
+                                background: '#ffffff',
+                                padding: '0.38rem 0.75rem',
+                                borderRadius: '9999px',
+                                border: '1px solid #e2e8f0',
+                                boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)',
+                                whiteSpace: 'nowrap',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.35rem',
+                                flexShrink: 0,
+                            }}
+                        >
+                            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', flexShrink: 0 }} />
+                            <span>{sums.pesananOrder.toLocaleString('id-ID')} pesanan</span>
                         </div>
                     </div>
                 ) : (
