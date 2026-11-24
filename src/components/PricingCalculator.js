@@ -136,26 +136,51 @@ function PricingCalculator() {
   const editingRow = rows.find(r => r.id === editingRowId);
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '1.25rem', paddingBottom: '3rem' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <div style={{ background: 'var(--gradient-primary)', color: 'white', padding: '0.625rem', borderRadius: '0.625rem', boxShadow: '0 4px 15px rgba(108,92,231,0.2)' }}>
-            <Calculator size={24} />
+    <div style={{ maxWidth: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '0.75rem', paddingBottom: '3rem' }}>
+      {/* Header Card */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: '0.65rem',
+        padding: '0.65rem 1rem',
+        background: 'var(--bg-card)',
+        borderRadius: 'var(--radius-lg)',
+        border: '1px solid var(--border-color)',
+        boxShadow: 'var(--shadow-xs)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+          <div style={{
+            width: '32px',
+            height: '32px',
+            borderRadius: '8px',
+            background: 'linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'white',
+            flexShrink: 0
+          }}>
+            <Calculator size={18} />
           </div>
           <div>
-            <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '0.125rem', color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>Kalkulator Simulasi Bebas</h2>
-            <p style={{ color: 'var(--text-tertiary)', fontSize: '0.875rem' }}>Input manual HPP untuk meracik harga jual platform secara instan.</p>
+            <h2 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+              Kalkulator Simulasi Bebas
+            </h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', margin: 0 }}>
+              Input manual HPP untuk meracik harga jual platform secara instan
+            </p>
           </div>
         </div>
         
-        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-           {saveSuccess && <span style={{ fontSize: '0.8125rem', color: 'var(--accent-success)', fontWeight: 600, animation: 'fadeIn 0.3s ease' }}>✓ Tersimpan</span>}
-           <button onClick={() => setShowSettings(true)} className="btn-secondary">
-             <Settings size={16} /> Pengaturan
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+           {saveSuccess && <span style={{ fontSize: '0.75rem', color: 'var(--accent-success)', fontWeight: 600 }}>✓ Tersimpan</span>}
+           <button onClick={() => setShowSettings(true)} className="btn-secondary" style={{ padding: '0.45rem 0.85rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+             <Settings size={14} /> Pengaturan
            </button>
-           <button onClick={handleSaveToDB} disabled={isSaving} className="btn-primary">
-             <Save size={16} /> {isSaving ? 'Menyimpan...' : 'Simpan Tabel'}
+           <button onClick={handleSaveToDB} disabled={isSaving} className="btn-primary" style={{ padding: '0.45rem 0.85rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+             <Save size={14} /> {isSaving ? 'Menyimpan...' : 'Simpan Tabel'}
            </button>
         </div>
       </div>

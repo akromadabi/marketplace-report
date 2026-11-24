@@ -145,7 +145,7 @@ function MobileNav({ currentPath }) {
                             }}
                             type="button"
                         >
-                            <Store size={12} />
+                            <Store size={12} style={{ flexShrink: 0 }} />
                             <span style={{
                                 whiteSpace: 'nowrap',
                                 overflow: 'hidden',

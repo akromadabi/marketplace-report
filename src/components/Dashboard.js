@@ -1233,7 +1233,7 @@ function Dashboard() {
         { id: 'all', label: 'Semua' },
         { id: 'last30', label: '30 Hari' },
         { id: 'last90', label: '3 Bulan' },
-        { id: 'thisMonth', label: 'Bulan Terakhir' },
+        { id: 'thisMonth', label: isMobile ? 'Bulan Ini' : 'Bulan Terakhir' },
     ];
 
     return (
@@ -1255,55 +1255,50 @@ function Dashboard() {
                 }}
             >
                 {isMobile ? (
-                    /* ── Mobile: Hanya Filter Tanggal Saja ── */
+                    /* ── Compact Mobile Date Filter (Semua + Kustom Utuh) ── */
                     <div
                         style={{
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '0.35rem',
-                            overflowX: 'auto',
-                            WebkitOverflowScrolling: 'touch',
-                            scrollbarWidth: 'none',
+                            gap: '0.45rem',
                             width: '100%',
+                            padding: '1px 0',
                         }}
                         ref={datePickerRef}
                     >
-                        {datePresets.map((p) => {
-                            const isPresetActive = (!filterStartDate && !filterEndDate)
-                                ? p.id === 'all'
-                                : activeDatePreset === p.id;
-                            return (
-                                <button
-                                    key={p.id}
-                                    type="button"
-                                    onClick={() => applyDatePreset(p.id)}
-                                    style={{
-                                        padding: '0.35rem 0.75rem',
-                                        borderRadius: '9999px',
-                                        border: isPresetActive ? '1px solid #7c3aed' : '1px solid #e5e7f0',
-                                        fontSize: '0.725rem',
-                                        fontWeight: 700,
-                                        cursor: 'pointer',
-                                        background: isPresetActive ? '#7c3aed' : '#f8f9fc',
-                                        color: isPresetActive ? '#ffffff' : 'var(--text-secondary)',
-                                        boxShadow: isPresetActive ? '0 2px 6px rgba(124, 58, 237, 0.25)' : 'none',
-                                        whiteSpace: 'nowrap',
-                                        flexShrink: 0,
-                                        transition: 'all 0.15s ease',
-                                    }}
-                                >
-                                    {p.label}
-                                </button>
-                            );
-                        })}
+                        {/* 1. Pill Semua */}
+                        <button
+                            type="button"
+                            onClick={() => {
+                                applyDatePreset('all');
+                                setFilterStartDate('');
+                                setFilterEndDate('');
+                            }}
+                            style={{
+                                padding: '0.3rem 0.75rem',
+                                borderRadius: '9999px',
+                                border: (!filterStartDate && !filterEndDate) ? '1px solid #7c3aed' : '1px solid #e5e7f0',
+                                fontSize: '0.725rem',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                background: (!filterStartDate && !filterEndDate) ? '#7c3aed' : '#f8f9fc',
+                                color: (!filterStartDate && !filterEndDate) ? '#ffffff' : 'var(--text-secondary)',
+                                boxShadow: (!filterStartDate && !filterEndDate) ? '0 2px 6px rgba(124, 58, 237, 0.25)' : 'none',
+                                whiteSpace: 'nowrap',
+                                flexShrink: 0,
+                                transition: 'all 0.15s ease',
+                            }}
+                        >
+                            Semua
+                        </button>
 
-                        {/* Custom Date Range Pill */}
+                        {/* 2. Custom Date Range Pill (Utuh & Tidak Terpotong) */}
                         <div style={{ position: 'relative', flexShrink: 0 }}>
                             <button
                                 type="button"
                                 onClick={() => setShowDatePicker(!showDatePicker)}
                                 style={{
-                                    padding: '0.35rem 0.75rem',
+                                    padding: '0.3rem 0.75rem',
                                     borderRadius: '9999px',
                                     border: (filterStartDate || filterEndDate) ? '1px solid #7c3aed' : '1px solid #e5e7f0',
                                     fontSize: '0.725rem',
@@ -1318,8 +1313,12 @@ function Dashboard() {
                                     transition: 'all 0.15s ease',
                                 }}
                             >
-                                <Calendar size={13} color={filterStartDate || filterEndDate ? '#7c3aed' : '#64748b'} />
-                                <span>{(filterStartDate && filterEndDate) ? (`${filterStartDate} — ${filterEndDate}`) : 'Kustom'}</span>
+                                <Calendar size={13} style={{ flexShrink: 0 }} color={filterStartDate || filterEndDate ? '#7c3aed' : '#64748b'} />
+                                <span>
+                                    {(filterStartDate && filterEndDate)
+                                        ? `${filterStartDate.slice(5).replace('-', '/')} - ${filterEndDate.slice(5).replace('-', '/')}`
+                                        : 'Kustom'}
+                                </span>
                                 {(filterStartDate || filterEndDate) && (
                                     <span
                                         onClick={(e) => {
@@ -1329,7 +1328,7 @@ function Dashboard() {
                                             setActiveDatePreset('all');
                                         }}
                                         title="Reset tanggal"
-                                        style={{ marginLeft: 2, display: 'inline-flex', color: '#7c3aed' }}
+                                        style={{ marginLeft: 2, display: 'inline-flex', color: '#7c3aed', flexShrink: 0 }}
                                     >
                                         <X size={12} />
                                     </span>
@@ -1337,19 +1336,45 @@ function Dashboard() {
                             </button>
 
                             {showDatePicker && (
-                                <div style={{ position: 'absolute', top: '120%', right: 0, zIndex: 200 }}>
-                                    <DateRangePicker
-                                        startDate={filterStartDate}
-                                        endDate={filterEndDate}
-                                        onChange={({ startDate, endDate }) => {
-                                            setFilterStartDate(startDate);
-                                            setFilterEndDate(endDate);
-                                            setActiveDatePreset(!startDate && !endDate ? 'all' : 'custom');
-                                            setSelectedBarIndex(null);
+                                <>
+                                    <div
+                                        onClick={() => setShowDatePicker(false)}
+                                        style={{
+                                            position: 'fixed',
+                                            top: 0,
+                                            left: 0,
+                                            right: 0,
+                                            bottom: 0,
+                                            background: 'rgba(15, 23, 42, 0.45)',
+                                            zIndex: 9998,
+                                            backdropFilter: 'blur(2px)',
                                         }}
-                                        onClose={() => setShowDatePicker(false)}
                                     />
-                                </div>
+                                    <div
+                                        style={{
+                                            position: 'fixed',
+                                            top: '50%',
+                                            left: '50%',
+                                            transform: 'translate(-50%, -50%)',
+                                            zIndex: 9999,
+                                            maxWidth: 'calc(100vw - 20px)',
+                                            maxHeight: '90vh',
+                                            overflowY: 'auto',
+                                        }}
+                                    >
+                                        <DateRangePicker
+                                            startDate={filterStartDate}
+                                            endDate={filterEndDate}
+                                            onChange={({ startDate, endDate }) => {
+                                                setFilterStartDate(startDate);
+                                                setFilterEndDate(endDate);
+                                                setActiveDatePreset(!startDate && !endDate ? 'all' : 'custom');
+                                                setSelectedBarIndex(null);
+                                            }}
+                                            onClose={() => setShowDatePicker(false)}
+                                        />
+                                    </div>
+                                </>
                             )}
                         </div>
                     </div>

@@ -298,6 +298,9 @@ maxWidth: '100%', // Bebas dari batasan 1400px agar tidak ada sisa ruang kosong 
 8. `/aset` — **Aset Barang** (`AsetTable.js`) — `[SELESAI - Standard Card & Viewport Table]`
 9. `/operasional` — **Biaya Operasional** (`OperasionalTable.js`) — `[SELESAI - Standard Card & Viewport Table]`
 10. `/stores` — **Kelola Toko** (`StoreManagement.js`) — `[SELESAI - Standard Card Header]`
+11. `/input-modal` — **Input HPP** (`InputModal.js`) — `[SELESAI - 100% Responsive Multi-Column Cards]`
+12. `/kampanye` — **Kampanye Promo** (`KampanyeMain.js`, `PromoTiktok.js`, `PromoShopee.js`) — `[SELESAI - 100% Responsive Multi-Column Cards]`
+13. `/kalkulator` — **Kalkulator Simulasi** (`PricingCalculator.js`) — `[SELESAI - Standard Card Header & 100% Width]`
 
 ---
 
