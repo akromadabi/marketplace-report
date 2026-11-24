@@ -978,7 +978,6 @@ function Dashboard() {
                         Upload File Sekarang →
                     </button>
                 </div>
-                <DashboardModernCards rangkumanData={rangkumanData} />
             </div>
         );
     }

@@ -19,18 +19,6 @@ function formatCompactRupiah(number) {
 
 const BRAND_PALETTE = ['#7c3aed', '#06b6d4', '#10b981', '#f59e0b', '#ec4899'];
 
-const FALLBACK_CATEGORIES = [
-    { name: 'Kulot Highwaist Basic', omzet: 184500000, pcs: 14200, orders: 12100 },
-    { name: 'Highwaist Premium & Knit', omzet: 112300000, pcs: 8600, orders: 7400 },
-    { name: 'Rok & Setelan Wanita', omzet: 86000000, pcs: 5400, orders: 4800 },
-];
-
-const FALLBACK_REGIONS = [
-    { name: 'JAWA BARAT', omzet: 142500000, orders: 11420, pcs: 13200 },
-    { name: 'JAWA TENGAH', omzet: 86200000, orders: 6840, pcs: 7900 },
-    { name: 'JAWA TIMUR', omzet: 78900000, orders: 6120, pcs: 7100 },
-];
-
 function detectProductCategory(title = '', sku = '') {
     const s = (sku || '').toString().trim().toLowerCase();
     const t = (title || '').toString().trim().toLowerCase();
@@ -180,12 +168,11 @@ const DashboardModernCards = React.memo(function DashboardModernCards({
     }, [rangkumanData, filterStartDate, filterEndDate, categoryGroupBy, channelFilter, regionLevel]);
 
     const viewData = useMemo(() => {
-        const sourceCats = rawAggregated ? rawAggregated.categoryList : FALLBACK_CATEGORIES;
-        const sourceLocs = rawAggregated ? rawAggregated.locationList : FALLBACK_REGIONS;
+        if (!rawAggregated) return null;
+        const sourceCats = rawAggregated.categoryList;
+        const sourceLocs = rawAggregated.locationList;
 
-        const totalMetric = rawAggregated
-            ? (metricMode === 'omzet' ? rawAggregated.totalOmzet : rawAggregated.totalQty)
-            : sourceCats.reduce((acc, c) => acc + (metricMode === 'omzet' ? c.omzet : c.pcs), 0);
+        const totalMetric = metricMode === 'omzet' ? rawAggregated.totalOmzet : rawAggregated.totalQty;
 
         const sortedCats = [...sourceCats].sort((a, b) =>
             metricMode === 'omzet' ? b.omzet - a.omzet : b.pcs - a.pcs
@@ -268,6 +255,10 @@ const DashboardModernCards = React.memo(function DashboardModernCards({
 
     const hasActiveCatFilter = categoryGroupBy !== 'category' || channelFilter !== 'all';
     const hasActiveRegionFilter = regionLevel !== 'province' || regionLimit !== 3;
+
+    if (!rawAggregated || !viewData) {
+        return null;
+    }
 
     const cardSurface = {
         background: '#ffffff',
