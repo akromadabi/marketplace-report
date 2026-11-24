@@ -376,6 +376,16 @@ function UploadFile() {
       return { platform: "tiktok", category: "payments" };
     }
 
+    // TikTok Returns — HARUS DICEK SEBELUM TikTok Orders karena file ekspor retur TikTok juga memuat kolom Order ID, Order Status, SKU ID, Seller SKU, dan Product Name!
+    const hasTiktokReturn = [
+      "return order id", "id pengembalian", "id pesanan pengembalian", "nomor pesanan pengembalian"
+    ].some(h => normalized.includes(h))
+      && ["order id", "id pesanan", "no. pesanan"].some(h => normalized.includes(h));
+      
+    if (hasTiktokReturn) {
+      return { platform: "tiktok", category: "return" };
+    }
+
     // TikTok Orders
     const hasTiktokOrders = ["order id", "id pesanan"].some(h => normalized.includes(h))
       && ["order status", "status pesanan"].some(h => normalized.includes(h))
@@ -385,15 +395,6 @@ function UploadFile() {
       
     if (hasTiktokOrders) {
       return { platform: "tiktok", category: "orders" };
-    }
-
-    // TikTok Returns
-    const hasTiktokReturn = ["return order id", "id pengembalian", "id pesanan pengembalian"].some(h => normalized.includes(h))
-      && ["order id", "id pesanan"].some(h => normalized.includes(h))
-      && ["sku id", "id sku"].some(h => normalized.includes(h));
-      
-    if (hasTiktokReturn) {
-      return { platform: "tiktok", category: "return" };
     }
 
     return { platform: "unknown", category: "unknown" };
@@ -490,7 +491,7 @@ function UploadFile() {
   const RETURN_WHITELIST = new Set([
     'order id', 'return order id', 'return status', 'return sub status',
     'return logistics tracking id', 'product name', 'sku id', 'seller sku',
-    'sku name', 'buyer username', 'return type', 'return reason',
+    'sku name', 'variation', 'buyer username', 'return type', 'return reason',
     'return quantity', 'return unit price', 'refund amount', 'order amount',
     'order status', 'order substatus', 'payment method', 'time requested',
     'refund time', 'dispute status', 'appeal status', 'compensation status',

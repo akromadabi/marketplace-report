@@ -67,6 +67,7 @@ class UploadController extends Controller
             'sku id',
             'seller sku',
             'sku name',
+            'variation',
             'buyer username',
             'return type',
             'return reason',
