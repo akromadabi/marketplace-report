@@ -271,8 +271,8 @@ const DashboardModernCards = React.memo(function DashboardModernCards({
 
     const cardSurface = {
         background: '#ffffff',
-        borderRadius: '20px',
-        padding: isMobile ? '1.15rem' : '1.5rem 1.6rem',
+        borderRadius: isMobile ? '16px' : '20px',
+        padding: isMobile ? '0.75rem 0.85rem' : '1.5rem 1.6rem',
         boxShadow: '0 4px 20px -2px rgba(108, 92, 231, 0.05), 0 2px 6px rgba(0,0,0,0.02)',
         border: '1px solid #eef0f6',
         color: 'var(--text-primary)',
@@ -288,8 +288,8 @@ const DashboardModernCards = React.memo(function DashboardModernCards({
             style={{
                 display: 'grid',
                 gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(360px, 1fr))',
-                gap: isMobile ? '0.875rem' : '1.25rem',
-                marginBottom: isMobile ? '0.875rem' : '1.5rem',
+                gap: isMobile ? '0.75rem' : '1.25rem',
+                marginBottom: isMobile ? '0.75rem' : '1.5rem',
             }}
         >
             {/* ════════════════════════════════════════════════════════════
@@ -297,13 +297,13 @@ const DashboardModernCards = React.memo(function DashboardModernCards({
                 ════════════════════════════════════════════════════════════ */}
             <div style={cardSurface}>
                 {/* Header */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '1.25rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.4rem', marginBottom: isMobile ? '0.75rem' : '1.25rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '0.5rem' : '0.65rem', minWidth: 0 }}>
                         <div
                             style={{
-                                width: 34,
-                                height: 34,
-                                borderRadius: 10,
+                                width: isMobile ? 28 : 34,
+                                height: isMobile ? 28 : 34,
+                                borderRadius: isMobile ? 8 : 10,
                                 background: 'rgba(124, 58, 237, 0.1)',
                                 display: 'flex',
                                 alignItems: 'center',
@@ -311,20 +311,20 @@ const DashboardModernCards = React.memo(function DashboardModernCards({
                                 flexShrink: 0,
                             }}
                         >
-                            <Layers size={16} color="#7c3aed" />
+                            <Layers size={isMobile ? 14 : 16} color="#7c3aed" />
                         </div>
-                        <div>
-                            <h3 style={{ fontSize: '1.05rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+                        <div style={{ minWidth: 0 }}>
+                            <h3 style={{ fontSize: isMobile ? '0.9rem' : '1.05rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)', letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                 Penjualan per {categoryGroupBy === 'sku' ? 'Kode SKU' : 'Kategori'}
                             </h3>
-                            <p style={{ fontSize: '0.725rem', color: 'var(--text-secondary)', margin: '0.1rem 0 0', fontWeight: 500 }}>
-                                {channelLabels[channelFilter]} · Berdasarkan {metricMode === 'omzet' ? 'penerimaan bersih' : 'unit terjual'}
+                            <p style={{ fontSize: isMobile ? '0.66rem' : '0.725rem', color: 'var(--text-secondary)', margin: '0.1rem 0 0', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {channelLabels[channelFilter]} · {metricMode === 'omzet' ? 'Penerimaan bersih' : 'Unit terjual'}
                             </p>
                         </div>
                     </div>
 
                     {/* Right Controls: Omzet/PCS Toggle + Data Filter Button */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', position: 'relative' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '0.35rem' : '0.45rem', position: 'relative', flexShrink: 0 }}>
                         <div
                             style={{
                                 display: 'flex',
@@ -338,10 +338,10 @@ const DashboardModernCards = React.memo(function DashboardModernCards({
                                 type="button"
                                 onClick={() => setMetricMode('omzet')}
                                 style={{
-                                    padding: '4px 11px',
+                                    padding: isMobile ? '3px 8px' : '4px 11px',
                                     borderRadius: '9999px',
                                     border: 'none',
-                                    fontSize: '0.7rem',
+                                    fontSize: isMobile ? '0.65rem' : '0.7rem',
                                     fontWeight: 700,
                                     cursor: 'pointer',
                                     background: metricMode === 'omzet' ? '#7c3aed' : 'transparent',
@@ -349,16 +349,16 @@ const DashboardModernCards = React.memo(function DashboardModernCards({
                                     transition: 'background 0.15s ease, color 0.15s ease',
                                 }}
                             >
-                                Penerimaan Bersih
+                                {isMobile ? 'Bersih' : 'Penerimaan Bersih'}
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setMetricMode('qty')}
                                 style={{
-                                    padding: '4px 11px',
+                                    padding: isMobile ? '3px 8px' : '4px 11px',
                                     borderRadius: '9999px',
                                     border: 'none',
-                                    fontSize: '0.7rem',
+                                    fontSize: isMobile ? '0.65rem' : '0.7rem',
                                     fontWeight: 700,
                                     cursor: 'pointer',
                                     background: metricMode === 'qty' ? '#7c3aed' : 'transparent',
@@ -375,8 +375,8 @@ const DashboardModernCards = React.memo(function DashboardModernCards({
                             title="Filter Pengelompokan & Sumber Pesanan"
                             onClick={() => setOpenMenu(openMenu === 'catFilter' ? null : 'catFilter')}
                             style={{
-                                width: 32,
-                                height: 32,
+                                width: isMobile ? 28 : 32,
+                                height: isMobile ? 28 : 32,
                                 borderRadius: '50%',
                                 background: hasActiveCatFilter ? 'rgba(124, 58, 237, 0.12)' : '#f4f5f9',
                                 border: hasActiveCatFilter ? '1px solid #7c3aed' : '1px solid #e5e7f0',
@@ -387,7 +387,7 @@ const DashboardModernCards = React.memo(function DashboardModernCards({
                                 color: hasActiveCatFilter ? '#7c3aed' : 'var(--text-secondary)',
                             }}
                         >
-                            <Filter size={14} />
+                            <Filter size={isMobile ? 12 : 14} />
                         </button>
 
                         {openMenu === 'catFilter' && (
@@ -482,15 +482,15 @@ const DashboardModernCards = React.memo(function DashboardModernCards({
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
-                        gap: '1.5rem',
+                        gap: isMobile ? '0.75rem' : '1.5rem',
                         flexWrap: isMobile ? 'wrap' : 'nowrap',
                     }}
                 >
                     <div
                         style={{
                             position: 'relative',
-                            width: 164,
-                            height: 164,
+                            width: isMobile ? 140 : 164,
+                            height: isMobile ? 140 : 164,
                             margin: '0 auto',
                             display: 'flex',
                             alignItems: 'center',
@@ -499,15 +499,15 @@ const DashboardModernCards = React.memo(function DashboardModernCards({
                         }}
                     >
                         <svg
-                            width="164"
-                            height="164"
-                            viewBox="0 0 164 164"
+                            width={isMobile ? 140 : 164}
+                            height={isMobile ? 140 : 164}
+                            viewBox={isMobile ? '0 0 140 140' : '0 0 164 164'}
                             style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}
                         >
                             <circle
-                                cx="82"
-                                cy="82"
-                                r="77"
+                                cx={isMobile ? 70 : 82}
+                                cy={isMobile ? 70 : 82}
+                                r={isMobile ? 65 : 77}
                                 fill="none"
                                 stroke="rgba(124, 58, 237, 0.22)"
                                 strokeWidth="1.4"
@@ -515,7 +515,7 @@ const DashboardModernCards = React.memo(function DashboardModernCards({
                             />
                         </svg>
 
-                        <ResponsiveContainer width={150} height={150}>
+                        <ResponsiveContainer width={isMobile ? 130 : 150} height={isMobile ? 130 : 150}>
                             <PieChart>
                                 <RechartsTooltip
                                     content={({ active, payload }) => {
@@ -548,8 +548,8 @@ const DashboardModernCards = React.memo(function DashboardModernCards({
                                     data={viewData.chartSlices}
                                     cx="50%"
                                     cy="50%"
-                                    innerRadius={47}
-                                    outerRadius={67}
+                                    innerRadius={isMobile ? 38 : 47}
+                                    outerRadius={isMobile ? 56 : 67}
                                     paddingAngle={3}
                                     dataKey="value"
                                     stroke="none"
@@ -572,12 +572,12 @@ const DashboardModernCards = React.memo(function DashboardModernCards({
                                 transform: 'translate(-50%, -50%)',
                                 textAlign: 'center',
                                 pointerEvents: 'none',
-                                width: '88px',
+                                width: isMobile ? '76px' : '88px',
                             }}
                         >
                             <div
                                 style={{
-                                    fontSize: '0.65rem',
+                                    fontSize: isMobile ? '0.6rem' : '0.65rem',
                                     color: 'var(--text-tertiary)',
                                     fontWeight: 700,
                                     textTransform: 'uppercase',
@@ -588,7 +588,7 @@ const DashboardModernCards = React.memo(function DashboardModernCards({
                             </div>
                             <div
                                 style={{
-                                    fontSize: '0.85rem',
+                                    fontSize: isMobile ? '0.78rem' : '0.85rem',
                                     color: 'var(--text-primary)',
                                     fontWeight: 800,
                                     marginTop: '2px',
@@ -606,8 +606,9 @@ const DashboardModernCards = React.memo(function DashboardModernCards({
                             display: 'flex',
                             flexDirection: 'column',
                             justifyContent: 'center',
-                            gap: '0.8rem',
+                            gap: isMobile ? '0.5rem' : '0.8rem',
                             minWidth: 0,
+                            width: isMobile ? '100%' : 'auto',
                         }}
                     >
                         {viewData.displayCategories.map((item, idx) => (
@@ -617,18 +618,18 @@ const DashboardModernCards = React.memo(function DashboardModernCards({
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'space-between',
-                                    paddingBottom: idx < viewData.displayCategories.length - 1 ? '0.8rem' : 0,
+                                    paddingBottom: idx < viewData.displayCategories.length - 1 ? (isMobile ? '0.5rem' : '0.8rem') : 0,
                                     borderBottom:
                                         idx < viewData.displayCategories.length - 1
                                             ? '1px solid #f0f1f7'
                                             : 'none',
                                 }}
                             >
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', minWidth: 0 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '0.5rem' : '0.65rem', minWidth: 0 }}>
                                     <div
                                         style={{
                                             width: '4px',
-                                            height: '28px',
+                                            height: isMobile ? '24px' : '28px',
                                             borderRadius: '4px',
                                             background: item.color,
                                             flexShrink: 0,
@@ -637,7 +638,7 @@ const DashboardModernCards = React.memo(function DashboardModernCards({
                                     <div style={{ minWidth: 0 }}>
                                         <div
                                             style={{
-                                                fontSize: '0.8125rem',
+                                                fontSize: isMobile ? '0.75rem' : '0.8125rem',
                                                 color: 'var(--text-secondary)',
                                                 fontWeight: 600,
                                                 whiteSpace: 'nowrap',
@@ -649,7 +650,7 @@ const DashboardModernCards = React.memo(function DashboardModernCards({
                                         </div>
                                         <div
                                             style={{
-                                                fontSize: '0.975rem',
+                                                fontSize: isMobile ? '0.875rem' : '0.975rem',
                                                 color: 'var(--text-primary)',
                                                 fontWeight: 800,
                                                 letterSpacing: '-0.01em',
@@ -667,8 +668,8 @@ const DashboardModernCards = React.memo(function DashboardModernCards({
                                     style={{
                                         background: `${item.color}14`,
                                         borderRadius: '9999px',
-                                        padding: '4px 11px',
-                                        fontSize: '0.725rem',
+                                        padding: isMobile ? '2px 8px' : '4px 11px',
+                                        fontSize: isMobile ? '0.675rem' : '0.725rem',
                                         fontWeight: 700,
                                         color: item.color,
                                         flexShrink: 0,
@@ -688,13 +689,13 @@ const DashboardModernCards = React.memo(function DashboardModernCards({
                 ════════════════════════════════════════════════════════════ */}
             <div style={cardSurface}>
                 {/* Header */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '1.25rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.4rem', marginBottom: isMobile ? '0.75rem' : '1.25rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '0.5rem' : '0.65rem', minWidth: 0 }}>
                         <div
                             style={{
-                                width: 34,
-                                height: 34,
-                                borderRadius: 10,
+                                width: isMobile ? 28 : 34,
+                                height: isMobile ? 28 : 34,
+                                borderRadius: isMobile ? 8 : 10,
                                 background: 'rgba(6, 182, 212, 0.1)',
                                 display: 'flex',
                                 alignItems: 'center',
@@ -702,12 +703,12 @@ const DashboardModernCards = React.memo(function DashboardModernCards({
                                 flexShrink: 0,
                             }}
                         >
-                            <MapPin size={16} color="#06b6d4" />
+                            <MapPin size={isMobile ? 14 : 16} color="#06b6d4" />
                         </div>
-                        <div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                <h3 style={{ fontSize: '1.05rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
-                                    Pendapatan per {regionLevel === 'city' ? 'Kota / Kabupaten' : 'Wilayah Provinsi'}
+                        <div style={{ minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                <h3 style={{ fontSize: isMobile ? '0.9rem' : '1.05rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)', letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    Pendapatan per {regionLevel === 'city' ? 'Kota' : 'Wilayah'}
                                 </h3>
                                 <button
                                     type="button"
@@ -722,24 +723,24 @@ const DashboardModernCards = React.memo(function DashboardModernCards({
                                         color: 'var(--text-tertiary)',
                                     }}
                                 >
-                                    <Info size={14} />
+                                    <Info size={13} />
                                 </button>
                             </div>
-                            <p style={{ fontSize: '0.725rem', color: 'var(--text-secondary)', margin: '0.1rem 0 0', fontWeight: 500 }}>
-                                Top {regionLimit} {regionLevel === 'city' ? 'kota/kabupaten' : 'provinsi'} kontributor {metricMode === 'omzet' ? 'omzet' : 'pesanan'} tertinggi
+                            <p style={{ fontSize: isMobile ? '0.66rem' : '0.725rem', color: 'var(--text-secondary)', margin: '0.1rem 0 0', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                Top {regionLimit} {regionLevel === 'city' ? 'kota/kab' : 'provinsi'} kontributor tertinggi
                             </p>
                         </div>
                     </div>
 
                     {/* Right Filter Button */}
-                    <div style={{ position: 'relative' }}>
+                    <div style={{ position: 'relative', flexShrink: 0 }}>
                         <button
                             type="button"
                             title="Filter Tingkat Wilayah & Jumlah Baris"
                             onClick={() => setOpenMenu(openMenu === 'regionFilter' ? null : 'regionFilter')}
                             style={{
-                                width: 32,
-                                height: 32,
+                                width: isMobile ? 28 : 32,
+                                height: isMobile ? 28 : 32,
                                 borderRadius: '50%',
                                 background: hasActiveRegionFilter ? 'rgba(6, 182, 212, 0.12)' : '#f4f5f9',
                                 border: hasActiveRegionFilter ? '1px solid #06b6d4' : '1px solid #e5e7f0',
@@ -750,7 +751,7 @@ const DashboardModernCards = React.memo(function DashboardModernCards({
                                 color: hasActiveRegionFilter ? '#06b6d4' : 'var(--text-secondary)',
                             }}
                         >
-                            <Filter size={14} />
+                            <Filter size={isMobile ? 12 : 14} />
                         </button>
 
                         {openMenu === 'info' && (
@@ -859,22 +860,22 @@ const DashboardModernCards = React.memo(function DashboardModernCards({
                 </div>
 
                 {/* Body: Clean Cohesive Region Progress Bars */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.95rem', justifyContent: 'center', flex: 1 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '0.65rem' : '0.95rem', justifyContent: 'center', flex: 1 }}>
                     {viewData.regions.map((item) => (
-                        <div key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                        <div key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '0.25rem' : '0.4rem' }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '0.5rem' : '0.65rem' }}>
                                     <div
                                         style={{
-                                            width: 28,
-                                            height: 28,
-                                            borderRadius: '8px',
+                                            width: isMobile ? 24 : 28,
+                                            height: isMobile ? 24 : 28,
+                                            borderRadius: isMobile ? '6px' : '8px',
                                             background: `${item.color}14`,
                                             color: item.color,
                                             display: 'flex',
                                             alignItems: 'center',
                                             justifyContent: 'center',
-                                            fontSize: '0.75rem',
+                                            fontSize: isMobile ? '0.7rem' : '0.75rem',
                                             fontWeight: 800,
                                             flexShrink: 0,
                                         }}
@@ -882,15 +883,15 @@ const DashboardModernCards = React.memo(function DashboardModernCards({
                                         #{item.rank}
                                     </div>
                                     <div>
-                                        <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2 }}>
+                                        <div style={{ fontSize: isMobile ? '0.78rem' : '0.85rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2 }}>
                                             {item.name}
                                         </div>
-                                        <div style={{ fontSize: '0.715rem', color: 'var(--text-secondary)', fontWeight: 500, marginTop: '1px' }}>
+                                        <div style={{ fontSize: isMobile ? '0.66rem' : '0.715rem', color: 'var(--text-secondary)', fontWeight: 500, marginTop: '1px' }}>
                                             {item.subDisplay}
                                         </div>
                                     </div>
                                 </div>
-                                <span style={{ fontSize: '0.9375rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                                <span style={{ fontSize: isMobile ? '0.825rem' : '0.9375rem', fontWeight: 800, color: 'var(--text-primary)' }}>
                                     {item.amountDisplay}
                                 </span>
                             </div>
@@ -898,7 +899,7 @@ const DashboardModernCards = React.memo(function DashboardModernCards({
                             <div
                                 style={{
                                     width: '100%',
-                                    height: '7px',
+                                    height: isMobile ? '5px' : '7px',
                                     background: '#f1f2f8',
                                     borderRadius: '9999px',
                                     overflow: 'hidden',

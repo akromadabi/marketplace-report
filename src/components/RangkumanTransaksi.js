@@ -2,7 +2,7 @@ import React, { useMemo, useState, useRef, useEffect, useDeferredValue } from "r
 import * as XLSX from "xlsx";
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { ClipboardList, Filter, ArrowUp, ArrowDown, ArrowUpDown, X, Download, CheckCircle, XCircle, Calendar, ChevronLeft, ChevronRight, Search, Copy, Check } from 'lucide-react';
+import { Filter, ArrowUp, ArrowDown, ArrowUpDown, X, Download, CheckCircle, XCircle, Calendar, ChevronLeft, ChevronRight, Search, Copy, Check, RotateCcw, SlidersHorizontal, ChevronDown, Receipt } from 'lucide-react';
 import { useProcessedOrders } from '../hooks/useProcessedOrders';
 import { useDataCache } from '../contexts/DataContext';
 
@@ -642,112 +642,155 @@ export default function RangkumanTransaksi({ isHidden = false }) {
         return {};
     }
 
+    const isStatusActive = Boolean(pdfChecked.retur || pdfChecked.gagal_kirim || pdfChecked.cancel);
+    const statusActiveCount = (pdfChecked.retur ? 1 : 0) + (pdfChecked.gagal_kirim ? 1 : 0) + (pdfChecked.cancel ? 1 : 0);
+    const isDateActive = Boolean(filterStartDate || filterEndDate);
+    const isSearchActive = Boolean(searchQuery && searchQuery.trim());
+    const isColFilterActive = Object.values(columnFilters).some(set => set && set.size > 0);
+    const hasAnyFilter = isStatusActive || isDateActive || isSearchActive || isColFilterActive;
+
+    const handleResetAllFilters = () => {
+        setSearchQuery('');
+        setFilterStartDate('');
+        setFilterEndDate('');
+        setPdfChecked({ retur: false, gagal_kirim: false, cancel: false });
+        setColumnFilters({});
+        setCurrentPage(1);
+    };
+
     if (isHidden) {
         return null; // Mounts the component, runs the hooks to save data to cache, but renders nothing to the DOM
     }
 
     return (
-        <div>
-            {/* ── Top Header & Filter Toolbar (Ultra-Compact) ── */}
-            <div style={{
-                background: '#ffffff',
-                borderRadius: '12px',
-                border: '1px solid #eef0f6',
-                padding: isMobile ? '0.5rem 0.65rem' : '0.5rem 0.85rem',
-                marginBottom: '0.5rem',
-                boxShadow: '0 1px 4px rgba(0,0,0,0.02)',
-                display: 'flex',
-                flexDirection: isMobile ? 'column' : 'row',
-                alignItems: isMobile ? 'stretch' : 'center',
-                justifyContent: 'space-between',
-                gap: '0.45rem',
-            }}>
-                {/* Left: Page Title + Total Count Badge */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <div style={{
-                            width: isMobile ? 26 : 28,
-                            height: isMobile ? 26 : 28,
-                            borderRadius: '7px',
-                            background: 'linear-gradient(135deg, #7c3aed, #06b6d4)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: '#ffffff',
-                            flexShrink: 0,
-                            boxShadow: '0 2px 6px rgba(124, 58, 237, 0.22)',
-                        }}>
-                            <ClipboardList size={isMobile ? 14 : 15} />
-                        </div>
-                        <h2 style={{
-                            margin: 0,
-                            fontSize: isMobile ? '0.9rem' : '1.05rem',
-                            fontWeight: 800,
-                            color: 'var(--text-primary)',
-                            letterSpacing: '-0.02em',
-                        }}>
-                            Rekap Transaksi
-                        </h2>
-                    </div>
-                    <span style={{
-                        fontSize: isMobile ? '0.675rem' : '0.725rem',
-                        fontWeight: 700,
-                        color: '#7c3aed',
-                        background: 'rgba(124, 58, 237, 0.08)',
-                        border: '1px solid rgba(124, 58, 237, 0.2)',
-                        padding: '1px 7px',
-                        borderRadius: '9999px',
-                        whiteSpace: 'nowrap',
-                    }}>
-                        {sortedData.length.toLocaleString('id-ID')} transaksi
-                    </span>
-                </div>
-
-                {/* Right: Inline Filter Controls */}
-                <div style={{
+        <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            height: isMobile ? 'calc(100vh - 8.35rem)' : 'calc(100vh - 1.3rem)',
+            overflow: 'hidden',
+        }}>
+            {/* ── Top Header Toolbar (Separate Card) ── */}
+            <div
+                style={{
+                    flexShrink: 0,
+                    background: '#ffffff',
+                    borderRadius: '12px',
+                    border: '1px solid #e2e8f0',
+                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02)',
+                    padding: isMobile ? '0.55rem 0.65rem' : '0.55rem 0.85rem',
+                    marginBottom: '0.5rem',
                     display: 'flex',
-                    alignItems: 'center',
-                    flexWrap: isMobile ? 'wrap' : 'nowrap',
-                    gap: '0.35rem',
-                    width: isMobile ? '100%' : 'auto',
-                }}>
-                    {/* Search */}
-                    <div style={{ position: 'relative', width: isMobile ? '100%' : '210px', flexShrink: 0 }}>
-                        <Search size={12} style={{ position: 'absolute', left: '0.6rem', top: '50%', transform: 'translateY(-50%)', color: searchQuery ? '#7c3aed' : 'var(--text-tertiary)', pointerEvents: 'none' }} />
-                        <input
-                            type="text"
-                            placeholder="Cari ID, Alamat, Resi..."
-                            value={searchQuery}
-                            onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                    flexDirection: isMobile ? 'column' : 'row',
+                    alignItems: isMobile ? 'stretch' : 'center',
+                    justifyContent: 'space-between',
+                    gap: isMobile ? '0.5rem' : '0.85rem',
+                }}
+            >
+                    {/* Left: Title + Icon + Count Badge */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: isMobile ? 'space-between' : 'flex-start', gap: '0.65rem', flexShrink: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                            <div
+                                style={{
+                                    width: isMobile ? 28 : 32,
+                                    height: isMobile ? 28 : 32,
+                                    borderRadius: '8px',
+                                    background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    color: '#ffffff',
+                                    flexShrink: 0,
+                                    boxShadow: '0 2px 6px rgba(99, 102, 241, 0.22)',
+                                }}
+                            >
+                                <Receipt size={isMobile ? 15 : 17} strokeWidth={2.3} />
+                            </div>
+                            <h2
+                                style={{
+                                    margin: 0,
+                                    fontSize: isMobile ? '0.925rem' : '1.025rem',
+                                    fontWeight: 800,
+                                    color: '#0f172a',
+                                    letterSpacing: '-0.02em',
+                                }}
+                            >
+                                Rekap Transaksi
+                            </h2>
+                        </div>
+                        <span
                             style={{
-                                width: '100%',
-                                height: '30px',
-                                padding: '0 1.6rem 0 1.85rem',
-                                borderRadius: '7px',
-                                border: searchQuery ? '1px solid #7c3aed' : '1px solid #e2e8f0',
-                                background: searchQuery ? 'rgba(124,58,237,0.05)' : '#f8f9fc',
-                                color: 'var(--text-primary)',
-                                fontSize: '0.735rem',
-                                fontWeight: 500,
-                                outline: 'none',
-                                transition: 'border-color 0.15s ease, background 0.15s ease',
+                                fontSize: isMobile ? '0.675rem' : '0.725rem',
+                                fontWeight: 600,
+                                color: '#475569',
+                                background: '#f1f5f9',
+                                border: '1px solid #e2e8f0',
+                                padding: '2px 8px',
+                                borderRadius: '9999px',
+                                whiteSpace: 'nowrap',
                             }}
-                        />
-                        {searchQuery && (
-                            <button type="button" onClick={() => { setSearchQuery(''); setCurrentPage(1); }}
-                                style={{ position: 'absolute', right: '0.35rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', padding: '0.1rem', display: 'flex' }}>
-                                <X size={12} />
-                            </button>
-                        )}
+                        >
+                            {sortedData.length.toLocaleString('id-ID')} pesanan
+                        </span>
                     </div>
 
-                    {/* Filter buttons (grid on mobile, flex on desktop) */}
+                    {/* Right: Search Box + Action Buttons Group (Pepet Kanan) */}
                     <div style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '0.35rem',
+                        gap: '0.45rem',
+                        flexWrap: isMobile ? 'wrap' : 'nowrap',
                         width: isMobile ? '100%' : 'auto',
+                        justifyContent: isMobile ? 'stretch' : 'flex-end',
                     }}>
+                        {/* Search Bar (Pepet Kanan) */}
+                        <div style={{
+                            position: 'relative',
+                            width: isMobile ? '100%' : '240px',
+                            flexShrink: 0,
+                        }}>
+                            <Search size={14} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: searchQuery ? '#6366f1' : '#94a3b8', pointerEvents: 'none' }} />
+                            <input
+                                type="text"
+                                placeholder="Cari ID, alamat, resi, status..."
+                                value={searchQuery}
+                                onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                                style={{
+                                    width: '100%',
+                                    height: '34px',
+                                    padding: '0 1.8rem 0 2.2rem',
+                                    borderRadius: '8px',
+                                    border: searchQuery ? '1px solid #6366f1' : '1px solid #e2e8f0',
+                                    background: searchQuery ? '#f5f3ff' : '#f8fafc',
+                                    color: '#0f172a',
+                                    fontSize: '0.775rem',
+                                    fontWeight: 500,
+                                    outline: 'none',
+                                    transition: 'border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease',
+                                    boxShadow: searchQuery ? '0 0 0 3px rgba(99, 102, 241, 0.1)' : 'none',
+                                }}
+                                onFocus={e => {
+                                    e.target.style.background = '#ffffff';
+                                    e.target.style.borderColor = '#6366f1';
+                                    e.target.style.boxShadow = '0 0 0 3px rgba(99, 102, 241, 0.1)';
+                                }}
+                                onBlur={e => {
+                                    if (!searchQuery) {
+                                        e.target.style.background = '#f8fafc';
+                                        e.target.style.borderColor = '#e2e8f0';
+                                        e.target.style.boxShadow = 'none';
+                                    }
+                                }}
+                            />
+                            {searchQuery && (
+                                <button
+                                    type="button"
+                                    onClick={() => { setSearchQuery(''); setCurrentPage(1); }}
+                                    style={{ position: 'absolute', right: '0.55rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: '0.15rem', display: 'flex' }}
+                                >
+                                    <X size={13} />
+                                </button>
+                            )}
+                        </div>
                         {/* Date Range Filter */}
                         <div style={{ position: 'relative', flex: isMobile ? 1 : 'none' }} ref={datePickerRef}>
                             <button
@@ -755,24 +798,35 @@ export default function RangkumanTransaksi({ isHidden = false }) {
                                 onClick={() => setShowDateRangePicker(!showDateRangePicker)}
                                 style={{
                                     width: isMobile ? '100%' : 'auto',
-                                    height: '30px',
-                                    display: 'flex',
+                                    height: '34px',
+                                    display: 'inline-flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    gap: '0.3rem',
-                                    padding: '0 0.65rem',
-                                    borderRadius: '7px',
-                                    border: (filterStartDate || filterEndDate) ? '1px solid rgba(124,58,237,0.4)' : '1px solid #e2e8f0',
-                                    background: (filterStartDate || filterEndDate) ? 'rgba(124,58,237,0.08)' : '#f8f9fc',
-                                    color: (filterStartDate || filterEndDate) ? '#7c3aed' : 'var(--text-secondary)',
-                                    cursor: 'pointer',
-                                    fontSize: '0.725rem',
+                                    gap: '0.4rem',
+                                    padding: '0 0.75rem',
+                                    borderRadius: '8px',
+                                    border: isDateActive ? '1px solid #6366f1' : '1px solid #e2e8f0',
+                                    background: isDateActive ? '#f5f3ff' : '#ffffff',
+                                    color: isDateActive ? '#6366f1' : '#334155',
+                                    fontSize: '0.75rem',
                                     fontWeight: 600,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s ease',
+                                    boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
                                     whiteSpace: 'nowrap',
                                 }}
                             >
-                                <Calendar size={12} />
-                                <span>{filterStartDate && filterEndDate ? `${filterStartDate} — ${filterEndDate}` : 'Tanggal'}</span>
+                                <Calendar size={13} style={{ color: isDateActive ? '#6366f1' : '#64748b' }} />
+                                <span>{(filterStartDate && filterEndDate) ? (`${filterStartDate} — ${filterEndDate}`) : 'Tanggal'}</span>
+                                {isDateActive && (
+                                    <span
+                                        onClick={(e) => { e.stopPropagation(); setFilterStartDate(''); setFilterEndDate(''); setCurrentPage(1); }}
+                                        title="Hapus filter tanggal"
+                                        style={{ marginLeft: '2px', display: 'inline-flex', color: '#6366f1', padding: '1px' }}
+                                    >
+                                        <X size={11} />
+                                    </span>
+                                )}
                             </button>
                             {showDateRangePicker && (
                                 <div style={{ position: 'absolute', top: '105%', left: isMobile ? 0 : 'auto', right: isMobile ? 'auto' : 0, zIndex: 120 }}>
@@ -790,47 +844,99 @@ export default function RangkumanTransaksi({ isHidden = false }) {
                                 type="button"
                                 style={{
                                     width: isMobile ? '100%' : 'auto',
-                                    height: '30px',
-                                    display: 'flex',
+                                    height: '34px',
+                                    display: 'inline-flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    gap: '0.3rem',
-                                    padding: '0 0.65rem',
-                                    borderRadius: '7px',
-                                    border: (pdfChecked.retur || pdfChecked.gagal_kirim || pdfChecked.cancel) ? '1px solid #7c3aed' : '1px solid #e2e8f0',
-                                    background: (pdfChecked.retur || pdfChecked.gagal_kirim || pdfChecked.cancel) ? 'rgba(124, 58, 237, 0.08)' : '#f8f9fc',
-                                    color: (pdfChecked.retur || pdfChecked.gagal_kirim || pdfChecked.cancel) ? '#7c3aed' : 'var(--text-secondary)',
-                                    cursor: 'pointer',
-                                    fontSize: '0.725rem',
+                                    gap: '0.4rem',
+                                    padding: '0 0.75rem',
+                                    borderRadius: '8px',
+                                    border: isStatusActive ? '1px solid #6366f1' : '1px solid #e2e8f0',
+                                    background: isStatusActive ? '#f5f3ff' : '#ffffff',
+                                    color: isStatusActive ? '#6366f1' : '#334155',
+                                    fontSize: '0.75rem',
                                     fontWeight: 600,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s ease',
+                                    boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
                                     whiteSpace: 'nowrap',
                                 }}
                             >
-                                <Filter size={12} />
-                                <span>Status {(pdfChecked.retur || pdfChecked.gagal_kirim || pdfChecked.cancel) ? '(Aktif)' : ''} ▾</span>
+                                <SlidersHorizontal size={13} style={{ color: isStatusActive ? '#6366f1' : '#64748b' }} />
+                                <span>Status</span>
+                                {isStatusActive && (
+                                    <span style={{
+                                        background: '#6366f1',
+                                        color: '#ffffff',
+                                        borderRadius: '9999px',
+                                        fontSize: '0.65rem',
+                                        padding: '0 5px',
+                                        fontWeight: 700,
+                                        lineHeight: '14px',
+                                    }}>
+                                        {statusActiveCount}
+                                    </span>
+                                )}
+                                <ChevronDown size={11} style={{ color: '#94a3b8' }} />
                             </button>
                             {showFilterMenu && (
                                 <div style={{
                                     position: 'absolute', top: '105%', left: 0, zIndex: 120,
-                                    background: '#ffffff', border: '1px solid #e5e7f0', borderRadius: '10px',
-                                    boxShadow: '0 8px 24px rgba(0,0,0,0.12)', minWidth: '170px', padding: '0.45rem 0.65rem',
-                                    display: 'flex', flexDirection: 'column', gap: '0.4rem',
+                                    background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '10px',
+                                    boxShadow: '0 10px 25px rgba(0,0,0,0.1)', minWidth: '175px', padding: '0.5rem 0.7rem',
+                                    display: 'flex', flexDirection: 'column', gap: '0.45rem',
                                 }}>
-                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.735rem', color: 'var(--text-secondary)' }}>
-                                        <input type="checkbox" checked={pdfChecked.retur} onChange={e => setPdfChecked({ ...pdfChecked, retur: e.target.checked })} style={{ accentColor: '#3b82f6', width: '0.85rem', height: '0.85rem' }} />
+                                    <div style={{ fontSize: '0.675rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>
+                                        Filter Status Order
+                                    </div>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.75rem', color: '#334155', fontWeight: 500 }}>
+                                        <input type="checkbox" checked={pdfChecked.retur} onChange={e => setPdfChecked({ ...pdfChecked, retur: e.target.checked })} style={{ accentColor: '#3b82f6', width: '0.9rem', height: '0.9rem' }} />
                                         <span>🔄 Retur</span>
                                     </label>
-                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.735rem', color: 'var(--text-secondary)' }}>
-                                        <input type="checkbox" checked={pdfChecked.gagal_kirim} onChange={e => setPdfChecked({ ...pdfChecked, gagal_kirim: e.target.checked })} style={{ accentColor: '#f97316', width: '0.85rem', height: '0.85rem' }} />
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.75rem', color: '#334155', fontWeight: 500 }}>
+                                        <input type="checkbox" checked={pdfChecked.gagal_kirim} onChange={e => setPdfChecked({ ...pdfChecked, gagal_kirim: e.target.checked })} style={{ accentColor: '#f97316', width: '0.9rem', height: '0.9rem' }} />
                                         <span>🚚 Gagal Kirim</span>
                                     </label>
-                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.735rem', color: 'var(--text-secondary)' }}>
-                                        <input type="checkbox" checked={pdfChecked.cancel} onChange={e => setPdfChecked({ ...pdfChecked, cancel: e.target.checked })} style={{ accentColor: '#ef4444', width: '0.85rem', height: '0.85rem' }} />
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.75rem', color: '#334155', fontWeight: 500 }}>
+                                        <input type="checkbox" checked={pdfChecked.cancel} onChange={e => setPdfChecked({ ...pdfChecked, cancel: e.target.checked })} style={{ accentColor: '#ef4444', width: '0.9rem', height: '0.9rem' }} />
                                         <span>❌ Cancel</span>
                                     </label>
                                 </div>
                             )}
                         </div>
+
+                        {/* Reset All Filters Button (Only when filtered) */}
+                        {hasAnyFilter && (
+                            <button
+                                type="button"
+                                onClick={handleResetAllFilters}
+                                title="Reset semua filter"
+                                style={{
+                                    height: '34px',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.35rem',
+                                    padding: '0 0.65rem',
+                                    borderRadius: '8px',
+                                    border: '1px solid #fecaca',
+                                    background: '#fff1f2',
+                                    color: '#e11d48',
+                                    fontSize: '0.725rem',
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s ease',
+                                    whiteSpace: 'nowrap',
+                                }}
+                            >
+                                <RotateCcw size={12} />
+                                <span>Reset</span>
+                            </button>
+                        )}
+
+                        {/* Divider on desktop */}
+                        {!isMobile && (
+                            <div style={{ height: '20px', width: '1px', background: '#e2e8f0', margin: '0 2px' }} />
+                        )}
 
                         {/* Export Dropdown */}
                         <div style={{ position: 'relative', flex: isMobile ? 1 : 'none' }} ref={pdfMenuRef}>
@@ -839,31 +945,33 @@ export default function RangkumanTransaksi({ isHidden = false }) {
                                 type="button"
                                 style={{
                                     width: isMobile ? '100%' : 'auto',
-                                    height: '30px',
-                                    display: 'flex',
+                                    height: '34px',
+                                    display: 'inline-flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    gap: '0.3rem',
-                                    padding: '0 0.75rem',
-                                    fontSize: '0.725rem',
+                                    gap: '0.4rem',
+                                    padding: '0 0.85rem',
+                                    fontSize: '0.75rem',
                                     fontWeight: 700,
-                                    borderRadius: '7px',
+                                    borderRadius: '8px',
                                     border: 'none',
-                                    background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
+                                    background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
                                     color: '#ffffff',
                                     cursor: 'pointer',
-                                    boxShadow: '0 2px 6px rgba(124, 58, 237, 0.22)',
+                                    boxShadow: '0 2px 6px rgba(79, 70, 229, 0.28)',
                                     whiteSpace: 'nowrap',
+                                    transition: 'all 0.15s ease',
                                 }}
                             >
-                                <Download size={12} />
-                                <span>Export ▾</span>
+                                <Download size={13} />
+                                <span>Export</span>
+                                <ChevronDown size={11} style={{ opacity: 0.85 }} />
                             </button>
                             {showPdfMenu && (
                                 <div style={{
                                     position: 'absolute', top: '105%', right: 0, zIndex: 120,
-                                    background: '#ffffff', border: '1px solid #e5e7f0', borderRadius: '10px',
-                                    boxShadow: '0 8px 24px rgba(0,0,0,0.12)', overflow: 'hidden', minWidth: '190px',
+                                    background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '10px',
+                                    boxShadow: '0 10px 25px rgba(0,0,0,0.12)', overflow: 'hidden', minWidth: '190px',
                                 }}>
                                     <button type="button" onClick={() => {
                                         setShowPdfMenu(false);
@@ -886,7 +994,7 @@ export default function RangkumanTransaksi({ isHidden = false }) {
                                         XLSX.writeFile(workbook, 'Laporan_Pengembalian.xlsx');
                                     }}
                                         style={{
-                                            display: 'flex', alignItems: 'center', gap: '0.45rem', width: '100%', padding: '0.5rem 0.8rem',
+                                            display: 'flex', alignItems: 'center', gap: '0.45rem', width: '100%', padding: '0.55rem 0.85rem',
                                             background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.735rem', fontWeight: 600,
                                             color: '#10b981', textAlign: 'left',
                                         }}
@@ -916,7 +1024,7 @@ export default function RangkumanTransaksi({ isHidden = false }) {
                                         XLSX.writeFile(workbook, 'Rekap_Transaksi_All.xlsx');
                                     }}
                                         style={{
-                                            display: 'flex', alignItems: 'center', gap: '0.45rem', width: '100%', padding: '0.5rem 0.8rem',
+                                            display: 'flex', alignItems: 'center', gap: '0.45rem', width: '100%', padding: '0.55rem 0.85rem',
                                             background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.735rem', fontWeight: 600,
                                             color: '#3b82f6', textAlign: 'left',
                                         }}
@@ -930,21 +1038,35 @@ export default function RangkumanTransaksi({ isHidden = false }) {
                                         handleDownloadVerifikasiPdf('semua');
                                     }}
                                         style={{
-                                            display: 'flex', alignItems: 'center', gap: '0.45rem', width: '100%', padding: '0.5rem 0.8rem',
+                                            display: 'flex', alignItems: 'center', gap: '0.45rem', width: '100%', padding: '0.55rem 0.85rem',
                                             background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.735rem', fontWeight: 600,
                                             color: '#ef4444', textAlign: 'left',
                                         }}
                                         onMouseEnter={e => e.target.style.background = 'rgba(239, 68, 68, 0.08)'}
                                         onMouseLeave={e => e.target.style.background = 'none'}>
-                                        📄 PDF Semua
+                                        📄 PDF Lengkap
                                     </button>
                                     <div style={{ height: '1px', background: '#f1f3f9' }} />
                                     <button type="button" onClick={() => {
                                         setShowPdfMenu(false);
-                                        handleDownloadVerifikasiPdf('belum');
+                                        handleDownloadVerifikasiPdf('diterima');
                                     }}
                                         style={{
-                                            display: 'flex', alignItems: 'center', gap: '0.45rem', width: '100%', padding: '0.5rem 0.8rem',
+                                            display: 'flex', alignItems: 'center', gap: '0.45rem', width: '100%', padding: '0.55rem 0.85rem',
+                                            background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.735rem', fontWeight: 600,
+                                            color: '#10b981', textAlign: 'left',
+                                        }}
+                                        onMouseEnter={e => e.target.style.background = 'rgba(16, 185, 129, 0.08)'}
+                                        onMouseLeave={e => e.target.style.background = 'none'}>
+                                        ✅ PDF Diterima
+                                    </button>
+                                    <div style={{ height: '1px', background: '#f1f3f9' }} />
+                                    <button type="button" onClick={() => {
+                                        setShowPdfMenu(false);
+                                        handleDownloadVerifikasiPdf('belum_diterima');
+                                    }}
+                                        style={{
+                                            display: 'flex', alignItems: 'center', gap: '0.45rem', width: '100%', padding: '0.55rem 0.85rem',
                                             background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.735rem', fontWeight: 600,
                                             color: '#f59e0b', textAlign: 'left',
                                         }}
@@ -957,27 +1079,23 @@ export default function RangkumanTransaksi({ isHidden = false }) {
                         </div>
                     </div>
                 </div>
-            </div>
 
-            {/* ── Table Card Container (Viewport-Filling & Compact Rows) ── */}
-            <div
-                className="modern-table-wrapper"
-                style={{
-                    background: '#ffffff',
-                    borderRadius: '12px',
-                    border: '1px solid #eef0f6',
-                    boxShadow: '0 2px 10px rgba(0,0,0,0.02)',
-                    overflow: 'hidden',
-                    display: 'flex',
-                    flexDirection: 'column',
-                }}
-            >
-                <div style={{ overflowX: 'auto', flex: 1 }}>
-                    <div style={{
-                        maxHeight: isMobile ? 'calc(100vh - 225px)' : 'calc(100vh - 170px)',
-                        minHeight: isMobile ? '340px' : '480px',
-                        overflowY: 'auto',
-                    }}>
+                {/* ── Table Container (Separate Card Filling All Remaining Space) ── */}
+                <div
+                    className="modern-table-wrapper"
+                    style={{
+                        flex: 1,
+                        minHeight: 0,
+                        background: '#ffffff',
+                        borderRadius: '12px',
+                        border: '1px solid #e2e8f0',
+                        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02)',
+                        overflow: 'hidden',
+                        display: 'flex',
+                        flexDirection: 'column',
+                    }}
+                >
+                    <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
                         <table className="modern-table compact-table" style={{ width: '100%', minWidth: isMobile ? '700px' : '100%' }}>
                             <thead>
                                 <tr>
@@ -1107,7 +1225,6 @@ export default function RangkumanTransaksi({ isHidden = false }) {
                             </tbody>
                         </table>
                     </div>
-                </div>
 
                 {/* ── Compact Pagination Integrated Footer ── */}
                 {(() => {
@@ -1124,6 +1241,7 @@ export default function RangkumanTransaksi({ isHidden = false }) {
 
                     return (
                         <div style={{
+                            flexShrink: 0,
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
