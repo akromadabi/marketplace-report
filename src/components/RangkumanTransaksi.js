@@ -9,7 +9,7 @@ import { useDataCache } from '../contexts/DataContext';
 // Nama kolom tampilan sesuai istilah standar keuangan (kunci data internal tidak diubah)
 const COLUMN_LABELS = {
     'PENCAIRAN': 'PENERIMAAN DANA',
-    'LABA': 'MARGIN KONTRIBUSI',
+    'LABA': 'PROFIT',
     'AFFILIASI': 'KOMISI AFILIASI',
     'KET AFFILIASI': 'KET AFILIASI',
     'TERKIRIM': 'STATUS PENGIRIMAN',

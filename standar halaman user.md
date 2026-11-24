@@ -252,7 +252,7 @@ Terdapat 3 variasi struktur isi tabel yang didukung, seluruhnya wajib dibungkus 
    - Satu baris `<th>` di `<thead>`, seluruh kolom dapat disortir langsung.
 2. **Tabel Matriks Berkelompok (Multi-Tier Header):**
    - Diterapkan pada `/olahan` (Analisis Pesanan).
-   - Baris 1: Grup metrik utama (`PESANAN`, `DIBATALKAN`, dsb.) menggunakan `colSpan={2}`, atau metrik tunggal (`PENERIMAAN BERSIH`, `MARGIN KONTRIBUSI`) menggunakan `rowSpan={2}`.
+   - Baris 1: Grup metrik utama (`PESANAN`, `DIBATALKAN`, dsb.) menggunakan `colSpan={2}`, atau metrik tunggal (`PENERIMAAN BERSIH`, `PROFIT`) menggunakan `rowSpan={2}`.
    - Baris 2: Sub-kolom rincian (`Order`, `PCS`).
    - Baris 3 (Header/Awal Body): Baris rangkuman `Jumlah` dengan warna latar lembut (`#ede9fe` / `var(--bg-card)`).
    - Sticky Kolom Kiri: Kolom `No` (`left: 0`) dan Dimensi/Tanggal (`left: 3rem`) terkunci saat scroll horizontal.
@@ -289,7 +289,7 @@ maxWidth: '100%', // Bebas dari batasan 1400px agar tidak ada sisa ruang kosong 
 ## 5. Daftar Halaman yang Telah Menerapkan Standar Penuh
 
 1. `/` — **Dashboard Utama** (`Dashboard.js`) — `[SELESAI - 100% Full Width & Compact]`
-2. `/upload` — **Upload File** (`UploadFile.js`) — `[SELESAI - Separate Card & Full Width]`
+2. `/upload` — **Upload File** (`UploadFile.js`) — `[SELESAI - Dua Box Vertikal: Box Atas Dropzone & Box Bawah Cards Grid]`
 3. `/rangkuman` — **Rekap Transaksi** (`RangkumanTransaksi.js`) — `[SELESAI & TERUJI]`
 4. `/olahan` — **Analisis Pesanan** (`OlahanDataPesanan.js`) — `[SELESAI & TERUJI]`
 5. `/return` — **Retur Penjualan** (`ReturnTable.js`) — `[SELESAI & TERUJI]`
@@ -298,7 +298,7 @@ maxWidth: '100%', // Bebas dari batasan 1400px agar tidak ada sisa ruang kosong 
 8. `/aset` — **Aset Barang** (`AsetTable.js`) — `[SELESAI - Standard Card & Viewport Table]`
 9. `/operasional` — **Biaya Operasional** (`OperasionalTable.js`) — `[SELESAI - Standard Card & Viewport Table]`
 10. `/stores` — **Kelola Toko** (`StoreManagement.js`) — `[SELESAI - Standard Card Header]`
-11. `/input-modal` — **Input HPP** (`InputModal.js`) — `[SELESAI - 100% Responsive Multi-Column Cards]`
+11. `/input-modal` — **Input HPP** (`InputModal.js`) — `[SELESAI - Single-Column Neat Cards (Centered 960px)]`
 12. `/kampanye` — **Kampanye Promo** (`KampanyeMain.js`, `PromoTiktok.js`, `PromoShopee.js`) — `[SELESAI - 100% Responsive Multi-Column Cards]`
 13. `/kalkulator` — **Kalkulator Simulasi** (`PricingCalculator.js`) — `[SELESAI - Standard Card Header & 100% Width]`
 

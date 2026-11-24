@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import * as XLSX from "xlsx";
 import FileInputList from "./FileInputList";
-import { Upload as UploadIcon, FileSpreadsheet, AlertCircle, Loader2, CheckCircle2, Trash2, Clock, Database, Store, Search, X, Layers, RefreshCw, Table, LayoutGrid, Sparkles, FileCheck, Check } from "lucide-react";
+import { Upload as UploadIcon, FileSpreadsheet, AlertCircle, Loader2, CheckCircle2, Trash2, Clock, Database, Store, Search, X, Layers, RefreshCw, Sparkles } from "lucide-react";
 import { apiUploadParsedFiles, apiGetUploadHistory, apiDeleteUpload, apiAssignOrphanUploads } from '../api';
 import { useAuth } from '../contexts/AuthContext';
 import { useStore } from '../contexts/StoreContext';
@@ -123,14 +123,7 @@ function UploadFile() {
     } catch { return true; }
   });
   const [historySearch, setHistorySearch] = useState('');
-  const [historyPlatform, setHistoryPlatform] = useState('all');
-  const [viewMode, setViewMode] = useState(() => {
-    try {
-      return localStorage.getItem('marketplace_upload_view_mode') || 'table';
-    } catch {
-      return 'table';
-    }
-  });
+  const [activeFilter, setActiveFilter] = useState('all');
   const [deletingId, setDeletingId] = useState(null);
   const [migratingOrphans, setMigratingOrphans] = useState(false);
   const [orphanMigrated, setOrphanMigrated] = useState(null);
@@ -830,23 +823,16 @@ function UploadFile() {
     { key: 'pengembalian', label: 'Pengembalian', files: filesByCategory.pengembalianFiles, gradient: 'var(--gradient-pink)', borderColor: 'rgba(236, 72, 153, 0.3)' },
   ];
 
-  const availablePlatforms = useMemo(() => {
-    const set = new Set();
-    uploadHistory.forEach(item => {
-      const p = (item.platform || '').toLowerCase();
-      if (p.includes('tiktok')) set.add('tiktok');
-      else if (p.includes('shopee')) set.add('shopee');
-      else if (p && p !== 'unknown' && p !== 'none') set.add(p);
-    });
-    return Array.from(set);
-  }, [uploadHistory]);
-
   const filteredHistory = useMemo(() => {
     return uploadHistory.filter((item) => {
-      if (historyPlatform !== 'all') {
+      if (activeFilter !== 'all') {
         const p = (item.platform || '').toLowerCase();
-        if (historyPlatform === 'tiktok' && !p.includes('tiktok')) return false;
-        if (historyPlatform === 'shopee' && !p.includes('shopee')) return false;
+        const c = (item.category || '').toLowerCase();
+        if (activeFilter === 'tiktok' && !p.includes('tiktok')) return false;
+        if (activeFilter === 'shopee' && !p.includes('shopee')) return false;
+        if (activeFilter === 'payments' && !c.includes('payment') && !c.includes('pembayaran') && !c.includes('income')) return false;
+        if (activeFilter === 'orders' && !c.includes('order') && !c.includes('pesanan')) return false;
+        if (activeFilter === 'return' && !c.includes('return') && !c.includes('retur') && !c.includes('pengembalian')) return false;
       }
       if (historySearch.trim()) {
         const q = historySearch.toLowerCase();
@@ -860,7 +846,7 @@ function UploadFile() {
       }
       return true;
     });
-  }, [uploadHistory, historyPlatform, historySearch]);
+  }, [uploadHistory, activeFilter, historySearch]);
 
   // Gate: harus ada store dulu sebelum upload
   const noStore = !storesLoading && stores.length === 0;
@@ -886,12 +872,12 @@ function UploadFile() {
         <div className="upload-header-right">
           {currentStore && (
             <span className="upload-store-pill">
-              <Store size={12} />
+              <Store size={12} style={{ flexShrink: 0 }} />
               <span>{currentStore.name}</span>
             </span>
           )}
           <span className="upload-count-pill">
-            <Database size={12} />
+            <Database size={12} style={{ flexShrink: 0 }} />
             <span>{uploadHistory.length} file tersimpan</span>
           </span>
         </div>
@@ -908,7 +894,7 @@ function UploadFile() {
           background: 'rgba(245, 158, 11, 0.06)',
           border: '1px solid rgba(245, 158, 11, 0.2)',
           borderRadius: 'var(--radius-lg)',
-          marginBottom: '1.5rem',
+          marginBottom: '1rem',
           textAlign: 'center',
         }}>
           <div style={{
@@ -938,13 +924,6 @@ function UploadFile() {
         </div>
       )}
 
-      {/* Banner: migrate data lama ke store aktif */}
-      {!noStore && activeStoreId && (
-        <div id="migrate-orphan-banner" style={{ display: 'none' }}>
-          {/* Hidden by default, will be shown by JS below */}
-        </div>
-      )}
-
       {/* Banner: migrate data lama — tampil jika ada histori tanpa store */}
       {!noStore && activeStoreId && !orphanMigrated && (
         <MigrateOrphanBanner
@@ -962,35 +941,37 @@ function UploadFile() {
         />
       )}
 
-      {/* ── Main Two-Column Grid: Samping Upload & Sampingnya Daftar File ── */}
-      <div className="upload-main-grid">
-        {/* Samping Kiri: Area Upload */}
-        <div className="upload-side-panel">
-          <form onSubmit={handleSubmit} style={{ opacity: noStore ? 0.4 : 1, pointerEvents: noStore ? 'none' : 'auto' }}>
-            {/* Drop Zone */}
+      {/* ── Box 1 (Atas): Upload Station Card ── */}
+      <div className="upload-station-card">
+        <form onSubmit={handleSubmit} style={{ opacity: noStore ? 0.4 : 1, pointerEvents: noStore ? 'none' : 'auto' }}>
+          <div className="upload-station-grid">
+            {/* Left: Modern Dropzone */}
             <div
-              className={`upload-dropzone ${dragActive ? 'active' : ''}`}
+              className={`upload-dropzone-modern ${dragActive ? 'active' : ''}`}
               onDragEnter={handleDrag}
               onDragLeave={handleDrag}
               onDragOver={handleDrag}
               onDrop={handleDrop}
               onClick={() => inputRef.current?.click()}
             >
-              <div className="upload-dropzone-icon">
-                <UploadIcon size={20} strokeWidth={2.3} />
+              <div className="upload-dropzone-icon-modern">
+                <UploadIcon size={24} strokeWidth={2.4} />
               </div>
-              <div className="upload-dropzone-text">
-                <p className="upload-dropzone-title">
-                  <span>Drag &amp; drop file di sini, atau </span>
-                  <span className="upload-browse-link">klik untuk browse</span>
+              <div className="upload-dropzone-text-modern">
+                <p className="upload-dropzone-title-modern">
+                  Tarik &amp; lepas file Excel di sini
                 </p>
-                <p className="upload-dropzone-desc">
-                  Format .xlsx, .xls • Deteksi otomatis TikTok Shop &amp; Shopee
+                <p className="upload-dropzone-desc-modern">
+                  atau klik untuk memilih file dari komputer
                 </p>
               </div>
-              <button type="button" className="upload-browse-btn" tabIndex={-1}>
-                Pilih File
+              <button type="button" className="upload-btn-secondary" tabIndex={-1}>
+                <FileSpreadsheet size={15} />
+                <span>Pilih File Excel</span>
               </button>
+              <span className="upload-dropzone-format-hint">
+                Format didukung: <strong>.xlsx</strong>, <strong>.xls</strong> • Otomatis deteksi &amp; multi-file
+              </span>
               <input
                 ref={inputRef}
                 type="file"
@@ -1001,112 +982,121 @@ function UploadFile() {
               />
             </div>
 
-            {/* File List */}
-            {allFiles.length > 0 && (
-              <div className="glass-card" style={{ padding: '0.85rem 1rem', marginTop: '0.65rem', marginBottom: '0.65rem' }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  marginBottom: '0.5rem',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                    <FileSpreadsheet size={15} color="var(--accent-primary)" />
-                    <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                      {allFiles.length} File Dipilih
-                    </span>
+            {/* Right: Panduan Format Box ("Notif Kanan") */}
+            <div className="upload-info-box">
+              <div className="upload-info-header">
+                <div className="upload-info-icon-badge">
+                  <Sparkles size={14} />
+                </div>
+                <div>
+                  <span className="upload-info-header-title">Panduan Format File</span>
+                  <span className="upload-info-header-sub">Otomatis dideteksi sistem</span>
+                </div>
+              </div>
+
+              <div className="upload-info-list">
+                <div className="upload-info-item">
+                  <span className="upload-info-tag tiktok">TikTok Shop</span>
+                  <div>
+                    <p className="upload-info-text-bold">Laporan Pesanan &amp; Settlement</p>
+                    <p className="upload-info-text-sub">Laporan pesanan atau rincian penyelesaian dana (.xlsx)</p>
                   </div>
                 </div>
-                <FileInputList
-                  label=""
-                  files={allFiles}
-                  onRemove={removing => !uploading && removeFile(removing)}
-                  iconSrcGetter={getIconForFile}
-                  fileCategoryMap={fileCategoryMap}
-                  fileRowCountMap={fileRowCountMap}
-                  uploadProgress={uploadProgress}
-                  uploading={uploading}
-                />
-              </div>
-            )}
 
-            {/* Error */}
-            {error && (
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.55rem 0.85rem',
-                background: 'rgba(239, 68, 68, 0.08)',
-                borderRadius: '8px',
-                border: '1px solid rgba(239, 68, 68, 0.2)',
-                marginTop: '0.5rem',
-                color: '#ef4444',
-                fontSize: '0.8125rem',
-              }}>
-                <AlertCircle size={15} style={{ flexShrink: 0 }} />
-                <span>{error}</span>
+                <div className="upload-info-item">
+                  <span className="upload-info-tag shopee">Shopee</span>
+                  <div>
+                    <p className="upload-info-text-bold">Laporan Pesanan &amp; Penghasilan</p>
+                    <p className="upload-info-text-sub">Laporan pesanan atau rincian saldo penjual/income (.xlsx)</p>
+                  </div>
+                </div>
               </div>
-            )}
 
-            {/* Success */}
-            {success && (
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.55rem 0.85rem',
-                background: 'rgba(16, 185, 129, 0.08)',
-                borderRadius: '8px',
-                border: '1px solid rgba(16, 185, 129, 0.2)',
-                marginTop: '0.5rem',
-                color: '#059669',
-                fontSize: '0.8125rem',
-              }}>
+              <div className="upload-info-footer">
                 <CheckCircle2 size={15} style={{ flexShrink: 0 }} />
-                <span>
-                  Upload berhasil!
-                  {success.orders > 0 && ` ${success.orders} pesanan`}
-                  {success.payments > 0 && ` • ${success.payments} pembayaran`}
-                  {success.returns > 0 && ` • ${success.returns} return`}
-                  {success.pengembalian > 0 && ` • ${success.pengembalian} pengembalian`}
-                  {' '}tersimpan di database.
-                  {success.totalSkipped > 0 && (
-                    <span style={{ color: 'var(--text-tertiary)', fontWeight: 500 }}>
-                      {' '}({success.totalSkipped} duplikat dilewati)
-                    </span>
-                  )}
-                </span>
+                <span>Header kolom tervalidasi otomatis &amp; baris duplikat akan dilewati.</span>
               </div>
-            )}
+            </div>
+          </div>
 
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={uploading || allFiles.length === 0}
-              className="upload-submit-btn"
-              style={{
-                marginTop: '0.55rem',
-                background: allFiles.length > 0 ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : '#f8fafc',
-                color: allFiles.length > 0 ? '#ffffff' : '#94a3b8',
-                border: allFiles.length > 0 ? 'none' : '1px solid #e2e8f0',
-                cursor: allFiles.length === 0 ? 'not-allowed' : uploading ? 'wait' : 'pointer',
-                boxShadow: allFiles.length > 0 ? '0 3px 10px rgba(99, 102, 241, 0.25)' : 'none',
-              }}
-            >
-              {uploading ? (
-                <>
-                  <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} />
-                  <span>Memproses {allFiles.length} File...</span>
-                </>
-              ) : (
-                <>
-                  <UploadIcon size={15} />
-                  <span>{allFiles.length > 0 ? `Proses ${allFiles.length} File Data` : 'Proses Data'}</span>
-                </>
-              )}
-            </button>
-          </form>
+          {/* Error Notice */}
+          {error && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              padding: '0.65rem 0.85rem',
+              background: 'rgba(239, 68, 68, 0.08)',
+              borderRadius: '8px',
+              border: '1px solid rgba(239, 68, 68, 0.2)',
+              marginTop: '0.65rem',
+              color: '#ef4444',
+              fontSize: '0.8125rem',
+            }}>
+              <AlertCircle size={15} style={{ flexShrink: 0 }} />
+              <span>{error}</span>
+            </div>
+          )}
+
+          {/* Success Notice */}
+          {success && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              padding: '0.65rem 0.85rem',
+              background: 'rgba(16, 185, 129, 0.08)',
+              borderRadius: '8px',
+              border: '1px solid rgba(16, 185, 129, 0.2)',
+              marginTop: '0.65rem',
+              color: '#059669',
+              fontSize: '0.8125rem',
+            }}>
+              <CheckCircle2 size={15} style={{ flexShrink: 0 }} />
+              <span>
+                Upload berhasil!
+                {success.orders > 0 && ` ${success.orders} pesanan`}
+                {success.payments > 0 && ` • ${success.payments} pembayaran`}
+                {success.returns > 0 && ` • ${success.returns} return`}
+                {success.pengembalian > 0 && ` • ${success.pengembalian} pengembalian`}
+                {' '}tersimpan di database.
+                {success.totalSkipped > 0 && (
+                  <span style={{ color: 'var(--text-tertiary)', fontWeight: 500 }}>
+                    {' '}({success.totalSkipped} duplikat dilewati)
+                  </span>
+                )}
+              </span>
+            </div>
+          )}
+
+          {/* Selected File Queue List */}
+          {allFiles.length > 0 && (
+            <div style={{ marginTop: '0.75rem' }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '0.5rem',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                  <FileSpreadsheet size={15} color="var(--accent-primary)" />
+                  <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                    Antrean File ({allFiles.length})
+                  </span>
+                </div>
+              </div>
+              <FileInputList
+                label=""
+                files={allFiles}
+                onRemove={removing => !uploading && removeFile(removing)}
+                iconSrcGetter={getIconForFile}
+                fileCategoryMap={fileCategoryMap}
+                fileRowCountMap={fileRowCountMap}
+                uploadProgress={uploadProgress}
+                uploading={uploading}
+              />
+            </div>
+          )}
 
           {/* Category summary boxes */}
           {allFiles.length > 0 && (
@@ -1114,14 +1104,14 @@ function UploadFile() {
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
               gap: '0.5rem',
-              marginTop: '0.75rem',
+              marginTop: '0.65rem',
             }}>
               {categoryBoxes.map(({ key, label, files, gradient, borderColor }) => (
                 <div
                   key={key}
                   className="glass-card"
                   style={{
-                    padding: '0.75rem',
+                    padding: '0.65rem 0.75rem',
                     borderColor: borderColor,
                     position: 'relative',
                     overflow: 'hidden',
@@ -1136,9 +1126,9 @@ function UploadFile() {
                     background: gradient,
                   }} />
                   <h3 style={{
-                    fontSize: '0.8125rem',
+                    fontSize: '0.785rem',
                     fontWeight: 700,
-                    marginBottom: '0.35rem',
+                    marginBottom: '0.25rem',
                     background: gradient,
                     WebkitBackgroundClip: 'text',
                     WebkitTextFillColor: 'transparent',
@@ -1147,7 +1137,7 @@ function UploadFile() {
                     {label}
                   </h3>
                   {files.length === 0 ? (
-                    <p style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>
+                    <p style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', margin: 0 }}>
                       Belum ada file
                     </p>
                   ) : (
@@ -1157,7 +1147,7 @@ function UploadFile() {
                           display: 'flex',
                           alignItems: 'center',
                           gap: '0.35rem',
-                          padding: '0.2rem 0',
+                          padding: '0.15rem 0',
                         }}>
                           <FileSpreadsheet size={11} />
                           <span style={{
@@ -1176,211 +1166,223 @@ function UploadFile() {
               ))}
             </div>
           )}
-        </div>
 
-        {/* Samping Kanan: Daftar File / Riwayat Upload */}
-        <div className="upload-history-panel">
-          <div className="upload-history-bar">
-            <div className="upload-history-title-wrap">
-              <div className="upload-history-icon-box">
-                <Database size={15} strokeWidth={2.3} />
-              </div>
-              <div>
-                <h3 className="upload-history-heading">Daftar File Tersimpan</h3>
-              </div>
-              <span
-                style={{
-                  fontSize: '0.7rem',
-                  fontWeight: 600,
-                  color: '#475569',
-                  background: '#f1f5f9',
-                  border: '1px solid #e2e8f0',
-                  padding: '2px 8px',
-                  borderRadius: '9999px',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {filteredHistory.length === uploadHistory.length
-                  ? `${uploadHistory.length} file`
-                  : `${filteredHistory.length} dari ${uploadHistory.length}`}
-              </span>
+          {/* Submit Action Button */}
+          {allFiles.length > 0 && (
+            <button
+              type="submit"
+              disabled={uploading}
+              className="upload-submit-btn"
+              style={{
+                marginTop: '0.75rem',
+                background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                color: '#ffffff',
+                cursor: uploading ? 'wait' : 'pointer',
+                boxShadow: '0 3px 10px rgba(99, 102, 241, 0.25)',
+              }}
+            >
+              {uploading ? (
+                <>
+                  <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
+                  <span>Memproses {allFiles.length} File ke Database...</span>
+                </>
+              ) : (
+                <>
+                  <UploadIcon size={16} />
+                  <span>Proses &amp; Simpan {allFiles.length} File Data</span>
+                </>
+              )}
+            </button>
+          )}
+        </form>
+      </div>
+
+      {/* ── Riwayat File Tersimpan Section ── */}
+      <div className="upload-section-card">
+        {/* Section Header with Tools */}
+        <div className="upload-section-header">
+          <div className="upload-section-title-wrap">
+            <div className="upload-section-icon">
+              <Database size={16} />
             </div>
-
-            {/* Tools: Filter & Search */}
-            {uploadHistory.length > 0 && (
-              <div className="upload-history-tools">
-                {/* Platform filter tabs */}
-                {availablePlatforms.length > 1 && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <button
-                      type="button"
-                      onClick={() => setHistoryPlatform('all')}
-                      className={`upload-filter-tab ${historyPlatform === 'all' ? 'active' : ''}`}
-                    >
-                      Semua
-                    </button>
-                    {availablePlatforms.includes('tiktok') && (
-                      <button
-                        type="button"
-                        onClick={() => setHistoryPlatform('tiktok')}
-                        className={`upload-filter-tab ${historyPlatform === 'tiktok' ? 'active' : ''}`}
-                      >
-                        TikTok
-                      </button>
-                    )}
-                    {availablePlatforms.includes('shopee') && (
-                      <button
-                        type="button"
-                        onClick={() => setHistoryPlatform('shopee')}
-                        className={`upload-filter-tab ${historyPlatform === 'shopee' ? 'active' : ''}`}
-                      >
-                        Shopee
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                {/* Search box */}
-                <div className="upload-search-wrap">
-                  <Search size={12} color="#94a3b8" style={{ position: 'absolute', left: '0.45rem', pointerEvents: 'none' }} />
-                  <input
-                    type="text"
-                    placeholder="Cari file..."
-                    value={historySearch}
-                    onChange={(e) => setHistorySearch(e.target.value)}
-                    className="upload-search-input"
-                  />
-                  {historySearch && (
-                    <button
-                      type="button"
-                      onClick={() => setHistorySearch('')}
-                      style={{
-                        position: 'absolute', right: '0.35rem', background: 'none', border: 'none',
-                        cursor: 'pointer', padding: 0, color: '#94a3b8', display: 'flex',
-                      }}
-                    >
-                      <X size={12} />
-                    </button>
-                  )}
-                </div>
-
-                {/* Refresh button */}
-                <button
-                  type="button"
-                  onClick={fetchHistory}
-                  disabled={historyLoading}
-                  className="upload-filter-tab"
-                  title="Muat ulang riwayat"
-                  style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '28px', padding: 0 }}
-                >
-                  <RefreshCw size={12} style={{ animation: historyLoading ? 'spin 1s linear infinite' : 'none' }} />
-                </button>
-              </div>
-            )}
+            <div>
+              <h3 className="upload-section-title">Riwayat File Tersimpan</h3>
+            </div>
+            <span
+              style={{
+                fontSize: '0.7rem',
+                fontWeight: 600,
+                color: '#475569',
+                background: '#f1f5f9',
+                border: '1px solid #e2e8f0',
+                padding: '2px 8px',
+                borderRadius: '9999px',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {filteredHistory.length === uploadHistory.length
+                ? `${uploadHistory.length} file`
+                : `${filteredHistory.length} dari ${uploadHistory.length}`}
+            </span>
           </div>
 
-          {historyLoading ? (
-            <div className="glass-card" style={{ padding: '1.75rem', textAlign: 'center', color: 'var(--text-tertiary)' }}>
-              <Loader2 size={20} style={{ animation: 'spin 1s linear infinite', margin: '0 auto 0.5rem' }} />
-              <p style={{ fontSize: '0.8125rem' }}>Memuat riwayat...</p>
-            </div>
-          ) : uploadHistory.length === 0 ? (
-            <div className="glass-card" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-tertiary)' }}>
-              <UploadIcon size={28} style={{ margin: '0 auto 0.5rem', opacity: 0.4 }} />
-              <p style={{ fontSize: '0.875rem' }}>Belum ada file yang diupload</p>
-            </div>
-          ) : filteredHistory.length === 0 ? (
-            <div className="glass-card" style={{ padding: '1.75rem', textAlign: 'center', color: 'var(--text-tertiary)' }}>
-              <Search size={22} style={{ margin: '0 auto 0.5rem', opacity: 0.4 }} />
-              <p style={{ fontSize: '0.8125rem' }}>Tidak ada file yang sesuai dengan pencarian</p>
+          <div className="upload-section-tools">
+            {/* Filter Tabs */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
               <button
                 type="button"
-                onClick={() => { setHistorySearch(''); setHistoryPlatform('all'); }}
-                style={{
-                  marginTop: '0.4rem', background: 'none', border: 'none', color: '#6366f1',
-                  fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer',
-                }}
+                onClick={() => setActiveFilter('all')}
+                className={`upload-filter-tab ${activeFilter === 'all' ? 'active' : ''}`}
               >
-                Reset Filter
+                Semua
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveFilter('tiktok')}
+                className={`upload-filter-tab ${activeFilter === 'tiktok' ? 'active' : ''}`}
+              >
+                TikTok
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveFilter('shopee')}
+                className={`upload-filter-tab ${activeFilter === 'shopee' ? 'active' : ''}`}
+              >
+                Shopee
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveFilter('payments')}
+                className={`upload-filter-tab ${activeFilter === 'payments' ? 'active' : ''}`}
+              >
+                Pembayaran
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveFilter('orders')}
+                className={`upload-filter-tab ${activeFilter === 'orders' ? 'active' : ''}`}
+              >
+                Pesanan
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveFilter('return')}
+                className={`upload-filter-tab ${activeFilter === 'return' ? 'active' : ''}`}
+              >
+                Retur
               </button>
             </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-              {filteredHistory.map((item) => {
-                const categoryConfig = {
-                  orders: { label: 'Pesanan', className: 'upload-badge-orders' },
-                  payments: { label: 'Pembayaran', className: 'upload-badge-payments' },
-                  return: { label: 'Retur', className: 'upload-badge-return' },
-                  pengembalian: { label: 'Pengembalian', className: 'upload-badge-pengembalian' },
-                };
-                const cat = categoryConfig[item.category] || { label: item.category || 'File', className: 'upload-badge-platform' };
-                const platformName = item.platform ? (item.platform.toLowerCase() === 'tiktok' ? 'TikTok' : item.platform.charAt(0).toUpperCase() + item.platform.slice(1)) : '-';
-                const isTikTok = (item.platform || '').toLowerCase().includes('tiktok');
-                const isShopee = (item.platform || '').toLowerCase().includes('shopee');
-                const dateStr = item.created_at ? new Date(item.created_at.replace(' ', 'T') + 'Z').toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
 
-                return (
-                  <div key={item.id} className="upload-history-card">
-                    {/* Platform Icon */}
-                    <div
-                      className="upload-card-icon"
-                      style={{
-                        background: isTikTok ? '#000000' : isShopee ? '#fff7ed' : '#f8fafc',
-                      }}
-                    >
-                      <img
-                        src={platformIcons[item.platform] || platformIcons[item.category] || platformIcons.unknown}
-                        alt={platformName}
-                        loading="lazy"
-                      />
-                    </div>
+            {/* Search Input */}
+            <div className="upload-search-wrap">
+              <Search size={12} color="#94a3b8" style={{ position: 'absolute', left: '0.5rem', pointerEvents: 'none' }} />
+              <input
+                type="text"
+                placeholder="Cari nama file..."
+                value={historySearch}
+                onChange={(e) => setHistorySearch(e.target.value)}
+                className="upload-search-input"
+              />
+              {historySearch && (
+                <button
+                  type="button"
+                  onClick={() => setHistorySearch('')}
+                  style={{
+                    position: 'absolute', right: '0.35rem', background: 'none', border: 'none',
+                    cursor: 'pointer', padding: 0, color: '#94a3b8', display: 'flex',
+                  }}
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
 
-                    {/* File Info */}
-                    <div className="upload-card-content">
-                      <div className="upload-card-top-row">
-                        <span className="upload-card-filename" title={item.filename}>
+            {/* Refresh Button */}
+            <button
+              type="button"
+              onClick={fetchHistory}
+              disabled={historyLoading}
+              className="upload-filter-tab"
+              title="Muat ulang riwayat"
+              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '28px', padding: 0 }}
+            >
+              <RefreshCw size={12} style={{ animation: historyLoading ? 'spin 1s linear infinite' : 'none' }} />
+            </button>
+          </div>
+        </div>
+
+        {/* Section Body */}
+        {historyLoading ? (
+          <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-tertiary)' }}>
+            <Loader2 size={22} style={{ animation: 'spin 1s linear infinite', margin: '0 auto 0.5rem' }} />
+            <p style={{ fontSize: '0.8125rem' }}>Memuat riwayat tersimpan...</p>
+          </div>
+        ) : uploadHistory.length === 0 ? (
+          <div style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-tertiary)' }}>
+            <UploadIcon size={32} style={{ margin: '0 auto 0.5rem', opacity: 0.35 }} />
+            <p style={{ fontSize: '0.875rem', fontWeight: 600, color: '#475569' }}>Belum ada file yang diupload</p>
+            <p style={{ fontSize: '0.75rem', marginTop: '0.25rem' }}>File Excel yang diupload akan otomatis tercatat dan tersimpan di sini</p>
+          </div>
+        ) : filteredHistory.length === 0 ? (
+          <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-tertiary)' }}>
+            <Search size={24} style={{ margin: '0 auto 0.5rem', opacity: 0.4 }} />
+            <p style={{ fontSize: '0.8125rem' }}>Tidak ada file yang sesuai dengan filter/pencarian</p>
+            <button
+              type="button"
+              onClick={() => { setHistorySearch(''); setActiveFilter('all'); }}
+              style={{
+                marginTop: '0.5rem', background: 'none', border: 'none', color: '#6366f1',
+                fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer',
+              }}
+            >
+              Reset Filter
+            </button>
+          </div>
+        ) : (
+          /* Cards Grid */
+          <div className="upload-cards-grid">
+            {filteredHistory.map((item) => {
+              const categoryConfig = {
+                orders: { label: 'Pesanan', className: 'upload-badge-orders' },
+                payments: { label: 'Pembayaran', className: 'upload-badge-payments' },
+                return: { label: 'Retur', className: 'upload-badge-return' },
+                pengembalian: { label: 'Pengembalian', className: 'upload-badge-pengembalian' },
+              };
+              const cat = categoryConfig[item.category] || { label: item.category || 'File', className: 'upload-badge-platform' };
+              const platformName = item.platform ? (item.platform.toLowerCase() === 'tiktok' ? 'TikTok' : item.platform.charAt(0).toUpperCase() + item.platform.slice(1)) : '-';
+              const isTikTok = (item.platform || '').toLowerCase().includes('tiktok');
+              const isShopee = (item.platform || '').toLowerCase().includes('shopee');
+              const dateStr = item.created_at ? new Date(item.created_at.replace(' ', 'T') + 'Z').toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
+
+              return (
+                <div key={item.id} className="upload-grid-card">
+                  {/* Card Header: Platform Icon, Filename, Date & Delete Button */}
+                  <div className="upload-card-header">
+                    <div className="upload-card-title-group">
+                      <div
+                        className="upload-card-icon"
+                        style={{
+                          background: isTikTok ? '#000000' : isShopee ? '#fff7ed' : '#f8fafc',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <img
+                          src={platformIcons[item.platform] || platformIcons[item.category] || platformIcons.unknown}
+                          alt={platformName}
+                          loading="lazy"
+                        />
+                      </div>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <p className="upload-card-filename-text" title={item.filename}>
                           {item.filename}
-                        </span>
-                        <div className="upload-card-badges">
-                          <span className={`upload-badge ${cat.className}`}>
-                            {cat.label}
-                          </span>
-                          {item.platform && item.platform !== 'none' && item.platform !== 'unknown' && (
-                            <span className={`upload-badge upload-badge-platform ${isTikTok ? 'tiktok' : isShopee ? 'shopee' : ''}`}>
-                              {platformName}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="upload-card-meta-row">
-                        <span className="upload-meta-chip">
-                          <Layers size={11} style={{ opacity: 0.7 }} />
-                          <span>{item.row_count?.toLocaleString('id-ID') || 0} baris</span>
-                        </span>
-
-                        {item.skipped_rows > 0 && (
-                          <span className="upload-meta-chip warn" title={`${item.skipped_rows.toLocaleString('id-ID')} baris data duplikat dilewati`}>
-                            <AlertCircle size={11} />
-                            <span>{item.skipped_rows.toLocaleString('id-ID')} duplikat dilewati</span>
-                          </span>
-                        )}
-
-                        {item.uploaded_by && (
-                          <span className="upload-meta-chip" title={`Diupload oleh ${item.uploaded_by}`}>
-                            <Store size={11} style={{ opacity: 0.7 }} />
-                            <span>{item.uploaded_by}</span>
-                          </span>
-                        )}
-
-                        <span className="upload-meta-chip" style={{ color: '#64748b' }}>
-                          <Clock size={11} style={{ opacity: 0.7 }} />
+                        </p>
+                        <p className="upload-card-date-sub">
+                          <Clock size={11} style={{ opacity: 0.6, marginRight: '3px', verticalAlign: '-1px', display: 'inline-block' }} />
                           <span>{dateStr}</span>
-                        </span>
+                        </p>
                       </div>
                     </div>
 
-                    {/* Delete Button */}
                     <button
                       type="button"
                       className="upload-card-del-btn"
@@ -1395,11 +1397,45 @@ function UploadFile() {
                       }
                     </button>
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+
+                  {/* Card Badges Row: Platform + Category */}
+                  <div className="upload-card-badges-row">
+                    {item.platform && item.platform !== 'none' && item.platform !== 'unknown' && (
+                      <span className={`upload-badge upload-badge-platform ${isTikTok ? 'tiktok' : isShopee ? 'shopee' : ''}`}>
+                        {platformName}
+                      </span>
+                    )}
+                    <span className={`upload-badge ${cat.className}`}>
+                      {cat.label}
+                    </span>
+                  </div>
+
+                  {/* Card Meta Grid: Rows, Duplicates, Store */}
+                  <div className="upload-card-meta-grid">
+                    <span className="upload-meta-chip">
+                      <Layers size={11} style={{ opacity: 0.7 }} />
+                      <span>{item.row_count?.toLocaleString('id-ID') || 0} baris</span>
+                    </span>
+
+                    {item.skipped_rows > 0 && (
+                      <span className="upload-meta-chip warn" title={`${item.skipped_rows.toLocaleString('id-ID')} baris data duplikat dilewati`}>
+                        <AlertCircle size={11} />
+                        <span>+{item.skipped_rows.toLocaleString('id-ID')} duplikat</span>
+                      </span>
+                    )}
+
+                    {item.uploaded_by && (
+                      <span className="upload-meta-chip" title={`Diupload oleh ${item.uploaded_by}`}>
+                        <Store size={11} style={{ opacity: 0.7 }} />
+                        <span>{item.uploaded_by}</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

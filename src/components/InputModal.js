@@ -1,7 +1,8 @@
 import React, { useMemo, useState, useCallback } from "react";
 import {
   Package, ChevronDown, ChevronRight, Save, Search,
-  CheckCircle2, Circle, Layers, Zap, Filter, X, Loader2
+  CheckCircle2, Circle, Layers, Zap, Filter, X, Loader2,
+  AlertTriangle, Check
 } from 'lucide-react';
 import { useApiData, useModalValues } from '../hooks/useApiData';
 import { useStore } from '../contexts/StoreContext';
@@ -9,8 +10,9 @@ import { useStore } from '../contexts/StoreContext';
 function InputModal() {
   const { activeStoreId } = useStore();
   const { data: ordersData, loading: loadingOrders } = useApiData('skuCatalog', activeStoreId);
-  const { modalValues, setModalValues, loading: loadingModal, saveAll, saveSingle } = useModalValues(activeStoreId);
-  // ─── Data Processing (unchanged logic) ─────────────────────────────
+  const { modalValues, setModalValues, loading: loadingModal, saveAll } = useModalValues(activeStoreId);
+
+  // ─── Data Processing ───────────────────────────────────────────────
   const skuIdToChannel = useMemo(() => {
     const map = new Map();
     const sellerSkuToChannel = new Map();
@@ -73,8 +75,6 @@ function InputModal() {
     });
   }, [ordersData]);
 
-
-
   // ─── State ─────────────────────────────────────────────────────────
   const [expandedSkus, setExpandedSkus] = useState(new Set());
   const [bulkInputs, setBulkInputs] = useState({});
@@ -104,7 +104,7 @@ function InputModal() {
     setIsSaving(false);
   }
 
-  // ─── Helpers (unchanged logic) ─────────────────────────────────────
+  // ─── Helpers ───────────────────────────────────────────────────────
   function getVariationTypes(variations) {
     if (!variations || variations.length === 0) return [];
     const allVariations = variations.map(v => v.variation);
@@ -320,7 +320,7 @@ function InputModal() {
     return items;
   }, [groupedBySellerSku, searchQuery, filterMode, getSkuFillStatus]);
 
-  // ─── Channel icon helper ──────────────────────────────────────────
+  // Channel icon helper
   function getChannelIcon(sellerSku, variations) {
     let ch = "";
     if (variations.length > 0) {
@@ -332,8 +332,44 @@ function InputModal() {
     return { iconSrc, channel: ch };
   }
 
-  // ─── Progress percentage ──────────────────────────────────────────
+  // Progress percentage
   const progressPercent = stats.total > 0 ? Math.round((stats.filled / stats.total) * 100) : 0;
+
+  // Toggle expand all
+  const allExpanded = useMemo(() => {
+    const multiVarSkus = filteredSkus.filter(g => g.variations.length > 1);
+    return multiVarSkus.length > 0 && multiVarSkus.every(g => expandedSkus.has(g.sellerSku));
+  }, [filteredSkus, expandedSkus]);
+
+  const toggleExpandAll = () => {
+    const multiVarSkus = filteredSkus.filter(g => g.variations.length > 1);
+    if (allExpanded) {
+      setExpandedSkus(prev => {
+        const next = new Set(prev);
+        multiVarSkus.forEach(g => next.delete(g.sellerSku));
+        return next;
+      });
+    } else {
+      setExpandedSkus(prev => {
+        const next = new Set(prev);
+        multiVarSkus.forEach(g => next.add(g.sellerSku));
+        return next;
+      });
+    }
+  };
+
+  // Keyboard Navigation: Enter advances to next card input
+  const handleInputKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const inputs = Array.from(document.querySelectorAll('.im-input:not([disabled])'));
+      const index = inputs.indexOf(e.target);
+      if (index >= 0 && index < inputs.length - 1) {
+        inputs[index + 1].focus();
+        inputs[index + 1].select();
+      }
+    }
+  };
 
   // ─── Loading State ─────────────────────────────────────────────────
   if (loadingOrders || loadingModal) {
@@ -366,27 +402,28 @@ function InputModal() {
 
         {/* Skeleton Cards */}
         <div className="im-cards-grid">
-          {Array.from({ length: 8 }).map((_, i) => (
+          {Array.from({ length: 6 }).map((_, i) => (
             <div
               key={`skel-${i}`}
               className="glass-card"
               style={{
-                padding: '1rem 1.25rem',
+                padding: '0.85rem 1.15rem',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 gap: '1rem',
-                animation: `fadeInUp 0.3s ease ${i * 60}ms both`,
+                borderRadius: '12px',
+                border: '1px solid #e2e8f0',
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, minWidth: 0 }}>
                 <div className="skeleton" style={{ width: '1.75rem', height: '1.75rem', borderRadius: '0.375rem', flexShrink: 0 }}>&nbsp;</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="skeleton" style={{ height: '0.875rem', width: `${45 + Math.random() * 35}%`, marginBottom: '0.375rem' }}>&nbsp;</div>
-                  <div className="skeleton" style={{ height: '0.625rem', width: '30%' }}>&nbsp;</div>
+                  <div className="skeleton" style={{ height: '0.875rem', width: `${40 + Math.random() * 30}%`, marginBottom: '0.375rem' }}>&nbsp;</div>
+                  <div className="skeleton" style={{ height: '0.625rem', width: '25%' }}>&nbsp;</div>
                 </div>
               </div>
-              <div className="skeleton" style={{ height: '2.25rem', width: '5.5rem', borderRadius: 'var(--radius-md)', flexShrink: 0 }}>&nbsp;</div>
+              <div className="skeleton" style={{ height: '2.1rem', width: '9rem', borderRadius: '6px', flexShrink: 0 }}>&nbsp;</div>
             </div>
           ))}
         </div>
@@ -420,17 +457,17 @@ function InputModal() {
           <button
             className="btn-primary"
             onClick={handleSaveAll}
-            disabled={isSaving || !isDirty}
+            disabled={isSaving || (!isDirty && !saveSuccess)}
             style={{
-              padding: '0.5rem 1.25rem',
+              padding: '0.45rem 1.15rem',
               fontSize: '0.8125rem',
               borderRadius: 'var(--radius-md)',
               display: 'flex',
               alignItems: 'center',
               gap: '0.375rem',
-              opacity: (!isDirty && !saveSuccess) ? 0.4 : 1,
+              opacity: (!isDirty && !saveSuccess) ? 0.45 : 1,
               background: saveSuccess ? 'var(--gradient-success)' : undefined,
-              transition: 'all 0.3s',
+              transition: 'all 0.25s ease',
             }}
           >
             {isSaving ? (
@@ -452,13 +489,13 @@ function InputModal() {
         <span className="im-progress-label">{progressPercent}%</span>
       </div>
 
-      {/* Toolbar: Search + Filter */}
+      {/* Toolbar: Search + Filter + Expand All */}
       <div className="im-toolbar">
         <div className="im-search-box">
           <Search size={16} className="im-search-icon" />
           <input
             type="text"
-            placeholder="Cari SKU produk..."
+            placeholder="Cari SKU atau nama produk..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="im-search-input"
@@ -469,33 +506,66 @@ function InputModal() {
             </button>
           )}
         </div>
-        <div className="im-filter-tabs">
-          {[
-            { key: 'all', label: 'Semua', count: stats.total },
-            { key: 'unfilled', label: 'Belum Terisi', count: stats.unfilled + stats.partial },
-            { key: 'filled', label: 'Terisi', count: stats.filled },
-          ].map(tab => (
-            <button
-              key={tab.key}
-              className={`im-filter-tab ${filterMode === tab.key ? 'active' : ''}`}
-              onClick={() => setFilterMode(tab.key)}
-            >
-              {tab.label}
-              <span className="im-filter-count">{tab.count}</span>
-            </button>
-          ))}
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+          <div className="im-filter-tabs">
+            {[
+              { key: 'all', label: 'Semua', count: stats.total },
+              { key: 'unfilled', label: 'Belum Terisi', count: stats.unfilled + stats.partial },
+              { key: 'filled', label: 'Terisi', count: stats.filled },
+            ].map(tab => (
+              <button
+                key={tab.key}
+                type="button"
+                className={`im-filter-tab ${filterMode === tab.key ? 'active' : ''}`}
+                onClick={() => setFilterMode(tab.key)}
+              >
+                {tab.label}
+                <span className="im-filter-count">({tab.count})</span>
+              </button>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={toggleExpandAll}
+            title={allExpanded ? "Tutup Semua Variasi" : "Buka Semua Variasi"}
+            style={{
+              height: '36px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              padding: '0 0.75rem',
+              borderRadius: '8px',
+              border: '1px solid #cbd5e1',
+              background: allExpanded ? '#eef2ff' : '#ffffff',
+              color: allExpanded ? '#4f46e5' : '#475569',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <Layers size={13} />
+            <span>{allExpanded ? 'Tutup Variasi' : 'Buka Variasi'}</span>
+          </button>
         </div>
       </div>
 
-      {/* SKU Cards */}
+      {/* SKU Cards (Single Clean Column) */}
       <div className="im-cards-grid">
         {filteredSkus.length === 0 ? (
           <div className="im-empty">
-            <Filter size={40} strokeWidth={1.5} />
-            <p>Tidak ada SKU yang cocok</p>
-            {searchQuery && (
-              <button className="btn-secondary" style={{ marginTop: '0.5rem', fontSize: '0.8125rem' }} onClick={() => { setSearchQuery(''); setFilterMode('all'); }}>
-                Reset Filter
+            <Filter size={38} strokeWidth={1.5} style={{ margin: '0 auto', opacity: 0.6 }} />
+            <p style={{ fontWeight: 600, color: '#475569' }}>Tidak ada SKU yang cocok</p>
+            {(searchQuery || filterMode !== 'all') && (
+              <button
+                className="btn-secondary"
+                style={{ marginTop: '0.65rem', fontSize: '0.8125rem', padding: '0.4rem 0.85rem' }}
+                onClick={() => { setSearchQuery(''); setFilterMode('all'); }}
+              >
+                Reset Pencarian & Filter
               </button>
             )}
           </div>
@@ -505,63 +575,105 @@ function InputModal() {
             const mainModalValue = modalValues[sellerSku] || '';
             const variationCount = variations.length;
             const anyVariationFilled = hasAnyVariationFilled(sellerSku);
+            const filledCount = filledVariationCountBySku.get(sellerSku) || 0;
             const isInvalid = invalidSkus.has(sellerSku);
             const variationTypes = getVariationTypes(variations);
             const bulk = bulkInputs[sellerSku] || { selections: [], value: '' };
             const chInfo = getChannelIcon(sellerSku, variations);
             const fillStatus = getSkuFillStatus(sellerSku, variations);
             const isFlashSaved = flashSaved === sellerSku;
-            // Display name for the card
             const displayName = noSku
               ? (productName || sellerSku.replace('__NSKU__', ''))
               : sellerSku;
 
             return (
-              <div key={sellerSku} className={`im-card ${fillStatus === 'filled' ? 'im-card-filled' : ''} ${isInvalid ? 'im-card-invalid' : ''} ${isFlashSaved ? 'im-card-flash' : ''}`}>
+              <div
+                key={sellerSku}
+                className={`im-card im-card-${fillStatus} ${isInvalid ? 'im-card-invalid' : ''} ${isFlashSaved ? 'im-card-flash' : ''}`}
+              >
                 {/* Card Main Row */}
-                <div className="im-card-header" onClick={() => variationCount > 1 && toggleExpand(sellerSku)} style={{ cursor: variationCount > 1 ? 'pointer' : 'default' }}>
+                <div
+                  className="im-card-header"
+                  onClick={() => variationCount > 1 && toggleExpand(sellerSku)}
+                  style={{ cursor: variationCount > 1 ? 'pointer' : 'default' }}
+                >
                   <div className="im-card-left">
                     {chInfo && (
-                      <img src={chInfo.iconSrc} alt={chInfo.channel} className="im-channel-icon" loading="lazy" />
+                      <img
+                        src={chInfo.iconSrc}
+                        alt={chInfo.channel}
+                        title={chInfo.channel}
+                        className="im-channel-icon"
+                        loading="lazy"
+                      />
                     )}
                     <div className="im-sku-info">
-                      <div className="im-sku-name">
+                      <div className="im-sku-title-row">
                         {noSku && (
-                          <span style={{
-                            background: 'linear-gradient(135deg, #f59e0b, #d97706)',
-                            color: '#fff',
-                            fontSize: '0.625rem',
-                            fontWeight: 700,
-                            padding: '0.125rem 0.375rem',
-                            borderRadius: '0.25rem',
-                            marginRight: '0.375rem',
-                            letterSpacing: '0.02em',
-                          }}>Tanpa SKU</span>
+                          <span
+                            style={{
+                              background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                              color: '#fff',
+                              fontSize: '0.625rem',
+                              fontWeight: 700,
+                              padding: '0.1rem 0.35rem',
+                              borderRadius: '4px',
+                              letterSpacing: '0.02em',
+                            }}
+                          >
+                            Tanpa SKU
+                          </span>
                         )}
-                        <span style={noSku ? { fontSize: '0.8125rem' } : {}}>{displayName}</span>
-                        {fillStatus === 'filled' && <CheckCircle2 size={14} className="im-check" />}
+                        <span className="im-sku-name">{displayName}</span>
+                        {fillStatus === 'filled' && (
+                          <CheckCircle2 size={15} className="im-check" />
+                        )}
+                        {variationCount > 1 && (
+                          <span
+                            className="im-var-badge"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleExpand(sellerSku);
+                            }}
+                            title="Klik untuk melihat rincian variasi"
+                          >
+                            <Layers size={11} />
+                            <span>{variationCount} variasi</span>
+                            {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                          </span>
+                        )}
                       </div>
-                      {variationCount > 1 && (
-                        <span className="im-var-badge">
-                          <Layers size={11} />
-                          {variationCount} variasi
-                          {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                        </span>
+                      {!noSku && productName && productName !== sellerSku && (
+                        <div className="im-sku-desc" title={productName}>
+                          {productName}
+                        </div>
                       )}
                     </div>
                   </div>
-                  <div className="im-card-right" onClick={e => e.stopPropagation()}>
+
+                  <div className="im-card-right" onClick={(e) => e.stopPropagation()}>
                     {variationCount <= 1 || !anyVariationFilled ? (
                       <input
-                        type="text" inputMode="numeric" pattern="[0-9]*"
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
                         placeholder="Rp0"
                         className={`im-input ${anyVariationFilled ? 'im-input-disabled' : ''}`}
                         value={anyVariationFilled ? '' : mainModalValue}
                         onInput={(e) => { if (!anyVariationFilled) handleMainInputChange(sellerSku, e); }}
+                        onKeyDown={handleInputKeyDown}
                         disabled={anyVariationFilled}
                       />
                     ) : (
-                      <span className="im-multi-label" onClick={() => toggleExpand(sellerSku)} style={{ cursor: 'pointer' }}>Multi-variasi</span>
+                      <span
+                        className="im-multi-label"
+                        onClick={() => toggleExpand(sellerSku)}
+                        style={{ cursor: 'pointer' }}
+                        title="Klik untuk melihat atau mengubah nilai variasi"
+                      >
+                        Multi-variasi ({filledCount}/{variationCount})
+                        {isExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                      </span>
                     )}
                   </div>
                 </div>
@@ -569,7 +681,8 @@ function InputModal() {
                 {/* Invalid Warning */}
                 {isInvalid && (
                   <div className="im-warning">
-                    ⚠ Isi seluruh nilai variasi atau kosongkan semua
+                    <AlertTriangle size={14} />
+                    <span>Perhatian: Isi seluruh nilai variasi atau kosongkan semua ({filledCount} dari {variationCount} terisi)</span>
                   </div>
                 )}
 
@@ -594,19 +707,26 @@ function InputModal() {
                         ))
                       ) : null}
                       <input
-                        type="text" inputMode="numeric" pattern="[0-9]*"
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
                         placeholder="Rp0"
                         className="im-bulk-input"
                         value={bulk.value}
                         onChange={(e) => handleBulkValueChange(sellerSku, e)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); applyBulkInput(sellerSku); } }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            applyBulkInput(sellerSku);
+                          }
+                        }}
                       />
                       <button
                         className="im-bulk-apply"
                         onClick={() => applyBulkInput(sellerSku)}
                         disabled={!bulk.value}
                       >
-                        <Save size={13} />
+                        <Check size={12} />
                         Terapkan
                       </button>
                     </div>
@@ -628,21 +748,25 @@ function InputModal() {
                       }).map(({ skuId, variation }) => {
                         const key = sellerSku + '||' + skuId + '||' + variation;
                         const val = modalValues[key] || '';
-                        let channel = skuIdToChannel.skuIdToChannel.get(skuId) || "";
-                        if (!channel) channel = skuIdToChannel.sellerSkuToChannel.get(sellerSku) || "";
                         return (
                           <div key={key} className={`im-var-item ${val ? 'im-var-filled' : ''}`}>
                             <div className="im-var-detail">
                               <span className="im-var-name">{variation || 'Default'}</span>
                               {skuId && <span className="im-var-skuid">{skuId}</span>}
                             </div>
-                            <input
-                              type="text" inputMode="numeric" pattern="[0-9]*"
-                              placeholder="Rp0"
-                              className="im-input im-input-sm"
-                              value={val}
-                              onInput={(e) => handleVariationInputChange(sellerSku, skuId, variation, e)}
-                            />
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                placeholder="Rp0"
+                                className="im-input im-input-sm"
+                                value={val}
+                                onInput={(e) => handleVariationInputChange(sellerSku, skuId, variation, e)}
+                                onKeyDown={handleInputKeyDown}
+                              />
+                              {val && <CheckCircle2 size={14} style={{ color: '#10b981', flexShrink: 0 }} />}
+                            </div>
                           </div>
                         );
                       })}

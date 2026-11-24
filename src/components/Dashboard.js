@@ -869,6 +869,18 @@ function Dashboard() {
 
     const activeBarPoint = activeBarIdx >= 0 && chartData[activeBarIdx] ? chartData[activeBarIdx] : null;
 
+    const activeMonthKey = useMemo(() => {
+        if (!filterStartDate || !filterEndDate) return null;
+        if (filterStartDate.slice(0, 7) === filterEndDate.slice(0, 7)) {
+            const [y, m] = filterStartDate.split('-').map(Number);
+            const lastDay = new Date(y, m, 0).getDate();
+            if (filterStartDate.endsWith('-01') && parseInt(filterEndDate.slice(8, 10), 10) === lastDay) {
+                return filterStartDate.slice(0, 7);
+            }
+        }
+        return null;
+    }, [filterStartDate, filterEndDate]);
+
     const handleBarClick = useCallback((_, index) => {
         if (typeof index === 'number' && index >= 0) {
             setSelectedBarIndex(index);
@@ -876,6 +888,11 @@ function Dashboard() {
     }, []);
 
     const formatDateDisplay = () => {
+        if (activeMonthKey) {
+            const [y, m] = activeMonthKey.split('-');
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+            return `${months[parseInt(m, 10) - 1]} ${y}`;
+        }
         if (!filterStartDate && !filterEndDate) return 'Semua Tanggal';
         const fmt = (d) => {
             if (!d) return '';
@@ -974,9 +991,9 @@ function Dashboard() {
 
     const earningHeroConfig = {
         labaBersih: {
-            title: 'Margin Kontribusi (Penerimaan Bersih - HPP)',
+            title: 'Profit (Penerimaan Bersih - HPP)',
             value: formatRupiah(sums.labaBersih),
-            badge: `+${profitMarginPct}% Margin`,
+            badge: `+${profitMarginPct}% Profit`,
             badgeColor: '#10b981',
             badgeBg: 'rgba(16, 185, 129, 0.12)',
             subText: `Penerimaan Bersih: ${formatRupiah(sums.labaKotor)}`,
@@ -990,15 +1007,15 @@ function Dashboard() {
             badge: `${sums.sudahCairOrder.toLocaleString('id-ID')} Order Dana Diterima`,
             badgeColor: '#06b6d4',
             badgeBg: 'rgba(6, 182, 212, 0.12)',
-            subText: `Margin Kontribusi: ${formatRupiah(sums.labaBersih)}`,
+            subText: `Profit: ${formatRupiah(sums.labaBersih)}`,
             dataKey: 'labaKotor',
             stroke: '#06b6d4',
             fillId: 'heroGradCyan',
         },
         aset: {
-            title: 'Margin + Persediaan Dalam Pengiriman',
+            title: 'Profit + Nilai Barang Dalam Pengiriman',
             value: formatRupiah(sums.labaBersih + sums.estimasiAsetDiJalan),
-            badge: `Persediaan Transit: ${formatCompact(sums.estimasiAsetDiJalan)}`,
+            badge: `Nilai Barang Dikirim: ${formatCompact(sums.estimasiAsetDiJalan)}`,
             badgeColor: '#f59e0b',
             badgeBg: 'rgba(245, 158, 11, 0.14)',
             subText: `${sums.belumCairOrder.toLocaleString('id-ID')} pesanan masih piutang marketplace`,
@@ -1028,11 +1045,11 @@ function Dashboard() {
             return {
                 heroValue: formatRupiah(sums.labaKotor),
                 heroSub: `${sums.sudahCairOrder.toLocaleString('id-ID')} Transaksi Dana Diterima`,
-                badgeText: `${profitMarginPct}% Margin`,
+                badgeText: `${profitMarginPct}% Profit`,
                 badgePositive: true,
                 segments: [
                     { label: 'HPP', amount: formatCompact(modalVal), fullAmount: formatRupiah(modalVal), pct: Math.max(6, Math.round((modalVal / total) * 100)), rawPct: ((modalVal / total) * 100).toFixed(1), color: '#7c3aed' },
-                    { label: 'Margin Kontribusi', amount: formatCompact(labaVal), fullAmount: formatRupiah(labaVal), pct: Math.max(6, Math.round((labaVal / total) * 100)), rawPct: ((labaVal / total) * 100).toFixed(1), color: '#10b981' },
+                    { label: 'Profit', amount: formatCompact(labaVal), fullAmount: formatRupiah(labaVal), pct: Math.max(6, Math.round((labaVal / total) * 100)), rawPct: ((labaVal / total) * 100).toFixed(1), color: '#10b981' },
                     { label: 'Komisi Afiliasi', amount: formatCompact(affVal), fullAmount: formatRupiah(affVal), pct: Math.max(6, Math.round((affVal / total) * 100)), rawPct: ((affVal / total) * 100).toFixed(1), color: '#06b6d4' },
                 ],
             };
@@ -1073,9 +1090,9 @@ function Dashboard() {
 
     const cashFlowTabsConfig = {
         labaBersih: {
-            label: 'Margin Kontribusi',
+            label: 'Profit',
             heroTotal: formatRupiah(sums.labaBersih),
-            heroSub: `Margin +${profitMarginPct}%`,
+            heroSub: `Profit +${profitMarginPct}%`,
             color: '#7c3aed',
             isCurrency: true,
             unit: '',
@@ -1150,7 +1167,7 @@ function Dashboard() {
                 },
                 {
                     id: 'laba',
-                    title: 'Margin Kontribusi',
+                    title: 'Profit',
                     subtitle: `Rasio ${profitMarginPct}% dari penerimaan bersih, setelah HPP`,
                     amount: formatRupiah(sums.labaBersih),
                     badge: `+${profitMarginPct}%`,
@@ -1160,7 +1177,7 @@ function Dashboard() {
                 },
                 {
                     id: 'aset',
-                    title: 'Persediaan Dalam Pengiriman',
+                    title: 'Nilai Barang Dalam Pengiriman',
                     subtitle: `${sums.belumCairOrder.toLocaleString('id-ID')} pesanan belum diterima dananya (piutang marketplace)`,
                     amount: formatRupiah(sums.estimasiAsetDiJalan),
                     badge: 'Dalam Proses',
@@ -1194,7 +1211,7 @@ function Dashboard() {
             {
                 id: 'belum-cair',
                 title: 'Piutang Marketplace',
-                subtitle: `Persediaan (HPP): ${formatRupiah(sums.estimasiAsetDiJalan)}`,
+                subtitle: `Nilai Barang (HPP): ${formatRupiah(sums.estimasiAsetDiJalan)}`,
                 amount: `${sums.belumCairOrder.toLocaleString('id-ID')} Order`,
                 badge: `${sums.belumCairPCS.toLocaleString('id-ID')} PCS`,
                 badgeColor: '#f59e0b',
@@ -1611,10 +1628,10 @@ function Dashboard() {
                     },
                     {
                         id: 'laba',
-                        label: 'Margin Kontribusi',
+                        label: 'Profit',
                         value: formatRupiah(sums.labaBersih),
                         leftSub: isMobile ? `Bersih: ${formatCompact(sums.labaKotor)}` : `Penerimaan Bersih: ${formatCompact(sums.labaKotor)}`,
-                        badge: isMobile ? `+${profitMarginPct}%` : `+${profitMarginPct}% Margin`,
+                        badge: isMobile ? `+${profitMarginPct}%` : `+${profitMarginPct}% Profit`,
                         icon: Wallet,
                         color: '#f59e0b',
                         gradient: 'linear-gradient(135deg, #f59e0b, #fbbf24)',
@@ -1627,9 +1644,9 @@ function Dashboard() {
                     },
                     {
                         id: 'aset',
-                        label: 'Margin + Persediaan',
+                        label: isMobile ? 'Nilai Barang Dikirim' : 'Profit + Nilai Barang Dikirim',
                         value: formatRupiah(sums.labaBersih + sums.estimasiAsetDiJalan),
-                        leftSub: isMobile ? `Transit: ${formatCompact(sums.estimasiAsetDiJalan)}` : `Persediaan Transit: ${formatCompact(sums.estimasiAsetDiJalan)}`,
+                        leftSub: isMobile ? `Kirim: ${formatCompact(sums.estimasiAsetDiJalan)}` : `Nilai Barang Dikirim: ${formatCompact(sums.estimasiAsetDiJalan)}`,
                         badge: isMobile ? `${sums.belumCairOrder} Proses` : `${sums.belumCairOrder.toLocaleString('id-ID')} Proses`,
                         icon: Landmark,
                         color: '#06b6d4',
@@ -1762,7 +1779,7 @@ function Dashboard() {
                                 <span style={{ fontSize: isMobile ? '0.875rem' : '0.975rem', fontWeight: 800, color: 'var(--text-primary)' }}>
                                     Earning Overview
                                 </span>
-                                <Info size={13} color="var(--text-tertiary)" title="Ringkasan tren penerimaan bersih dan margin kontribusi toko Anda" />
+                                <Info size={13} color="var(--text-tertiary)" title="Ringkasan tren penerimaan bersih dan profit toko Anda" />
                             </div>
 
                             {isMobile ? (
@@ -1806,9 +1823,9 @@ function Dashboard() {
                                                 Mode Tampilan
                                             </div>
                                             {[
-                                                { id: 'labaBersih', label: 'Margin Kontribusi' },
+                                                { id: 'labaBersih', label: 'Profit' },
                                                 { id: 'labaKotor', label: 'Penerimaan Bersih' },
-                                                { id: 'aset', label: 'Margin + Persediaan' },
+                                                { id: 'aset', label: 'Profit + Nilai Barang Dikirim' },
                                             ].map((tab) => (
                                                 <button
                                                     key={tab.id}
@@ -1847,9 +1864,9 @@ function Dashboard() {
                                     }}
                                 >
                                     {[
-                                        { id: 'labaBersih', label: 'Margin Kontribusi' },
+                                        { id: 'labaBersih', label: 'Profit' },
                                         { id: 'labaKotor', label: 'Penerimaan Bersih' },
-                                        { id: 'aset', label: 'Margin + Persediaan' },
+                                        { id: 'aset', label: 'Profit + Nilai Barang Dikirim' },
                                     ].map((tab) => (
                                         <button
                                             key={tab.id}
@@ -2047,7 +2064,7 @@ function Dashboard() {
                                             </div>
                                             {[
                                                 { id: 'status', label: 'Status Pesanan' },
-                                                { id: 'keuangan', label: 'HPP & Margin' },
+                                                { id: 'keuangan', label: 'HPP & Profit' },
                                                 { id: 'pencairan', label: 'Penerimaan Dana' },
                                             ].map((tab) => (
                                                 <button
@@ -2088,7 +2105,7 @@ function Dashboard() {
                                 >
                                     {[
                                         { id: 'status', label: 'Status' },
-                                        { id: 'keuangan', label: 'HPP & Margin' },
+                                        { id: 'keuangan', label: 'HPP & Profit' },
                                         { id: 'pencairan', label: 'Penerimaan Dana' },
                                     ].map((tab) => (
                                         <button
@@ -2592,7 +2609,7 @@ function Dashboard() {
                             >
                                 {[
                                     { label: 'Penerimaan', val: formatCompact(activeBarPoint.labaKotor), color: '#06b6d4' },
-                                    { label: 'Margin', val: formatCompact(activeBarPoint.labaBersih), color: '#7c3aed' },
+                                    { label: 'Profit', val: formatCompact(activeBarPoint.labaBersih), color: '#7c3aed' },
                                     { label: 'Terjual', val: `${activeBarPoint.fixTerbeli.toLocaleString('id-ID')} PCS`, color: '#10b981' },
                                     { label: 'Dana Masuk', val: `${activeBarPoint.sudahCair.toLocaleString('id-ID')} Order`, color: '#f59e0b' },
                                     { label: 'Piutang', val: `${activeBarPoint.belumCair.toLocaleString('id-ID')} Order`, color: '#2563eb' },

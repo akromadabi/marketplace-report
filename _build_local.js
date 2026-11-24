@@ -18,7 +18,16 @@ function copyDirSync(src, dest, excludeFiles = []) {
         if (entry.isDirectory()) {
             copyDirSync(srcPath, destPath, excludeFiles);
         } else {
-            fs.copyFileSync(srcPath, destPath);
+            try {
+                if (fs.existsSync(srcPath)) {
+                    fs.copyFileSync(srcPath, destPath);
+                }
+            } catch (err) {
+                // Ignore transient or missing map files
+                if (!srcPath.endsWith('.map')) {
+                    console.warn(`Warning copying ${srcPath}:`, err.message);
+                }
+            }
         }
     }
 }
