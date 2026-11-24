@@ -143,6 +143,14 @@ export default function RangkumanTransaksi({ isHidden = false }) {
     const pdfMenuRef = useRef(null);
     const filterMenuRef = useRef(null);
 
+    const [windowWidth, setWindowWidth] = useState(() => (typeof window !== 'undefined' ? window.innerWidth : 1200));
+    useEffect(() => {
+        function handleResize() { setWindowWidth(window.innerWidth); }
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+    const isMobile = windowWidth < 768;
+
     useEffect(() => {
         function handleClickOutside(event) {
             if (filterPopupRef.current && !filterPopupRef.current.contains(event.target)) setFilterPopupOpen(null);
@@ -640,225 +648,353 @@ export default function RangkumanTransaksi({ isHidden = false }) {
 
     return (
         <div>
-            <div className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
-                <div>
-                    <h2 className="gradient-text" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <ClipboardList size={24} style={{ color: '#7c3aed' }} />
-                        Rekap Transaksi
-                    </h2>
-                    <p>{sortedData.length.toLocaleString('id-ID')} transaksi</p>
+            {/* ── Top Header & Filter Toolbar (Ultra-Compact) ── */}
+            <div style={{
+                background: '#ffffff',
+                borderRadius: '12px',
+                border: '1px solid #eef0f6',
+                padding: isMobile ? '0.5rem 0.65rem' : '0.5rem 0.85rem',
+                marginBottom: '0.5rem',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.02)',
+                display: 'flex',
+                flexDirection: isMobile ? 'column' : 'row',
+                alignItems: isMobile ? 'stretch' : 'center',
+                justifyContent: 'space-between',
+                gap: '0.45rem',
+            }}>
+                {/* Left: Page Title + Total Count Badge */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <div style={{
+                            width: isMobile ? 26 : 28,
+                            height: isMobile ? 26 : 28,
+                            borderRadius: '7px',
+                            background: 'linear-gradient(135deg, #7c3aed, #06b6d4)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#ffffff',
+                            flexShrink: 0,
+                            boxShadow: '0 2px 6px rgba(124, 58, 237, 0.22)',
+                        }}>
+                            <ClipboardList size={isMobile ? 14 : 15} />
+                        </div>
+                        <h2 style={{
+                            margin: 0,
+                            fontSize: isMobile ? '0.9rem' : '1.05rem',
+                            fontWeight: 800,
+                            color: 'var(--text-primary)',
+                            letterSpacing: '-0.02em',
+                        }}>
+                            Rekap Transaksi
+                        </h2>
+                    </div>
+                    <span style={{
+                        fontSize: isMobile ? '0.675rem' : '0.725rem',
+                        fontWeight: 700,
+                        color: '#7c3aed',
+                        background: 'rgba(124, 58, 237, 0.08)',
+                        border: '1px solid rgba(124, 58, 237, 0.2)',
+                        padding: '1px 7px',
+                        borderRadius: '9999px',
+                        whiteSpace: 'nowrap',
+                    }}>
+                        {sortedData.length.toLocaleString('id-ID')} transaksi
+                    </span>
+                </div>
+
+                {/* Right: Inline Filter Controls */}
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    flexWrap: isMobile ? 'wrap' : 'nowrap',
+                    gap: '0.35rem',
+                    width: isMobile ? '100%' : 'auto',
+                }}>
+                    {/* Search */}
+                    <div style={{ position: 'relative', width: isMobile ? '100%' : '210px', flexShrink: 0 }}>
+                        <Search size={12} style={{ position: 'absolute', left: '0.6rem', top: '50%', transform: 'translateY(-50%)', color: searchQuery ? '#7c3aed' : 'var(--text-tertiary)', pointerEvents: 'none' }} />
+                        <input
+                            type="text"
+                            placeholder="Cari ID, Alamat, Resi..."
+                            value={searchQuery}
+                            onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                            style={{
+                                width: '100%',
+                                height: '30px',
+                                padding: '0 1.6rem 0 1.85rem',
+                                borderRadius: '7px',
+                                border: searchQuery ? '1px solid #7c3aed' : '1px solid #e2e8f0',
+                                background: searchQuery ? 'rgba(124,58,237,0.05)' : '#f8f9fc',
+                                color: 'var(--text-primary)',
+                                fontSize: '0.735rem',
+                                fontWeight: 500,
+                                outline: 'none',
+                                transition: 'border-color 0.15s ease, background 0.15s ease',
+                            }}
+                        />
+                        {searchQuery && (
+                            <button type="button" onClick={() => { setSearchQuery(''); setCurrentPage(1); }}
+                                style={{ position: 'absolute', right: '0.35rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', padding: '0.1rem', display: 'flex' }}>
+                                <X size={12} />
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Filter buttons (grid on mobile, flex on desktop) */}
+                    <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                        width: isMobile ? '100%' : 'auto',
+                    }}>
+                        {/* Date Range Filter */}
+                        <div style={{ position: 'relative', flex: isMobile ? 1 : 'none' }} ref={datePickerRef}>
+                            <button
+                                type="button"
+                                onClick={() => setShowDateRangePicker(!showDateRangePicker)}
+                                style={{
+                                    width: isMobile ? '100%' : 'auto',
+                                    height: '30px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '0.3rem',
+                                    padding: '0 0.65rem',
+                                    borderRadius: '7px',
+                                    border: (filterStartDate || filterEndDate) ? '1px solid rgba(124,58,237,0.4)' : '1px solid #e2e8f0',
+                                    background: (filterStartDate || filterEndDate) ? 'rgba(124,58,237,0.08)' : '#f8f9fc',
+                                    color: (filterStartDate || filterEndDate) ? '#7c3aed' : 'var(--text-secondary)',
+                                    cursor: 'pointer',
+                                    fontSize: '0.725rem',
+                                    fontWeight: 600,
+                                    whiteSpace: 'nowrap',
+                                }}
+                            >
+                                <Calendar size={12} />
+                                <span>{filterStartDate && filterEndDate ? `${filterStartDate} — ${filterEndDate}` : 'Tanggal'}</span>
+                            </button>
+                            {showDateRangePicker && (
+                                <div style={{ position: 'absolute', top: '105%', left: isMobile ? 0 : 'auto', right: isMobile ? 'auto' : 0, zIndex: 120 }}>
+                                    <DateRangePicker startDate={filterStartDate} endDate={filterEndDate}
+                                        onChange={({ startDate, endDate }) => { setFilterStartDate(startDate); setFilterEndDate(endDate); setCurrentPage(1); }}
+                                        onClose={() => setShowDateRangePicker(false)} />
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Status Filter */}
+                        <div style={{ position: 'relative', flex: isMobile ? 1 : 'none' }} ref={filterMenuRef}>
+                            <button
+                                onClick={() => setShowFilterMenu(!showFilterMenu)}
+                                type="button"
+                                style={{
+                                    width: isMobile ? '100%' : 'auto',
+                                    height: '30px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '0.3rem',
+                                    padding: '0 0.65rem',
+                                    borderRadius: '7px',
+                                    border: (pdfChecked.retur || pdfChecked.gagal_kirim || pdfChecked.cancel) ? '1px solid #7c3aed' : '1px solid #e2e8f0',
+                                    background: (pdfChecked.retur || pdfChecked.gagal_kirim || pdfChecked.cancel) ? 'rgba(124, 58, 237, 0.08)' : '#f8f9fc',
+                                    color: (pdfChecked.retur || pdfChecked.gagal_kirim || pdfChecked.cancel) ? '#7c3aed' : 'var(--text-secondary)',
+                                    cursor: 'pointer',
+                                    fontSize: '0.725rem',
+                                    fontWeight: 600,
+                                    whiteSpace: 'nowrap',
+                                }}
+                            >
+                                <Filter size={12} />
+                                <span>Status {(pdfChecked.retur || pdfChecked.gagal_kirim || pdfChecked.cancel) ? '(Aktif)' : ''} ▾</span>
+                            </button>
+                            {showFilterMenu && (
+                                <div style={{
+                                    position: 'absolute', top: '105%', left: 0, zIndex: 120,
+                                    background: '#ffffff', border: '1px solid #e5e7f0', borderRadius: '10px',
+                                    boxShadow: '0 8px 24px rgba(0,0,0,0.12)', minWidth: '170px', padding: '0.45rem 0.65rem',
+                                    display: 'flex', flexDirection: 'column', gap: '0.4rem',
+                                }}>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.735rem', color: 'var(--text-secondary)' }}>
+                                        <input type="checkbox" checked={pdfChecked.retur} onChange={e => setPdfChecked({ ...pdfChecked, retur: e.target.checked })} style={{ accentColor: '#3b82f6', width: '0.85rem', height: '0.85rem' }} />
+                                        <span>🔄 Retur</span>
+                                    </label>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.735rem', color: 'var(--text-secondary)' }}>
+                                        <input type="checkbox" checked={pdfChecked.gagal_kirim} onChange={e => setPdfChecked({ ...pdfChecked, gagal_kirim: e.target.checked })} style={{ accentColor: '#f97316', width: '0.85rem', height: '0.85rem' }} />
+                                        <span>🚚 Gagal Kirim</span>
+                                    </label>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', cursor: 'pointer', fontSize: '0.735rem', color: 'var(--text-secondary)' }}>
+                                        <input type="checkbox" checked={pdfChecked.cancel} onChange={e => setPdfChecked({ ...pdfChecked, cancel: e.target.checked })} style={{ accentColor: '#ef4444', width: '0.85rem', height: '0.85rem' }} />
+                                        <span>❌ Cancel</span>
+                                    </label>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Export Dropdown */}
+                        <div style={{ position: 'relative', flex: isMobile ? 1 : 'none' }} ref={pdfMenuRef}>
+                            <button
+                                onClick={() => setShowPdfMenu(!showPdfMenu)}
+                                type="button"
+                                style={{
+                                    width: isMobile ? '100%' : 'auto',
+                                    height: '30px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '0.3rem',
+                                    padding: '0 0.75rem',
+                                    fontSize: '0.725rem',
+                                    fontWeight: 700,
+                                    borderRadius: '7px',
+                                    border: 'none',
+                                    background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
+                                    color: '#ffffff',
+                                    cursor: 'pointer',
+                                    boxShadow: '0 2px 6px rgba(124, 58, 237, 0.22)',
+                                    whiteSpace: 'nowrap',
+                                }}
+                            >
+                                <Download size={12} />
+                                <span>Export ▾</span>
+                            </button>
+                            {showPdfMenu && (
+                                <div style={{
+                                    position: 'absolute', top: '105%', right: 0, zIndex: 120,
+                                    background: '#ffffff', border: '1px solid #e5e7f0', borderRadius: '10px',
+                                    boxShadow: '0 8px 24px rgba(0,0,0,0.12)', overflow: 'hidden', minWidth: '190px',
+                                }}>
+                                    <button type="button" onClick={() => {
+                                        setShowPdfMenu(false);
+                                        const rowsToExport = filteredTableData.filter(row => ['Gagal Kirim Paket', 'Paket Ditolak'].includes(row['Alasan Cancel']));
+                                        const exportColumns = ['ORDER ID', 'QTT', 'WAKTU PESANAN DIBUAT', 'ALAMAT', 'Alasan Cancel', 'Waktu Pengembalian', 'Resi', 'Verifikasi Paket'];
+                                        const worksheetData = rowsToExport.map(row => {
+                                            const obj = {};
+                                            exportColumns.forEach(col => {
+                                                if (col === 'Verifikasi Paket') {
+                                                    if (typeof row[col] === 'string') obj[col] = row[col];
+                                                    else if (typeof row[col] === 'object' && row[col] !== null && 'text' in row[col]) obj[col] = row[col].text;
+                                                    else obj[col] = '';
+                                                } else obj[col] = row[col] || '';
+                                            });
+                                            return obj;
+                                        });
+                                        const worksheet = XLSX.utils.json_to_sheet(worksheetData, { header: exportColumns });
+                                        const workbook = XLSX.utils.book_new();
+                                        XLSX.utils.book_append_sheet(workbook, worksheet, 'Laporan Pengembalian');
+                                        XLSX.writeFile(workbook, 'Laporan_Pengembalian.xlsx');
+                                    }}
+                                        style={{
+                                            display: 'flex', alignItems: 'center', gap: '0.45rem', width: '100%', padding: '0.5rem 0.8rem',
+                                            background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.735rem', fontWeight: 600,
+                                            color: '#10b981', textAlign: 'left',
+                                        }}
+                                        onMouseEnter={e => e.target.style.background = 'rgba(16, 185, 129, 0.08)'}
+                                        onMouseLeave={e => e.target.style.background = 'none'}>
+                                        📊 Excel Laporan
+                                    </button>
+                                    <div style={{ height: '1px', background: '#f1f3f9' }} />
+                                    <button type="button" onClick={() => {
+                                        setShowPdfMenu(false);
+                                        const exportColumns = columns.map(colLabel);
+                                        const worksheetData = sortedData.map(row => {
+                                            const obj = {};
+                                            columns.forEach(col => {
+                                                const outKey = colLabel(col);
+                                                if (col === 'Verifikasi Paket') {
+                                                    if (typeof row[col] === 'string') obj[outKey] = row[col];
+                                                    else if (typeof row[col] === 'object' && row[col] !== null && 'text' in row[col]) obj[outKey] = row[col].text;
+                                                    else obj[outKey] = '';
+                                                } else obj[outKey] = row[col] || '';
+                                            });
+                                            return obj;
+                                        });
+                                        const worksheet = XLSX.utils.json_to_sheet(worksheetData, { header: exportColumns });
+                                        const workbook = XLSX.utils.book_new();
+                                        XLSX.utils.book_append_sheet(workbook, worksheet, 'Semua Data');
+                                        XLSX.writeFile(workbook, 'Rekap_Transaksi_All.xlsx');
+                                    }}
+                                        style={{
+                                            display: 'flex', alignItems: 'center', gap: '0.45rem', width: '100%', padding: '0.5rem 0.8rem',
+                                            background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.735rem', fontWeight: 600,
+                                            color: '#3b82f6', textAlign: 'left',
+                                        }}
+                                        onMouseEnter={e => e.target.style.background = 'rgba(59, 130, 246, 0.08)'}
+                                        onMouseLeave={e => e.target.style.background = 'none'}>
+                                        📥 Excel Semua Data
+                                    </button>
+                                    <div style={{ height: '1px', background: '#f1f3f9' }} />
+                                    <button type="button" onClick={() => {
+                                        setShowPdfMenu(false);
+                                        handleDownloadVerifikasiPdf('semua');
+                                    }}
+                                        style={{
+                                            display: 'flex', alignItems: 'center', gap: '0.45rem', width: '100%', padding: '0.5rem 0.8rem',
+                                            background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.735rem', fontWeight: 600,
+                                            color: '#ef4444', textAlign: 'left',
+                                        }}
+                                        onMouseEnter={e => e.target.style.background = 'rgba(239, 68, 68, 0.08)'}
+                                        onMouseLeave={e => e.target.style.background = 'none'}>
+                                        📄 PDF Semua
+                                    </button>
+                                    <div style={{ height: '1px', background: '#f1f3f9' }} />
+                                    <button type="button" onClick={() => {
+                                        setShowPdfMenu(false);
+                                        handleDownloadVerifikasiPdf('belum');
+                                    }}
+                                        style={{
+                                            display: 'flex', alignItems: 'center', gap: '0.45rem', width: '100%', padding: '0.5rem 0.8rem',
+                                            background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.735rem', fontWeight: 600,
+                                            color: '#f59e0b', textAlign: 'left',
+                                        }}
+                                        onMouseEnter={e => e.target.style.background = 'rgba(245, 158, 11, 0.08)'}
+                                        onMouseLeave={e => e.target.style.background = 'none'}>
+                                        ⏳ PDF Belum Diterima
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <div style={{ marginBottom: '1rem', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.75rem' }}>
-                {/* Search */}
-                <div style={{ position: 'relative', minWidth: '200px', flex: '0 1 280px' }}>
-                    <Search size={14} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: searchQuery ? '#a78bfa' : 'var(--text-tertiary)', pointerEvents: 'none' }} />
-                    <input
-                        type="text" placeholder="Cari Order ID, Alamat, Resi..."
-                        value={searchQuery}
-                        onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-                        style={{
-                            width: '100%', padding: '0.5rem 0.5rem 0.5rem 2.25rem',
-                            borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)',
-                            background: searchQuery ? 'rgba(124,58,237,0.08)' : 'var(--bg-glass)',
-                            color: 'var(--text-primary)', fontSize: '0.8125rem', fontWeight: 500,
-                            outline: 'none', transition: 'border-color 0.2s, background 0.2s',
-                        }}
-                        onFocus={e => e.target.style.borderColor = '#a78bfa'}
-                        onBlur={e => e.target.style.borderColor = 'var(--border-subtle)'}
-                    />
-                    {searchQuery && (
-                        <button type="button" onClick={() => { setSearchQuery(''); setCurrentPage(1); }}
-                            style={{ position: 'absolute', right: '0.5rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', padding: '0.125rem', display: 'flex' }}>
-                            <X size={14} />
-                        </button>
-                    )}
-                </div>
-                {/* Date Range Filter */}
-                <div style={{ position: 'relative' }} ref={datePickerRef}>
-                    <button type="button" onClick={() => setShowDateRangePicker(!showDateRangePicker)}
-                        style={{
-                            display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem',
-                            borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)',
-                            background: (filterStartDate || filterEndDate) ? 'rgba(124,58,237,0.15)' : 'var(--bg-glass)',
-                            color: (filterStartDate || filterEndDate) ? '#a78bfa' : 'var(--text-secondary)',
-                            cursor: 'pointer', fontSize: '0.8125rem', fontWeight: 600,
-                        }}>
-                        <Calendar size={14} />
-                        {filterStartDate && filterEndDate ? `${filterStartDate} — ${filterEndDate}` : 'Pilih Rentang Tanggal'}
-                    </button>
-                    {showDateRangePicker && (
-                        <div style={{ position: 'absolute', top: '100%', left: 0, zIndex: 999, marginTop: '0.5rem' }}>
-                            <DateRangePicker startDate={filterStartDate} endDate={filterEndDate}
-                                onChange={({ startDate, endDate }) => { setFilterStartDate(startDate); setFilterEndDate(endDate); setCurrentPage(1); }}
-                                onClose={() => setShowDateRangePicker(false)} />
-                        </div>
-                    )}
-                </div>
-                {/* Checkbox Filters Dropdown */}
-                <div style={{ position: 'relative' }} ref={filterMenuRef}>
-                    <button onClick={() => setShowFilterMenu(!showFilterMenu)} type="button"
-                        style={{
-                            display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem',
-                            borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)',
-                            background: showFilterMenu ? 'var(--bg-active)' : 'var(--bg-glass)',
-                            color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.8125rem', fontWeight: 600,
-                            transition: 'background 0.2s', height: '36px'
-                        }}>
-                        <Filter size={14} />
-                        Status Filter {(pdfChecked.retur || pdfChecked.gagal_kirim || pdfChecked.cancel) ? ' (Aktif)' : ''} ▾
-                    </button>
-                    {showFilterMenu && (
-                        <div style={{
-                            position: 'absolute', top: '100%', left: 0, marginTop: '0.5rem', zIndex: 50,
-                            background: 'var(--bg-card)', border: '1px solid var(--border-medium)', borderRadius: 'var(--radius-md)',
-                            boxShadow: 'var(--shadow-lg)', overflow: 'hidden', minWidth: '180px', padding: '0.5rem 0.75rem',
-                            display: 'flex', flexDirection: 'column', gap: '0.625rem'
-                        }}>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                                <input type="checkbox" checked={pdfChecked.retur} onChange={e => setPdfChecked({ ...pdfChecked, retur: e.target.checked })} style={{ accentColor: '#3b82f6', width: '1rem', height: '1rem' }} />
-                                <span>🔄 Retur</span>
-                            </label>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                                <input type="checkbox" checked={pdfChecked.gagal_kirim} onChange={e => setPdfChecked({ ...pdfChecked, gagal_kirim: e.target.checked })} style={{ accentColor: '#f97316', width: '1rem', height: '1rem' }} />
-                                <span>🚚 Gagal Kirim</span>
-                            </label>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                                <input type="checkbox" checked={pdfChecked.cancel} onChange={e => setPdfChecked({ ...pdfChecked, cancel: e.target.checked })} style={{ accentColor: '#ef4444', width: '1rem', height: '1rem' }} />
-                                <span>❌ Cancel</span>
-                            </label>
-                        </div>
-                    )}
-                </div>
-
-                {/* Export Dropdown */}
-                <div style={{ position: 'relative' }} ref={pdfMenuRef}>
-                    <button onClick={() => setShowPdfMenu(!showPdfMenu)} type="button"
-                        style={{
-                            display: 'flex', alignItems: 'center', gap: '0.375rem', padding: '0.5rem 1rem', fontSize: '0.8125rem',
-                            fontWeight: 700, borderRadius: 'var(--radius-md)', border: '1px solid #7c3aed',
-                            background: showPdfMenu ? 'rgba(124, 58, 237, 0.2)' : 'var(--accent-primary)', color: '#fff', cursor: 'pointer',
-                            height: '36px'
-                        }}>
-                        <Download size={14} /> Export Laporan ▾
-                    </button>
-                    {showPdfMenu && (
-                        <div style={{
-                            position: 'absolute', top: '100%', right: 0, marginTop: '0.375rem', zIndex: 50,
-                            background: 'var(--bg-card)', border: '1px solid var(--border-medium)', borderRadius: 'var(--radius-md)',
-                            boxShadow: 'var(--shadow-lg)', overflow: 'hidden', minWidth: '220px',
-                        }}>
-                            <button type="button" onClick={() => {
-                                setShowPdfMenu(false);
-                                const rowsToExport = filteredTableData.filter(row => ['Gagal Kirim Paket', 'Paket Ditolak'].includes(row['Alasan Cancel']));
-                                const exportColumns = ['ORDER ID', 'QTT', 'WAKTU PESANAN DIBUAT', 'ALAMAT', 'Alasan Cancel', 'Waktu Pengembalian', 'Resi', 'Verifikasi Paket'];
-                                const worksheetData = rowsToExport.map(row => {
-                                    const obj = {};
-                                    exportColumns.forEach(col => {
-                                        if (col === 'Verifikasi Paket') {
-                                            if (typeof row[col] === 'string') obj[col] = row[col];
-                                            else if (typeof row[col] === 'object' && row[col] !== null && 'text' in row[col]) obj[col] = row[col].text;
-                                            else obj[col] = '';
-                                        } else obj[col] = row[col] || '';
-                                    });
-                                    return obj;
-                                });
-                                const worksheet = XLSX.utils.json_to_sheet(worksheetData, { header: exportColumns });
-                                const workbook = XLSX.utils.book_new();
-                                XLSX.utils.book_append_sheet(workbook, worksheet, 'Laporan Pengembalian');
-                                XLSX.writeFile(workbook, 'Laporan_Pengembalian.xlsx');
-                            }}
-                                style={{
-                                    display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%', padding: '0.625rem 1rem',
-                                    background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.8125rem', fontWeight: 600,
-                                    color: '#10b981', textAlign: 'left',
-                                }}
-                                onMouseEnter={e => e.target.style.background = 'rgba(16, 185, 129, 0.08)'}
-                                onMouseLeave={e => e.target.style.background = 'none'}>
-                                📊 Excel Laporan
-                            </button>
-                            <div style={{ height: '1px', background: 'var(--border-subtle)' }} />
-                            <button type="button" onClick={() => {
-                                setShowPdfMenu(false);
-                                const exportColumns = columns.map(colLabel);
-                                const worksheetData = sortedData.map(row => {
-                                    const obj = {};
-                                    columns.forEach(col => {
-                                        const outKey = colLabel(col);
-                                        if (col === 'Verifikasi Paket') {
-                                            if (typeof row[col] === 'string') obj[outKey] = row[col];
-                                            else if (typeof row[col] === 'object' && row[col] !== null && 'text' in row[col]) obj[outKey] = row[col].text;
-                                            else obj[outKey] = '';
-                                        } else obj[outKey] = row[col] || '';
-                                    });
-                                    return obj;
-                                });
-                                const worksheet = XLSX.utils.json_to_sheet(worksheetData, { header: exportColumns });
-                                const workbook = XLSX.utils.book_new();
-                                XLSX.utils.book_append_sheet(workbook, worksheet, 'Semua Data');
-                                XLSX.writeFile(workbook, 'Rekap_Transaksi_All.xlsx');
-                            }}
-                                style={{
-                                    display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%', padding: '0.625rem 1rem',
-                                    background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.8125rem', fontWeight: 600,
-                                    color: '#3b82f6', textAlign: 'left',
-                                }}
-                                onMouseEnter={e => e.target.style.background = 'rgba(59, 130, 246, 0.08)'}
-                                onMouseLeave={e => e.target.style.background = 'none'}>
-                                📥 Excel Semua Data
-                            </button>
-                            <div style={{ height: '1px', background: 'var(--border-subtle)' }} />
-                            <button type="button" onClick={() => {
-                                setShowPdfMenu(false);
-                                handleDownloadVerifikasiPdf('semua');
-                            }}
-                                style={{
-                                    display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%', padding: '0.625rem 1rem',
-                                    background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.8125rem', fontWeight: 600,
-                                    color: '#ef4444', textAlign: 'left',
-                                }}
-                                onMouseEnter={e => e.target.style.background = 'rgba(239, 68, 68, 0.08)'}
-                                onMouseLeave={e => e.target.style.background = 'none'}>
-                                📄 PDF Semua
-                            </button>
-                            <div style={{ height: '1px', background: 'var(--border-subtle)' }} />
-                            <button type="button" onClick={() => {
-                                setShowPdfMenu(false);
-                                handleDownloadVerifikasiPdf('belum');
-                            }}
-                                style={{
-                                    display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%', padding: '0.625rem 1rem',
-                                    background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.8125rem', fontWeight: 600,
-                                    color: '#f59e0b', textAlign: 'left',
-                                }}
-                                onMouseEnter={e => e.target.style.background = 'rgba(245, 158, 11, 0.08)'}
-                                onMouseLeave={e => e.target.style.background = 'none'}>
-                                ⏳ PDF Belum Diterima
-                            </button>
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            <div className="modern-table-wrapper">
-                <div style={{ overflowX: 'auto' }}>
-                    <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
-                        <table className="modern-table">
+            {/* ── Table Card Container (Viewport-Filling & Compact Rows) ── */}
+            <div
+                className="modern-table-wrapper"
+                style={{
+                    background: '#ffffff',
+                    borderRadius: '12px',
+                    border: '1px solid #eef0f6',
+                    boxShadow: '0 2px 10px rgba(0,0,0,0.02)',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    flexDirection: 'column',
+                }}
+            >
+                <div style={{ overflowX: 'auto', flex: 1 }}>
+                    <div style={{
+                        maxHeight: isMobile ? 'calc(100vh - 225px)' : 'calc(100vh - 170px)',
+                        minHeight: isMobile ? '340px' : '480px',
+                        overflowY: 'auto',
+                    }}>
+                        <table className="modern-table compact-table" style={{ width: '100%', minWidth: isMobile ? '700px' : '100%' }}>
                             <thead>
                                 <tr>
-                                    <th style={{ width: '3rem' }}>No</th>
+                                    <th style={{ width: '2.5rem', textAlign: 'center' }}>No</th>
                                     {columns.map(col => {
                                         const uniqueValues = filterPopupOpen === col ? getUniqueValuesForColumn(col) : [];
                                         const selectedValues = columnFilters[col] || new Set();
                                         const isFilterActive = selectedValues.size > 0;
+                                        const isNum = ['HPP', 'PENCAIRAN', 'LABA', 'AFFILIASI', 'PEMBAYARAN CS', 'Kerugian'].includes(col);
+                                        const isCent = ['QTT', 'STATUS ORDER', 'TERKIRIM', 'Verifikasi Paket'].includes(col);
                                         return (
-                                            <th key={col} style={{ position: 'relative' }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                                    <span onClick={() => requestSort(col)} style={{ cursor: 'pointer', flex: 1, userSelect: 'none' }}>{colLabel(col)}</span>
+                                            <th key={col} style={{ position: 'relative', textAlign: isNum ? 'right' : isCent ? 'center' : 'left' }}>
+                                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem', justifyContent: isNum ? 'flex-end' : isCent ? 'center' : 'flex-start' }}>
+                                                    <span onClick={() => requestSort(col)} style={{ cursor: 'pointer', userSelect: 'none' }}>{colLabel(col)}</span>
                                                     <button type="button" onClick={e => { e.stopPropagation(); setFilterPopupOpen(filterPopupOpen === col ? null : col); }}
-                                                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: isFilterActive ? '#a78bfa' : 'var(--text-tertiary)' }}>
-                                                        <Filter size={11} />
+                                                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: isFilterActive ? '#7c3aed' : 'var(--text-tertiary)' }}>
+                                                        <Filter size={10} />
                                                     </button>
                                                     <SortIcon columnKey={col} />
                                                 </div>
@@ -875,11 +1011,11 @@ export default function RangkumanTransaksi({ isHidden = false }) {
                             </thead>
                             <tbody>
                                 {effectiveLoading ? (
-                                    Array.from({ length: 10 }).map((_, i) => (
+                                    Array.from({ length: 14 }).map((_, i) => (
                                         <tr key={`skel-${i}`}>
-                                            <td><div className="skeleton" style={{ height: '1rem', width: '1.5rem' }}>&nbsp;</div></td>
+                                            <td style={{ textAlign: 'center' }}><div className="skeleton" style={{ height: '0.85rem', width: '1.25rem', margin: '0 auto' }}>&nbsp;</div></td>
                                             {columns.map(col => (
-                                                <td key={col}><div className="skeleton" style={{ height: '1rem', width: `${40 + Math.random() * 60}%` }}>&nbsp;</div></td>
+                                                <td key={col}><div className="skeleton" style={{ height: '0.85rem', width: `${40 + Math.random() * 60}%` }}>&nbsp;</div></td>
                                             ))}
                                         </tr>
                                     ))
@@ -897,23 +1033,36 @@ export default function RangkumanTransaksi({ isHidden = false }) {
                                         const pageData = sortedData.slice(startIdx, startIdx + rowsPerPage);
                                         return pageData.map((row, i) => (
                                             <tr key={startIdx + i}>
-                                                <td style={{ fontWeight: 600, color: 'var(--text-tertiary)' }}>{startIdx + i + 1}</td>
+                                                <td style={{ fontWeight: 600, color: 'var(--text-tertiary)', textAlign: 'center', width: '2.5rem' }}>{startIdx + i + 1}</td>
                                                 {columns.map(col => {
+                                                    const isNum = ['HPP', 'PENCAIRAN', 'LABA', 'AFFILIASI', 'PEMBAYARAN CS', 'Kerugian'].includes(col);
+                                                    const isCent = ['QTT', 'STATUS ORDER', 'TERKIRIM', 'Verifikasi Paket'].includes(col);
+                                                    const cellAlign = isNum ? 'right' : isCent ? 'center' : 'left';
+                                                    const numStyle = isNum ? { textAlign: 'right', fontVariantNumeric: 'tabular-nums' } : {};
+
                                                     if (col === 'ORDER ID') {
                                                         return (
                                                             <td key={col} title="Klik untuk detail"
                                                                 onClick={() => setSelectedRow(row)}
-                                                                style={{ cursor: 'pointer', color: '#a78bfa', fontWeight: 600, textDecoration: 'underline', textDecorationColor: 'rgba(167,139,250,0.3)' }}
-                                                                onMouseEnter={e => e.currentTarget.style.color = '#c4b5fd'}
-                                                                onMouseLeave={e => e.currentTarget.style.color = '#a78bfa'}>
+                                                                style={{
+                                                                    cursor: 'pointer',
+                                                                    color: '#7c3aed',
+                                                                    fontWeight: 700,
+                                                                    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                                                                    fontSize: '0.725rem',
+                                                                    letterSpacing: '-0.02em',
+                                                                    whiteSpace: 'nowrap',
+                                                                }}
+                                                                onMouseEnter={e => e.currentTarget.style.color = '#a78bfa'}
+                                                                onMouseLeave={e => e.currentTarget.style.color = '#7c3aed'}>
                                                                 {row[col]}
                                                             </td>
                                                         );
                                                     }
                                                     if (col === 'Verifikasi Paket') {
-                                                        if (typeof row[col] === 'string') return <td key={col} title={row[col]}>{row[col]}</td>;
-                                                        if (typeof row[col] === 'object' && row[col] !== null && 'jsx' in row[col]) return <td key={col}>{row[col].jsx}</td>;
-                                                        return <td key={col}>-</td>;
+                                                        if (typeof row[col] === 'string') return <td key={col} title={row[col]} style={{ textAlign: 'center' }}>{row[col]}</td>;
+                                                        if (typeof row[col] === 'object' && row[col] !== null && 'jsx' in row[col]) return <td key={col} style={{ textAlign: 'center' }}>{row[col].jsx}</td>;
+                                                        return <td key={col} style={{ textAlign: 'center' }}>-</td>;
                                                     }
                                                     if (col && typeof col === 'string' && col.trim().toLowerCase() === 'resi') {
                                                         const resiVal = row['Resi'] || row['RESI'] || row[col];
@@ -921,29 +1070,35 @@ export default function RangkumanTransaksi({ isHidden = false }) {
                                                             return (
                                                                 <td key={col} title="Tampilkan QR Code"
                                                                     onClick={(e) => { e.stopPropagation(); setQrPopupResi(resiVal.toString().trim()); }}
-                                                                    style={{ cursor: 'pointer', color: '#818cf8', fontWeight: 600, textDecoration: 'underline', textDecorationColor: 'rgba(129,140,248,0.3)' }}
-                                                                    onMouseEnter={e => e.currentTarget.style.color = '#c4b5fd'}
-                                                                    onMouseLeave={e => e.currentTarget.style.color = '#818cf8'}>
+                                                                    style={{
+                                                                        cursor: 'pointer',
+                                                                        color: '#2563eb',
+                                                                        fontWeight: 600,
+                                                                        fontFamily: 'ui-monospace, monospace',
+                                                                        fontSize: '0.725rem',
+                                                                    }}
+                                                                    onMouseEnter={e => e.currentTarget.style.color = '#60a5fa'}
+                                                                    onMouseLeave={e => e.currentTarget.style.color = '#2563eb'}>
                                                                     {resiVal}
                                                                 </td>
                                                             );
                                                         }
                                                     }
                                                     if (col === 'STATUS ORDER' || col === 'TERKIRIM') {
-                                                        return <td key={col} title={row[col]} style={getStatusBadgeStyle(row[col])}>{row[col]}</td>;
+                                                        return <td key={col} title={row[col]} style={{ textAlign: 'center', ...getStatusBadgeStyle(row[col]) }}>{row[col]}</td>;
                                                     }
-                                                    if (col === 'PROFIT') {
+                                                    if (col === 'LABA' || col === 'PROFIT') {
                                                         const profitVal = row[col];
-                                                        let profitStyle = {};
+                                                        let profitStyle = { textAlign: 'right', fontVariantNumeric: 'tabular-nums' };
                                                         if (profitVal && profitVal.startsWith && profitVal.startsWith('Rp')) {
                                                             const num = parseFloat(profitVal.replace(/[^0-9.-]+/g, ''));
-                                                            if (!isNaN(num)) profitStyle = { color: num >= 0 ? '#34d399' : '#f87171', fontWeight: 600 };
-                                                        } else if (profitVal === 'CANCEL') profitStyle = { color: '#f87171', fontWeight: 600 };
-                                                        else if (profitVal === 'Return' || profitVal === 'Gagal Kirim') profitStyle = { color: '#fbbf24', fontWeight: 600 };
-                                                        else if (profitVal === 'Dana Belum Diterima') profitStyle = { color: '#60a5fa', fontWeight: 600 };
+                                                            if (!isNaN(num)) profitStyle = { ...profitStyle, color: num >= 0 ? '#10b981' : '#ef4444', fontWeight: 700 };
+                                                        } else if (profitVal === 'CANCEL') profitStyle = { ...profitStyle, color: '#ef4444', fontWeight: 600 };
+                                                        else if (profitVal === 'Return' || profitVal === 'Gagal Kirim') profitStyle = { ...profitStyle, color: '#f59e0b', fontWeight: 600 };
+                                                        else if (profitVal === 'Dana Belum Diterima') profitStyle = { ...profitStyle, color: '#60a5fa', fontWeight: 600 };
                                                         return <td key={col} title={row[col]} style={profitStyle}>{row[col]}</td>;
                                                     }
-                                                    return <td key={col} title={row[col]}>{row[col]}</td>;
+                                                    return <td key={col} title={row[col]} style={{ textAlign: cellAlign, ...numStyle }}>{row[col]}</td>;
                                                 })}
                                             </tr>
                                         ));
@@ -953,70 +1108,93 @@ export default function RangkumanTransaksi({ isHidden = false }) {
                         </table>
                     </div>
                 </div>
-            </div>
 
-            {/* Pagination Controls */}
-            {(() => {
-                const totalPages = Math.max(1, Math.ceil(sortedData.length / rowsPerPage));
-                const safePage = Math.min(currentPage, totalPages);
-                const startIdx = (safePage - 1) * rowsPerPage;
-                const endIdx = Math.min(startIdx + rowsPerPage, sortedData.length);
-                const maxButtons = 7;
-                let startPage = Math.max(1, safePage - Math.floor(maxButtons / 2));
-                let endPage = Math.min(totalPages, startPage + maxButtons - 1);
-                if (endPage - startPage + 1 < maxButtons) startPage = Math.max(1, endPage - maxButtons + 1);
-                const pageButtons = [];
-                for (let p = startPage; p <= endPage; p++) pageButtons.push(p);
+                {/* ── Compact Pagination Integrated Footer ── */}
+                {(() => {
+                    const totalPages = Math.max(1, Math.ceil(sortedData.length / rowsPerPage));
+                    const safePage = Math.min(currentPage, totalPages);
+                    const startIdx = (safePage - 1) * rowsPerPage;
+                    const endIdx = Math.min(startIdx + rowsPerPage, sortedData.length);
+                    const maxButtons = isMobile ? 3 : 7;
+                    let startPage = Math.max(1, safePage - Math.floor(maxButtons / 2));
+                    let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+                    if (endPage - startPage + 1 < maxButtons) startPage = Math.max(1, endPage - maxButtons + 1);
+                    const pageButtons = [];
+                    for (let p = startPage; p <= endPage; p++) pageButtons.push(p);
 
-                return (
-                    <div style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap',
-                        gap: '0.75rem', marginTop: '1rem', padding: '0.75rem 1rem',
-                        background: 'var(--bg-glass)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)',
-                    }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                            <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>Tampilkan</span>
-                            <select value={rowsPerPage} onChange={e => { setRowsPerPage(Number(e.target.value)); setCurrentPage(1); }}
-                                style={{
-                                    padding: '0.25rem 0.5rem', fontSize: '0.8125rem', fontWeight: 600,
-                                    borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)',
-                                    background: 'var(--bg-glass)', color: 'var(--text-secondary)', cursor: 'pointer',
-                                }}>
-                                {[10, 20, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}
-                            </select>
-                            <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                                | {sortedData.length > 0 ? `${startIdx + 1}–${endIdx}` : '0'} dari {sortedData.length.toLocaleString('id-ID')} transaksi
-                            </span>
-                        </div>
-                        {totalPages > 1 && (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                <button type="button" disabled={safePage <= 1} onClick={() => setCurrentPage(1)}
-                                    style={{ padding: '0.375rem 0.625rem', fontSize: '0.75rem', fontWeight: 600, borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)', background: 'var(--bg-glass)', color: safePage <= 1 ? 'var(--text-tertiary)' : 'var(--text-secondary)', cursor: safePage <= 1 ? 'default' : 'pointer', opacity: safePage <= 1 ? 0.5 : 1 }}>
-                                    «
-                                </button>
-                                <button type="button" disabled={safePage <= 1} onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                                    style={{ padding: '0.375rem 0.625rem', fontSize: '0.75rem', fontWeight: 600, borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)', background: 'var(--bg-glass)', color: safePage <= 1 ? 'var(--text-tertiary)' : 'var(--text-secondary)', cursor: safePage <= 1 ? 'default' : 'pointer', opacity: safePage <= 1 ? 0.5 : 1 }}>
-                                    ‹
-                                </button>
-                                {pageButtons.map(p => (
-                                    <button key={p} type="button" onClick={() => setCurrentPage(p)}
-                                        style={{ padding: '0.375rem 0.625rem', fontSize: '0.75rem', fontWeight: 600, borderRadius: 'var(--radius-sm)', border: p === safePage ? '1px solid var(--accent-primary)' : '1px solid var(--border-subtle)', background: p === safePage ? 'var(--accent-primary)' : 'var(--bg-glass)', color: p === safePage ? '#fff' : 'var(--text-secondary)', cursor: 'pointer' }}>
-                                        {p}
-                                    </button>
-                                ))}
-                                <button type="button" disabled={safePage >= totalPages} onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                                    style={{ padding: '0.375rem 0.625rem', fontSize: '0.75rem', fontWeight: 600, borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)', background: 'var(--bg-glass)', color: safePage >= totalPages ? 'var(--text-tertiary)' : 'var(--text-secondary)', cursor: safePage >= totalPages ? 'default' : 'pointer', opacity: safePage >= totalPages ? 0.5 : 1 }}>
-                                    ›
-                                </button>
-                                <button type="button" disabled={safePage >= totalPages} onClick={() => setCurrentPage(totalPages)}
-                                    style={{ padding: '0.375rem 0.625rem', fontSize: '0.75rem', fontWeight: 600, borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)', background: 'var(--bg-glass)', color: safePage >= totalPages ? 'var(--text-tertiary)' : 'var(--text-secondary)', cursor: safePage >= totalPages ? 'default' : 'pointer', opacity: safePage >= totalPages ? 0.5 : 1 }}>
-                                    »
-                                </button>
+                    return (
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            flexWrap: 'wrap',
+                            gap: '0.4rem',
+                            padding: isMobile ? '0.35rem 0.6rem' : '0.4rem 0.85rem',
+                            background: '#fcfdfe',
+                            borderTop: '1px solid #eef0f6',
+                            fontSize: isMobile ? '0.7rem' : '0.75rem',
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                                <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Tampilkan</span>
+                                <select
+                                    value={rowsPerPage}
+                                    onChange={e => { setRowsPerPage(Number(e.target.value)); setCurrentPage(1); }}
+                                    style={{
+                                        padding: '2px 5px',
+                                        height: '25px',
+                                        fontSize: '0.735rem',
+                                        fontWeight: 600,
+                                        borderRadius: '6px',
+                                        border: '1px solid #e2e8f0',
+                                        background: '#ffffff',
+                                        color: 'var(--text-primary)',
+                                        cursor: 'pointer',
+                                    }}
+                                >
+                                    {[20, 50, 100, 200].map(n => <option key={n} value={n}>{n}</option>)}
+                                </select>
+                                <span style={{ color: 'var(--text-tertiary)' }}>
+                                    | {sortedData.length > 0 ? `${startIdx + 1}–${endIdx}` : '0'} dari <strong style={{ color: 'var(--text-primary)' }}>{sortedData.length.toLocaleString('id-ID')}</strong>
+                                </span>
                             </div>
-                        )}
-                    </div>
-                );
-            })()}
+
+                            {totalPages > 1 && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                    <button type="button" disabled={safePage <= 1} onClick={() => setCurrentPage(1)}
+                                        style={{ height: 25, minWidth: 25, padding: '0 4px', fontSize: '0.7rem', fontWeight: 700, borderRadius: '5px', border: '1px solid #e2e8f0', background: '#ffffff', color: safePage <= 1 ? 'var(--text-tertiary)' : 'var(--text-secondary)', cursor: safePage <= 1 ? 'default' : 'pointer', opacity: safePage <= 1 ? 0.4 : 1 }}>
+                                        «
+                                    </button>
+                                    <button type="button" disabled={safePage <= 1} onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                        style={{ height: 25, minWidth: 25, padding: '0 4px', fontSize: '0.7rem', fontWeight: 700, borderRadius: '5px', border: '1px solid #e2e8f0', background: '#ffffff', color: safePage <= 1 ? 'var(--text-tertiary)' : 'var(--text-secondary)', cursor: safePage <= 1 ? 'default' : 'pointer', opacity: safePage <= 1 ? 0.4 : 1 }}>
+                                        ‹
+                                    </button>
+                                    {pageButtons.map(p => (
+                                        <button key={p} type="button" onClick={() => setCurrentPage(p)}
+                                            style={{
+                                                height: 25, minWidth: 25, padding: '0 5px', fontSize: '0.725rem', fontWeight: 700,
+                                                borderRadius: '5px',
+                                                border: p === safePage ? '1px solid #7c3aed' : '1px solid #e2e8f0',
+                                                background: p === safePage ? '#7c3aed' : '#ffffff',
+                                                color: p === safePage ? '#ffffff' : 'var(--text-secondary)',
+                                                cursor: 'pointer',
+                                            }}>
+                                            {p}
+                                        </button>
+                                    ))}
+                                    <button type="button" disabled={safePage >= totalPages} onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                        style={{ height: 25, minWidth: 25, padding: '0 4px', fontSize: '0.7rem', fontWeight: 700, borderRadius: '5px', border: '1px solid #e2e8f0', background: '#ffffff', color: safePage >= totalPages ? 'var(--text-tertiary)' : 'var(--text-secondary)', cursor: safePage >= totalPages ? 'default' : 'pointer', opacity: safePage >= totalPages ? 0.4 : 1 }}>
+                                        ›
+                                    </button>
+                                    <button type="button" disabled={safePage >= totalPages} onClick={() => setCurrentPage(totalPages)}
+                                        style={{ height: 25, minWidth: 25, padding: '0 4px', fontSize: '0.7rem', fontWeight: 700, borderRadius: '5px', border: '1px solid #e2e8f0', background: '#ffffff', color: safePage >= totalPages ? 'var(--text-tertiary)' : 'var(--text-secondary)', cursor: safePage >= totalPages ? 'default' : 'pointer', opacity: safePage >= totalPages ? 0.4 : 1 }}>
+                                        »
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    );
+                })()}
+            </div>
 
             {/* QR Code Popup */}
             {qrPopupResi && (

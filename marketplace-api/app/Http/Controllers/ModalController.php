@@ -82,8 +82,14 @@ class ModalController extends Controller
     public function index(Request $request)
     {
         $storeId = $request->query('store_id');
-        $query = DB::table('modal_values')->select('seller_sku', 'sku_id', 'variation', 'value');
-        if ($storeId) $query->where('store_id', $storeId);
+        $query = DB::table('modal_values')->select('store_id', 'seller_sku', 'sku_id', 'variation', 'value');
+        if ($storeId) {
+            // Ambil data spesifik store_id ATAU fallback ke nilai default (store_id IS NULL)
+            $query->where(function ($q) use ($storeId) {
+                $q->where('store_id', $storeId)
+                  ->orWhereNull('store_id');
+            })->orderByRaw('CASE WHEN store_id IS NOT NULL THEN 1 ELSE 0 END ASC');
+        }
         $rows = $query->get();
 
         $result = [];
@@ -93,6 +99,7 @@ class ModalController extends Controller
             } else {
                 $key = $row->seller_sku;
             }
+            // Nilai toko yang spesifik (bukan NULL) akan menimpa nilai default jika ada duplikasi
             $result[$key] = (string) $row->value;
         }
         return response()->json($result);
