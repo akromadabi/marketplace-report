@@ -59,6 +59,7 @@ fi
 
 # ── 2. Pull Latest Code ─────────────────────────────────────────────
 step "2/8 — Mengambil kode terbaru dari Git"
+git config --global --add safe.directory "$PROJECT_DIR" 2>/dev/null || true
 git fetch origin master
 git reset --hard origin/master
 success "Kode berhasil diperbarui ke: $(git log --oneline -1)"
