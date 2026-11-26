@@ -125,10 +125,11 @@ export default function VariationMultiSelect({
   return (
     <div
       ref={containerRef}
+      className={isOpen ? 'im-bulk-select-open' : ''}
       style={{
         position: 'relative',
         display: 'inline-block',
-        zIndex: isOpen ? 60 : 1,
+        zIndex: isOpen ? 100 : 1,
         ...style
       }}
     >
