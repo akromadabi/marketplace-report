@@ -136,6 +136,12 @@ export default function VariationMultiSelect({
         type="button"
         className={`im-bulk-select ${className}`}
         onClick={() => setIsOpen(prev => !prev)}
+        onMouseOver={e => {
+          if (!isOpen && isAll) e.currentTarget.style.borderColor = '#94a3b8';
+        }}
+        onMouseOut={e => {
+          if (!isOpen && isAll) e.currentTarget.style.borderColor = '#cbd5e1';
+        }}
         style={{
           display: 'inline-flex',
           alignItems: 'center',
@@ -146,12 +152,13 @@ export default function VariationMultiSelect({
           padding: '0 0.55rem',
           fontSize: '0.75rem',
           background: isAll ? '#ffffff' : 'rgba(108, 92, 231, 0.08)',
-          borderColor: isAll ? '#cbd5e1' : '#6c5ce7',
+          border: `1px solid ${isOpen ? '#6c5ce7' : isAll ? '#cbd5e1' : '#6c5ce7'}`,
+          borderRadius: '6px',
           color: isAll ? '#0f172a' : '#6c5ce7',
           fontWeight: isAll ? 500 : 700,
+          outline: 'none',
+          boxShadow: isOpen ? '0 0 0 2px rgba(108, 92, 231, 0.15)' : 'none',
           cursor: 'pointer',
-          borderRadius: '6px',
-          border: '1px solid',
           userSelect: 'none',
           whiteSpace: 'nowrap',
           transition: 'all 0.15s ease'
