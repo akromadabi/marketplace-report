@@ -293,6 +293,7 @@ function PromoShopee() {
   const [expandedSkus, setExpandedSkus] = useState(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [filterMode, setFilterMode] = useState('all');
+  const [retainedSkus, setRetainedSkus] = useState(() => new Set());
   const [isDirty, setIsDirty] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -393,6 +394,13 @@ function PromoShopee() {
       return a.sellerSku.localeCompare(b.sellerSku);
     });
   }, [products]);
+  const skuByRowId = useMemo(() => {
+    const map = new Map();
+    products.forEach(p => {
+      map.set(p.id, p.seller_sku || ('__NS__' + (p.product_name || '')));
+    });
+    return map;
+  }, [products]);
 
   // ─── Local value helpers ─────────────────────────────────────
   function getLocal(id, field) {
@@ -481,14 +489,14 @@ function PromoShopee() {
     }
     if (filterMode !== 'all') {
       if (filterMode === 'harga_empty' || filterMode === 'unfilled') {
-        items = items.filter(({ rows }) => rows.some(r => !(toRawNum(getLocal(r.id, 'harga_promo')) > 0)));
+        items = items.filter(({ sellerSku, rows }) => retainedSkus.has(sellerSku) || rows.some(r => !(toRawNum(getLocal(r.id, 'harga_promo')) > 0)));
       } else if (filterMode === 'stok_empty') {
-        items = items.filter(({ rows }) => rows.some(r => {
+        items = items.filter(({ sellerSku, rows }) => retainedSkus.has(sellerSku) || rows.some(r => {
           const v = getLocal(r.id, 'stok_promo');
           return v === null || v === '' || v === undefined;
         }));
       } else if (filterMode === 'batas_empty') {
-        items = items.filter(({ rows }) => rows.some(r => {
+        items = items.filter(({ sellerSku, rows }) => retainedSkus.has(sellerSku) || rows.some(r => {
           const v = getLocal(r.id, 'batas_pembelian');
           return v === null || v === '' || v === undefined;
         }));
@@ -529,7 +537,39 @@ function PromoShopee() {
       );
     }
     return items;
-  }, [grouped, searchQuery, filterMode, getFillStatus, failReasonFilters, failMap, ignoreZeroStock, localValues, products]);
+  }, [grouped, searchQuery, filterMode, getFillStatus, failReasonFilters, failMap, ignoreZeroStock, localValues, products, retainedSkus]);
+  // ─── Retained Completed Count for UX Refresh ───
+  const retainedCompletedCount = useMemo(() => {
+    if (filterMode === 'all' || retainedSkus.size === 0) return 0;
+    let count = 0;
+    grouped.forEach(({ sellerSku, rows }) => {
+      if (!retainedSkus.has(sellerSku)) return;
+      if (filterMode === 'harga_empty' || filterMode === 'unfilled') {
+        const anyEmpty = rows.some(r => !(toRawNum(getLocal(r.id, 'harga_promo')) > 0));
+        if (!anyEmpty) count++;
+      } else if (filterMode === 'stok_empty') {
+        const anyEmpty = rows.some(r => {
+          const v = getLocal(r.id, 'stok_promo');
+          return v === null || v === '' || v === undefined;
+        });
+        if (!anyEmpty) count++;
+      } else if (filterMode === 'batas_empty') {
+        const anyEmpty = rows.some(r => {
+          const v = getLocal(r.id, 'batas_pembelian');
+          return v === null || v === '' || v === undefined;
+        });
+        if (!anyEmpty) count++;
+      } else if (filterMode === 'incomplete') {
+        const anyIncomplete = rows.some(r => {
+          const h = toRawNum(getLocal(r.id, 'harga_promo')) > 0;
+          const s = getLocal(r.id, 'stok_promo');
+          return !h || s === null || s === '' || s === undefined;
+        });
+        if (!anyIncomplete) count++;
+      }
+    });
+    return count;
+  }, [grouped, filterMode, retainedSkus, localValues, products]);
 
   // ─── Templates API ────────────────────────────────────────────────
   const loadTemplates = useCallback(async () => {
@@ -764,6 +804,12 @@ function PromoShopee() {
   }
 
   function executeApplyCardBulk(sellerSku, targets, harga, stok, batas, stockMode = 'rata', selections = []) {
+    setRetainedSkus(prev => {
+      if (prev.has(sellerSku)) return prev;
+      const next = new Set(prev);
+      next.add(sellerSku);
+      return next;
+    });
     let filledCount = 0;
     let skippedCount = 0;
     const targetNum = stok !== '' ? Number(stok) : null;
@@ -958,6 +1004,15 @@ function PromoShopee() {
 
   // Direct-set a single localValues field (used by saran harga)
   function setLocalField(id, field, value) {
+    const sku = skuByRowId.get(id);
+    if (sku) {
+      setRetainedSkus(prev => {
+        if (prev.has(sku)) return prev;
+        const next = new Set(prev);
+        next.add(sku);
+        return next;
+      });
+    }
     setLocalValues(prev => {
       const cur = prev[id] || {};
       return { ...prev, [id]: { ...cur, [field]: value } };
@@ -1055,7 +1110,8 @@ function PromoShopee() {
     // Save berhasil — baru clear local edits dan reload
     setLocalValues({});
     setIsDirty(false);
-    setSaveSuccess(true);
+      setRetainedSkus(new Set());
+      setSaveSuccess(true);
     try { await loadProducts(); } catch { /* reload gagal tapi data sudah tersimpan */ }
     setIsSaving(false);
     setTimeout(() => setSaveSuccess(false), 2000);
@@ -1427,6 +1483,11 @@ function PromoShopee() {
                   style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.375rem 0.875rem', cursor: 'pointer', transition: 'background 0.1s' }}
                   onMouseOver={e => e.currentTarget.style.background = 'var(--bg-glass-hover)'}
                   onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+                  onClick={() => {
+                    setFilterMode(opt.key);
+                    setRetainedSkus(new Set());
+                    setShowFilterMenu(false);
+                  }}
                 >
                   <input
                     type="radio" name="filterMode"
@@ -1461,6 +1522,33 @@ function PromoShopee() {
             </div>
           )}
         </div>
+
+{retainedCompletedCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setRetainedSkus(new Set())}
+            title="Segarkan daftar untuk menyaring produk yang sudah selesai diisi"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              padding: '0.4rem 0.75rem',
+              borderRadius: 'var(--radius-md)',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              background: '#ecfdf5',
+              color: '#059669',
+              border: '1px solid #a7f3d0',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+              flexShrink: 0
+            }}
+          >
+            <RefreshCw size={12} />
+            <span>{retainedCompletedCount} selesai · Segarkan</span>
+          </button>
+        )}
 
         {/* ── Stok Masal ── */}
         <button
@@ -1890,7 +1978,7 @@ function PromoShopee() {
             <p style={{ marginTop: '0.5rem' }}>
               {products.length === 0 ? 'Belum ada produk. Upload Sales Information dulu.' : 'Tidak ada SKU yang cocok.'}
             </p>
-            {searchQuery && <button className="btn-secondary" style={{ marginTop: '0.5rem', fontSize: '0.8125rem' }} onClick={() => { setSearchQuery(''); setFilterMode('all'); }}>Reset Filter</button>}
+            {searchQuery && <button className="btn-secondary" style={{ marginTop: '0.5rem', fontSize: '0.8125rem' }} onClick={() => { setSearchQuery(''); setFilterMode('all'); setRetainedSkus(new Set()); }}>Reset Filter</button>}
           </div>
         ) : filteredGroups.map(({ sellerSku, noSku, productName, rows }) => {
           const isExpanded = expandedSkus.has(sellerSku);

@@ -380,12 +380,12 @@ function InputModal() {
       items = items.filter(({ sellerSku, variations }) => {
         const status = getSkuFillStatus(sellerSku, variations);
         if (filterMode === 'filled') return status === 'filled';
-        if (filterMode === 'unfilled') return status === 'unfilled' || status === 'partial';
+        if (filterMode === 'unfilled') return status === 'unfilled' || status === 'partial' || variations.some(v => recentlyFilledKeys.has(sellerSku + '||' + v.skuId + '||' + v.variation)) || recentlyFilledKeys.has(sellerSku);
         return true;
       });
     }
     return items;
-  }, [groupedBySellerSku, searchQuery, filterMode, getSkuFillStatus]);
+  }, [groupedBySellerSku, searchQuery, filterMode, getSkuFillStatus, recentlyFilledKeys]);
 
   // Channel icon helper
   function getChannelIcon(sellerSku, variations) {
