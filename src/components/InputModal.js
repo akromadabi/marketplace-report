@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useApiData, useModalValues } from '../hooks/useApiData';
 import { useStore } from '../contexts/StoreContext';
+import VariationMultiSelect, { isVarMatch, formatDisplayName } from './VariationMultiSelect';
 
 function InputModal() {
   const { activeStoreId } = useStore();
@@ -141,6 +142,10 @@ function InputModal() {
         variationTypes.push({ index: i, values: Array.from(vals).sort() });
       }
       return variationTypes;
+    }
+    const distinct = Array.from(new Set(allVariations.map(v => (v || '').trim()).filter(Boolean))).sort();
+    if (distinct.length > 1) {
+      return [{ index: 0, values: distinct }];
     }
     return [];
   }
@@ -311,7 +316,7 @@ function InputModal() {
           let match = true;
           for (let i = 0; i < variationTypes.length; i++) {
             const sel = selections[i] || 'Semua Variasi';
-            if (sel !== 'Semua Variasi' && sel !== parts[i]) { match = false; break; }
+            if (!isVarMatch(sel, parts[i])) { match = false; break; }
           }
           if (match) keysToUpdate.push(sellerSku + '||' + skuId + '||' + variation);
         }
@@ -366,6 +371,7 @@ function InputModal() {
       const q = searchQuery.toLowerCase();
       items = items.filter(({ sellerSku, productName }) =>
         sellerSku.toLowerCase().includes(q) ||
+        formatDisplayName(sellerSku).toLowerCase().includes(q) ||
         (productName && productName.toLowerCase().includes(q))
       );
     }
@@ -657,9 +663,10 @@ function InputModal() {
             const chInfo = getChannelIcon(sellerSku, variations);
             const fillStatus = getSkuFillStatus(sellerSku, variations);
             const isFlashSaved = flashSaved === sellerSku;
-            const displayName = noSku
+            const rawName = noSku
               ? (productName || sellerSku.replace('__NSKU__', ''))
               : sellerSku;
+            const displayName = formatDisplayName(rawName);
 
             return (
               <div
@@ -699,7 +706,12 @@ function InputModal() {
                             Tanpa SKU
                           </span>
                         )}
-                        <span className="im-sku-name">{displayName}</span>
+                        <span
+                          className="im-sku-name"
+                          title={sellerSku !== displayName ? `SKU: ${sellerSku}` : undefined}
+                        >
+                          {displayName}
+                        </span>
                         {fillStatus === 'filled' && (
                           <CheckCircle2 size={15} className="im-check" />
                         )}
@@ -783,15 +795,13 @@ function InputModal() {
                       <span className="im-bulk-label">Isi Masal:</span>
                       {variationTypes.length > 0 ? (
                         variationTypes.map(({ values }, idx) => (
-                          <select
+                          <VariationMultiSelect
                             key={idx}
-                            value={bulk.selections[idx] || 'Semua Variasi'}
-                            onChange={(e) => handleBulkDropdownChange(sellerSku, idx, e.target.value)}
-                            className="im-bulk-select"
-                          >
-                            <option value="Semua Variasi">Semua</option>
-                            {values.map(val => <option key={val} value={val}>{val}</option>)}
-                          </select>
+                            values={values}
+                            selected={bulk.selections[idx]}
+                            onChange={(vals) => handleBulkDropdownChange(sellerSku, idx, vals)}
+                            allLabel="Semua"
+                          />
                         ))
                       ) : null}
                       <input
@@ -835,7 +845,7 @@ function InputModal() {
                           if (parts.length !== variationTypes.length) return true;
                           for (let i = 0; i < variationTypes.length; i++) {
                             const sel = selections[i] || 'Semua Variasi';
-                            if (sel !== 'Semua Variasi' && sel !== parts[i]) return false;
+                            if (!isVarMatch(sel, parts[i])) return false;
                           }
                           return true;
                         }).map(({ skuId, variation }) => {

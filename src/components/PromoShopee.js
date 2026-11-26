@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useModalValues } from '../hooks/useApiData';
+import VariationMultiSelect, { isVarMatch, formatDisplayName } from './VariationMultiSelect';
 import {
   apiGetPromoShopeeValues as apiGetPromoValues,
   apiUploadPromoShopeeProducts as apiUploadPromoProducts,
@@ -55,6 +56,10 @@ function getVariationTypes(rows) {
       types.push({ index: i, values: Array.from(vals).sort() });
     }
     return types;
+  }
+  const distinct = Array.from(new Set(allVars.map(v => (v || '').trim()).filter(Boolean))).sort();
+  if (distinct.length > 1) {
+    return [{ index: 0, values: distinct }];
   }
   return [];
 }
@@ -711,7 +716,11 @@ function PromoShopee() {
     const varTypes = getVariationTypes(rows);
     const selections = bulk.selections || [];
 
+    const checkedRowIdsInGroup = rows.filter(r => selectedIds.has(r.id)).map(r => r.id);
+    const hasRowSelection = checkedRowIdsInGroup.length > 0;
+
     const targets = rows.filter(p => {
+      if (hasRowSelection && !selectedIds.has(p.id)) return false;
       if (varTypes.length === 0) return true;
       const varStr = p.variation_value || '';
       let parts = varStr.split(' / ');
@@ -720,10 +729,15 @@ function PromoShopee() {
       if (parts.length !== varTypes.length) return true;
       for (let i = 0; i < varTypes.length; i++) {
         const sel = selections[i] || 'Semua';
-        if (sel !== 'Semua' && sel !== parts[i]) return false;
+        if (!isVarMatch(sel, parts[i])) return false;
       }
       return true;
     });
+
+    if (targets.length === 0) {
+      alert('Tidak ada variasi yang cocok untuk diterapkan.');
+      return;
+    }
 
     if (bulk.stok !== '') {
       const targetNum = Number(bulk.stok);
@@ -1882,7 +1896,8 @@ function PromoShopee() {
           const isExpanded = expandedSkus.has(sellerSku);
           const fillStatus = getFillStatus(rows);
           const failReason = getFailReason(rows);
-          const displayName = noSku ? (productName || sellerSku.replace('__NS__', '')) : sellerSku;
+          const rawName = noSku ? (productName || sellerSku.replace('__NS__', '')) : sellerSku;
+          const displayName = formatDisplayName(rawName);
           const groupIds = rows.map(r => r.id);
           const allGroupSelected = groupIds.every(id => selectedIds.has(id));
           const someGroupSelected = groupIds.some(id => selectedIds.has(id));
@@ -1895,88 +1910,126 @@ function PromoShopee() {
           return (
             <div key={sellerSku} className={`im-card ${fillStatus === 'filled' ? 'im-card-filled' : ''} ${failReason ? 'im-card-invalid' : ''} ${isFlash ? 'im-card-flash' : ''}`}>
               {/* Card Header */}
-              <div className="im-card-header" style={{ gap: '0.5rem' }}>
-                {/* Checkbox */}
-                <button onClick={() => toggleSelectGroup(rows)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.125rem', flexShrink: 0, color: allGroupSelected ? '#6c5ce7' : someGroupSelected ? '#a78bfa' : 'var(--text-tertiary)' }}
-                >
-                  {allGroupSelected || someGroupSelected ? <CheckSquare size={15} /> : <Square size={15} />}
-                </button>
+              <div
+                className="im-card-header"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '0.75rem 1.15rem',
+                  gap: '0.75rem',
+                  cursor: rows.length > 1 ? 'pointer' : 'default',
+                  userSelect: 'none'
+                }}
+                onClick={() => {
+                  if (rows.length > 1) {
+                    setExpandedSkus(prev => {
+                      const next = new Set(prev);
+                      next.has(sellerSku) ? next.delete(sellerSku) : next.add(sellerSku);
+                      return next;
+                    });
+                  }
+                }}
+              >
+                {/* Left side: Checkbox + Name + Stock */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', minWidth: 0, flex: 1 }}>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); toggleSelectGroup(rows); }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0.125rem', flexShrink: 0, color: allGroupSelected ? '#6c5ce7' : someGroupSelected ? '#a78bfa' : 'var(--text-tertiary)', display: 'flex', alignItems: 'center' }}
+                  >
+                    {allGroupSelected || someGroupSelected ? <CheckSquare size={16} /> : <Square size={16} />}
+                  </button>
 
-                {/* Name */}
-                <div className="im-card-left" 
-                  style={{ flex: 1, minWidth: 0, cursor: rows.length > 1 ? 'pointer' : 'default' }}
-                  onClick={() => {
-                    if (rows.length > 1) {
-                      setExpandedSkus(prev => {
-                        const next = new Set(prev);
-                        next.has(sellerSku) ? next.delete(sellerSku) : next.add(sellerSku);
-                        return next;
-                      });
-                    }
-                  }}
-                >
-                  <div className="im-sku-info">
-                    <div className="im-sku-name">
-                      {noSku && <span style={{ background: 'linear-gradient(135deg,#f59e0b,#d97706)', color: '#fff', fontSize: '0.5625rem', fontWeight: 700, padding: '0.1rem 0.3rem', borderRadius: '0.2rem' }}>SKU-</span>}
-                      <span style={{ fontSize: noSku ? '0.75rem' : '0.8125rem' }}>{displayName}</span>
-                      {fillStatus === 'filled' && <CheckCircle2 size={13} className="im-check" />}
-                      {failReason && (
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem', background: 'rgba(239,68,68,0.1)', color: '#f87171', fontSize: '0.5625rem', fontWeight: 700, padding: '0.1rem 0.3rem', borderRadius: '0.2rem' }} title={failReason}>
-                          <AlertTriangle size={9} /> GAGAL
-                        </span>
-                      )}
-                      {totalStock > 0 && (
-                        <span style={{ fontSize: '0.625rem', color: 'var(--text-tertiary)', fontWeight: 500, marginLeft: '0.25rem' }}>
-                          · stok {totalStock.toLocaleString('id-ID')}
-                        </span>
-                      )}
-                    </div>
-                    {rows.length > 1 && (
-                      <button className="im-var-badge" onClick={() => {
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap', minWidth: 0 }}>
+                    {noSku && (
+                      <span style={{ background: 'linear-gradient(135deg,#f59e0b,#d97706)', color: '#fff', fontSize: '0.5625rem', fontWeight: 700, padding: '0.1rem 0.35rem', borderRadius: '0.25rem', letterSpacing: '0.02em' }}>
+                        SKU-
+                      </span>
+                    )}
+                    <span style={{ fontWeight: 700, fontSize: noSku ? '0.75rem' : '0.84rem', color: '#0f172a', letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {displayName}
+                    </span>
+                    {fillStatus === 'filled' && <CheckCircle2 size={14} className="im-check" />}
+                    {failReason && (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem', background: 'rgba(239,68,68,0.1)', color: '#f87171', fontSize: '0.6rem', fontWeight: 700, padding: '0.1rem 0.35rem', borderRadius: '0.25rem' }} title={failReason}>
+                        <AlertTriangle size={10} /> GAGAL
+                      </span>
+                    )}
+                    {totalStock > 0 && (
+                      <span style={{ fontSize: '0.6875rem', color: '#64748b', fontWeight: 500 }}>
+                        · stok {totalStock.toLocaleString('id-ID')}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Right side: Single var inputs OR Multi var badge */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+                  {rows.length === 1 ? (
+                    (() => {
+                      const singleReko = rows[0].saran_harga;
+                      return (
+                        <div style={{ display: 'flex', gap: '0.375rem', flexShrink: 0, alignItems: 'center' }}>
+                          <input type="text" inputMode="numeric" placeholder="Harga Promo" className="im-input" style={{ width: '7.5rem' }}
+                            value={localValues[rows[0].id]?.harga_promo !== undefined ? localValues[rows[0].id].harga_promo : fmtRp(rows[0].harga_promo || '')}
+                            onInput={e => onHargaChange(rows[0].id, e)}
+                          />
+                          <input type="text" inputMode="numeric" placeholder="Stok (∞)" className="im-input" style={{ width: '5.25rem' }}
+                            value={localValues[rows[0].id]?.stok_promo !== undefined ? localValues[rows[0].id].stok_promo : (rows[0].stok_promo != null ? rows[0].stok_promo : '')}
+                            onInput={e => onStokChange(rows[0].id, e)}
+                          />
+                          <input type="text" inputMode="numeric" placeholder="Batas" className="im-input" style={{ width: '4.5rem' }}
+                            value={localValues[rows[0].id]?.batas_pembelian !== undefined ? localValues[rows[0].id].batas_pembelian : (rows[0].batas_pembelian != null ? rows[0].batas_pembelian : '')}
+                            onInput={e => onBatasChange(rows[0].id, e)}
+                          />
+                          {singleReko && (
+                            <button
+                              type="button"
+                              onClick={() => applySaranHarga(rows)}
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem', padding: '0.25rem 0.5rem', background: 'rgba(108,92,231,0.1)', border: '1px solid rgba(108,92,231,0.3)', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: '0.625rem', fontWeight: 700, color: '#6c5ce7', whiteSpace: 'nowrap' }}
+                              title={`Saran harga: ${fmtRp(singleReko)}`}
+                            >
+                              💡 {fmtRp(singleReko)}
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })()
+                  ) : (
+                    <button
+                      type="button"
+                      className="im-var-badge"
+                      onClick={() => {
                         setExpandedSkus(prev => {
                           const next = new Set(prev);
                           next.has(sellerSku) ? next.delete(sellerSku) : next.add(sellerSku);
                           return next;
                         });
-                      }}>
-                        <Layers size={10} />{rows.length} variasi
-                        {isExpanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
-                      </button>
-                    )}
-                  </div>
+                      }}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                        padding: '0.3rem 0.75rem',
+                        background: isExpanded ? '#6c5ce7' : '#eef2ff',
+                        color: isExpanded ? '#ffffff' : '#6c5ce7',
+                        border: '1px solid',
+                        borderColor: isExpanded ? '#6c5ce7' : '#c7d2fe',
+                        borderRadius: '9999px',
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <Layers size={11} />
+                      <span>{rows.length} variasi</span>
+                      {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                    </button>
+                  )}
                 </div>
-
-                {/* Input direct (single var) */}
-                {rows.length === 1 && (() => {
-                  const singleReko = rows[0].saran_harga;
-                  return (
-                    <div style={{ display: 'flex', gap: '0.375rem', flexShrink: 0, alignItems: 'center' }}>
-                      <input type="text" inputMode="numeric" placeholder="Harga Promo" className="im-input" style={{ width: '7.5rem' }}
-                        value={localValues[rows[0].id]?.harga_promo !== undefined ? localValues[rows[0].id].harga_promo : fmtRp(rows[0].harga_promo || '')}
-                        onInput={e => onHargaChange(rows[0].id, e)}
-                      />
-                      <input type="text" inputMode="numeric" placeholder="Stok (∞)" className="im-input" style={{ width: '5.25rem' }}
-                        value={localValues[rows[0].id]?.stok_promo !== undefined ? localValues[rows[0].id].stok_promo : (rows[0].stok_promo != null ? rows[0].stok_promo : '')}
-                        onInput={e => onStokChange(rows[0].id, e)}
-                      />
-                      <input type="text" inputMode="numeric" placeholder="Batas" className="im-input" style={{ width: '4.5rem' }}
-                        value={localValues[rows[0].id]?.batas_pembelian !== undefined ? localValues[rows[0].id].batas_pembelian : (rows[0].batas_pembelian != null ? rows[0].batas_pembelian : '')}
-                        onInput={e => onBatasChange(rows[0].id, e)}
-                      />
-                      {singleReko && (
-                        <button
-                          onClick={() => applySaranHarga(rows)}
-                          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem', padding: '0.25rem 0.5rem', background: 'rgba(108,92,231,0.1)', border: '1px solid rgba(108,92,231,0.3)', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontSize: '0.625rem', fontWeight: 700, color: '#6c5ce7', whiteSpace: 'nowrap' }}
-                          title={`Saran harga: ${fmtRp(singleReko)}`}
-                        >
-                          💡 {fmtRp(singleReko)}
-                        </button>
-                      )}
-                    </div>
-                  );
-                })()}
-                {rows.length > 1 && !isExpanded && <span className="im-multi-label">Multi-variasi</span>}
               </div>
 
               {/* Fail detail — removed block, reason shown per variation row */}
@@ -1991,15 +2044,12 @@ function PromoShopee() {
 
                     {/* Variation dropdowns */}
                     {varTypes.map(({ values }, idx) => (
-                      <select
+                      <VariationMultiSelect
                         key={idx}
-                        value={bulk.selections[idx] || 'Semua'}
-                        onChange={e => setCardBulkSelection(sellerSku, idx, e.target.value)}
-                        className="im-bulk-select"
-                      >
-                        <option value="Semua">Semua</option>
-                        {values.map(val => <option key={val} value={val}>{val}</option>)}
-                      </select>
+                        values={values}
+                        selected={bulk.selections[idx]}
+                        onChange={vals => setCardBulkSelection(sellerSku, idx, vals)}
+                      />
                     ))}
 
                     {/* Harga input */}
@@ -2074,7 +2124,7 @@ function PromoShopee() {
                         if (parts.length !== varTypes.length) return true;
                         for (let i = 0; i < varTypes.length; i++) {
                           const sel = selections[i] || 'Semua';
-                          if (sel !== 'Semua' && sel !== parts[i]) return false;
+                          if (!isVarMatch(sel, parts[i])) return false;
                         }
                         return true;
                       })
