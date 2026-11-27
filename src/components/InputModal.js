@@ -6,9 +6,11 @@ import {
 } from 'lucide-react';
 import { useApiData, useModalValues } from '../hooks/useApiData';
 import { useStore } from '../contexts/StoreContext';
+import { useNotification } from '../contexts/NotificationContext';
 import VariationMultiSelect, { isVarMatch, formatDisplayName } from './VariationMultiSelect';
 
 function InputModal() {
+  const { addNotification } = useNotification();
   const { activeStoreId } = useStore();
   const { data: ordersData, loading: loadingOrders } = useApiData('skuCatalog', activeStoreId);
   const { modalValues, setModalValues, loading: loadingModal, saveAll } = useModalValues(activeStoreId);
@@ -93,6 +95,7 @@ function InputModal() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterMode, setFilterMode] = useState('all'); // all | filled | unfilled
   const [flashSaved, setFlashSaved] = useState(null);
+  const [appliedSkus, setAppliedSkus] = useState({});
   const [recentlyFilledKeys, setRecentlyFilledKeys] = useState(() => new Set());
   const [isDirty, setIsDirty] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -100,6 +103,14 @@ function InputModal() {
 
   // ─── Save all to DB ───────────────────────────────────────────────
   async function handleSaveAll() {
+    if (!isDirty && !isSaving) {
+      addNotification?.({
+        type: 'info',
+        message: 'Tidak ada perubahan baru untuk disimpan. Semua nilai HPP sudah tersimpan di database.',
+        duration: 3500
+      });
+      return;
+    }
     setIsSaving(true);
     try {
       const toSave = {};
@@ -110,9 +121,18 @@ function InputModal() {
       await saveAll(toSave);
       setIsDirty(false);
       setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 2000);
-    } catch {
-      // ignore
+      addNotification?.({
+        type: 'success',
+        message: '✓ Nilai HPP berhasil disimpan ke database!',
+        duration: 4000
+      });
+      setTimeout(() => setSaveSuccess(false), 2500);
+    } catch (err) {
+      addNotification?.({
+        type: 'error',
+        message: 'Gagal menyimpan HPP: ' + (err?.message || 'Terjadi kesalahan'),
+        duration: 5000
+      });
     }
     setIsSaving(false);
   }
@@ -285,7 +305,14 @@ function InputModal() {
 
   function applyBulkInput(sellerSku) {
     const bulk = bulkInputs[sellerSku];
-    if (!bulk || !bulk.value) return;
+    if (!bulk || !bulk.value) {
+      addNotification?.({
+        type: 'info',
+        message: 'Masukkan nilai HPP terlebih dahulu pada bar Isi Masal.',
+        duration: 3500
+      });
+      return;
+    }
     const variations = groupedBySellerSku.find(g => g.sellerSku === sellerSku)?.variations || [];
     if (variations.length === 0) return;
 
@@ -342,6 +369,14 @@ function InputModal() {
     // Flash saved feedback
     setFlashSaved(sellerSku);
     setTimeout(() => setFlashSaved(null), 1500);
+    setAppliedSkus(prev => ({ ...prev, [sellerSku]: true }));
+    setTimeout(() => setAppliedSkus(prev => ({ ...prev, [sellerSku]: false })), 2000);
+
+    addNotification?.({
+      type: 'success',
+      message: `✓ Nilai HPP diterapkan ke ${keysToUpdate.length} variasi pada "${sellerSku}". Klik "Simpan" di atas untuk menyimpan permanen.`,
+      duration: 3500
+    });
   }
 
   // ─── Computed Stats & Filtering ────────────────────────────────────

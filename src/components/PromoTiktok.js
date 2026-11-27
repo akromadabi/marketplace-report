@@ -19,6 +19,7 @@ import {
   apiGetFeeProfiles
 } from '../api';
 import { useStore } from '../contexts/StoreContext';
+import { useNotification } from '../contexts/NotificationContext';
 
 // ─── Format helpers ────────────────────────────────────────────────
 function fmtRp(val) {
@@ -183,6 +184,7 @@ function exportCampaign(rows, withStock, filename) {
 
 // ─── Main Component ────────────────────────────────────────────────
 function PromoTiktok() {
+  const { addNotification } = useNotification();
   const { activeStore } = useStore();
   const storeId = activeStore?.id || null;
   const fileInputRef = useRef(null);
@@ -226,6 +228,7 @@ function PromoTiktok() {
   // Per-card bulk state: { [sellerSku]: { selections: [], harga: '', stok: '' } }
   const [cardBulk, setCardBulk] = useState({});
   const [flashSku, setFlashSku] = useState(null);
+  const [appliedSkus, setAppliedSkus] = useState({});
   const [ignoreZeroStock, setIgnoreZeroStock] = useState(false);
   const [downloadConfirm, setDownloadConfirm] = useState(null); // { rows, skipped, withStock, filename }
 
@@ -464,7 +467,10 @@ function PromoTiktok() {
 
   const handleSaveTemplate = async (overrideName = null) => {
     const finalName = typeof overrideName === 'string' ? overrideName : templateName;
-    if (!finalName.trim()) return;
+    if (!finalName.trim()) {
+      addNotification?.({ type: 'info', message: 'Masukkan nama preset terlebih dahulu.' });
+      return;
+    }
 
     // Ambil hanya produk yang tampil berdasar filter aktif
     const visibleIds = new Set(filteredGroups.flatMap(g => g.rows.map(r => r.id)));
@@ -499,8 +505,17 @@ function PromoTiktok() {
       setSaveTemplateModal(false);
       setTemplateName('');
       loadTemplates();
+      addNotification?.({
+        type: 'success',
+        message: `✓ Preset "${finalName.trim()}" (${payload.length} produk) berhasil disimpan!`,
+        duration: 4000
+      });
     } catch (e) {
-      alert("Gagal simpan template: " + e.message);
+      addNotification?.({
+        type: 'error',
+        message: `Gagal menyimpan preset: ${e.message}`,
+        duration: 5000
+      });
     } finally {
       setIsSavingTemplate(false);
     }
@@ -584,8 +599,17 @@ function PromoTiktok() {
 
       setLocalValues(newLocalValues);
       setSelectedIds(newSelectedIds);
+      addNotification?.({
+        type: 'success',
+        message: `✓ Preset "${template.name}" berhasil dimuat ke tabel!`,
+        duration: 4000
+      });
     } catch (e) {
-      alert("Gagal load template: " + e.message);
+      addNotification?.({
+        type: 'error',
+        message: "Gagal load template: " + e.message,
+        duration: 5000
+      });
     } finally {
       setLoading(false);
     }
@@ -597,8 +621,17 @@ function PromoTiktok() {
     try {
       await apiDeleteCampaignTemplate(id);
       loadTemplates();
+      addNotification?.({
+        type: 'info',
+        message: 'Preset berhasil dihapus.',
+        duration: 3000
+      });
     } catch (e) {
-      alert("Gagal menghapus: " + e.message);
+      addNotification?.({
+        type: 'error',
+        message: "Gagal menghapus: " + e.message,
+        duration: 4000
+      });
     }
   };
 
@@ -625,7 +658,14 @@ function PromoTiktok() {
   // ─── Per-Card Bulk apply ─────────────────────────────────────
   function applyCardBulk(sellerSku, rows) {
     const bulk = cardBulk[sellerSku] || { selections: [], harga: '', stok: '' };
-    if (!bulk.harga && bulk.stok === '') return;
+    if (!bulk.harga && bulk.stok === '') {
+      addNotification?.({
+        type: 'info',
+        message: 'Silakan isi Harga Promo atau Stok terlebih dahulu pada bar Isi Masal.',
+        duration: 3500
+      });
+      return;
+    }
     const varTypes = getVariationTypes(rows);
     const selections = bulk.selections || [];
 
@@ -730,7 +770,15 @@ function PromoTiktok() {
     setCardBulk(prev => ({ ...prev, [sellerSku]: { selections, harga: '', stok: '' } }));
     setFlashSku(sellerSku);
     setTimeout(() => setFlashSku(null), 1500);
+    setAppliedSkus(prev => ({ ...prev, [sellerSku]: true }));
+    setTimeout(() => setAppliedSkus(prev => ({ ...prev, [sellerSku]: false })), 2000);
     setCardBulkStockConfirm(null);
+
+    addNotification?.({
+      type: 'success',
+      message: `✓ Nilai masal diterapkan ke ${targets.length} variasi pada "${sellerSku}". Klik "Simpan" di atas untuk menyimpan ke database.`,
+      duration: 3500
+    });
 
     if (stok !== '' && skippedCount > 0) {
       alert(`Stok promo untuk SKU "${sellerSku}" berhasil diterapkan:\n\n✓ ${filledCount} variasi diisi stok ${stok}\n✗ ${skippedCount} variasi dilewati/kosong karena stok real < ${stok}`);
@@ -847,10 +895,21 @@ function PromoTiktok() {
 
   // Apply saran harga from failMap to a list of rows
   function applySaranHarga(rows) {
+    let appliedCount = 0;
     rows.forEach(r => {
       const rekoPrice = extractRekoPrice(failMap.get(String(r.sku_id)));
-      if (rekoPrice) setLocalField(r.id, 'harga_promo', fmtRp(rekoPrice));
+      if (rekoPrice) {
+        setLocalField(r.id, 'harga_promo', fmtRp(rekoPrice));
+        appliedCount++;
+      }
     });
+    if (appliedCount > 0) {
+      addNotification?.({
+        type: 'success',
+        message: `✓ Saran harga diterapkan ke ${appliedCount} variasi.`,
+        duration: 3000
+      });
+    }
   }
 
   // ─── Upload ──────────────────────────────────────────────────
@@ -933,21 +992,42 @@ function PromoTiktok() {
 
   // ─── Save ────────────────────────────────────────────────────
   async function handleSave() {
+    if (!isDirty && !isSaving) {
+      addNotification?.({
+        type: 'info',
+        message: 'Tidak ada perubahan baru untuk disimpan. Semua data sudah tersimpan di database.',
+        duration: 3500
+      });
+      return;
+    }
     setIsSaving(true);
+    let countUpdates = 0;
     try {
       const updates = Object.entries(localValues).map(([id, vals]) => ({
         id: Number(id),
         ...('harga_promo' in vals ? { harga_promo: toRawNum(vals.harga_promo) } : {}),
         ...('stok_promo' in vals ? { stok_promo: vals.stok_promo !== '' ? toRawNum(vals.stok_promo) : null } : {}),
       }));
+      countUpdates = updates.length;
       if (updates.length > 0) await apiSavePromoBatch(updates, storeId);
       setLocalValues({});
       setIsDirty(false);
       setRetainedSkus(new Set());
       setSaveSuccess(true);
+      addNotification?.({
+        type: 'success',
+        message: `✓ Berhasil menyimpan ${countUpdates > 0 ? countUpdates + ' data promo' : 'perubahan'} ke database!`,
+        duration: 4500
+      });
       await loadProducts();
-      setTimeout(() => setSaveSuccess(false), 2000);
-    } catch (err) { alert('Gagal menyimpan: ' + err.message); }
+      setTimeout(() => setSaveSuccess(false), 2500);
+    } catch (err) {
+      addNotification?.({
+        type: 'error',
+        message: 'Gagal menyimpan: ' + err.message,
+        duration: 5000
+      });
+    }
     setIsSaving(false);
   }
 
@@ -1200,8 +1280,18 @@ function PromoTiktok() {
                       <button onClick={() => confirmLoadTemplate(t)} style={{ flex: 1, padding: '0.625rem 0.75rem', textAlign: 'left', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '0.8125rem', color: 'var(--text-primary)' }}>
                         {t.name}
                       </button>
-                      <button onClick={(e) => { e.stopPropagation(); setShowTemplateMenu(false); handleSaveTemplate(t.name); }} title="Timpa (Update) Preset Ini" style={{ padding: '0.625rem 0.4rem', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)', opacity: 0.8 }}
-                        onMouseOver={e => e.currentTarget.style.opacity = 1} onMouseOut={e => e.currentTarget.style.opacity = 0.8}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (window.confirm(`Perbarui preset "${t.name}" dengan data promo saat ini?`)) {
+                            setShowTemplateMenu(false);
+                            handleSaveTemplate(t.name);
+                          }
+                        }}
+                        title="Timpa (Update) Preset Ini"
+                        style={{ padding: '0.625rem 0.4rem', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)', opacity: 0.8 }}
+                        onMouseOver={e => e.currentTarget.style.opacity = 1}
+                        onMouseOut={e => e.currentTarget.style.opacity = 0.8}
                       >
                         <Save size={13} />
                       </button>
@@ -1243,10 +1333,26 @@ function PromoTiktok() {
           </div>
 
           {/* Save */}
-          <button className="btn-primary" onClick={handleSave} disabled={isSaving || !isDirty}
-            style={{ padding: '0.4rem 1rem', fontSize: '0.8125rem', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: '0.375rem', opacity: !isDirty && !saveSuccess ? 0.4 : 1, background: saveSuccess ? 'var(--gradient-success)' : undefined, transition: 'all 0.3s' }}
+          <button
+            className="btn-primary"
+            onClick={handleSave}
+            disabled={isSaving}
+            title={isDirty ? "Simpan perubahan ke database" : "Semua data sudah tersimpan (klik untuk cek status)"}
+            style={{
+              padding: '0.4rem 1rem',
+              fontSize: '0.8125rem',
+              borderRadius: 'var(--radius-md)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.375rem',
+              opacity: !isDirty && !saveSuccess ? 0.6 : 1,
+              background: saveSuccess ? 'var(--gradient-success)' : undefined,
+              boxShadow: isDirty ? '0 0 10px rgba(108, 92, 231, 0.4)' : undefined,
+              transition: 'all 0.3s',
+              cursor: isSaving ? 'wait' : 'pointer'
+            }}
           >
-            {isSaving ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Simpan...</>
+            {isSaving ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Menyimpan...</>
               : saveSuccess ? <><CheckCircle2 size={13} /> Tersimpan!</>
               : <><Save size={13} /> Simpan{isDirty ? ' •' : ''}</>}
           </button>
@@ -1646,8 +1752,7 @@ function PromoTiktok() {
               <button className="btn-primary" onClick={handleSaveTemplate} disabled={isSavingTemplate || !templateName.trim()}
                 style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', padding: '0.45rem 1rem', fontSize: '0.8125rem', fontWeight: 600 }}
               >
-                {isSavingTemplate ? <Loader2 size={13} className="spin" /> : <Save size={13} />}
-                Simpan
+                {isSavingTemplate ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Menyimpan...</> : <><Save size={13} /> Simpan</>}
               </button>
             </div>
           </div>
@@ -1905,9 +2010,13 @@ function PromoTiktok() {
                     <button
                       className="im-bulk-apply"
                       onClick={() => applyCardBulk(sellerSku, rows)}
-                      disabled={!bulk.harga && bulk.stok === ''}
+                      style={appliedSkus[sellerSku] ? { background: 'var(--gradient-success, #10b981)', color: '#fff' } : undefined}
                     >
-                      <Save size={13} /> Terapkan
+                      {appliedSkus[sellerSku] ? (
+                        <><CheckCircle2 size={13} /> Diterapkan!</>
+                      ) : (
+                        <><Save size={13} /> Terapkan</>
+                      )}
                     </button>
 
                     {/* Saran harga — di samping Terapkan, langsung ke semua variasi yg punya saran */}

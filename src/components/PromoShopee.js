@@ -1500,10 +1500,26 @@ function PromoShopee() {
           </div>
 
           {/* Save */}
-          <button className="btn-primary" onClick={handleSave} disabled={isSaving || !isDirty}
-            style={{ padding: '0.4rem 1rem', fontSize: '0.8125rem', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: '0.375rem', opacity: !isDirty && !saveSuccess ? 0.4 : 1, background: saveSuccess ? 'var(--gradient-success)' : undefined, transition: 'all 0.3s' }}
+          <button
+            className="btn-primary"
+            onClick={handleSave}
+            disabled={isSaving}
+            title={isDirty ? "Simpan perubahan ke database" : "Semua data sudah tersimpan (klik untuk cek status)"}
+            style={{
+              padding: '0.4rem 1rem',
+              fontSize: '0.8125rem',
+              borderRadius: 'var(--radius-md)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.375rem',
+              opacity: !isDirty && !saveSuccess ? 0.6 : 1,
+              background: saveSuccess ? 'var(--gradient-success)' : undefined,
+              boxShadow: isDirty ? '0 0 10px rgba(108, 92, 231, 0.4)' : undefined,
+              transition: 'all 0.3s',
+              cursor: isSaving ? 'wait' : 'pointer'
+            }}
           >
-            {isSaving ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Simpan...</>
+            {isSaving ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Menyimpan...</>
               : saveSuccess ? <><CheckCircle2 size={13} /> Tersimpan!</>
               : <><Save size={13} /> Simpan{isDirty ? ' •' : ''}</>}
           </button>
@@ -1998,8 +2014,7 @@ function PromoShopee() {
               <button className="btn-primary" onClick={handleSaveTemplate} disabled={isSavingTemplate || !templateName.trim()}
                 style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', padding: '0.45rem 1rem', fontSize: '0.8125rem', fontWeight: 600 }}
               >
-                {isSavingTemplate ? <Loader2 size={13} className="spin" /> : <Save size={13} />}
-                Simpan
+                {isSavingTemplate ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Menyimpan...</> : <><Save size={13} /> Simpan</>}
               </button>
             </div>
           </div>
@@ -2266,9 +2281,13 @@ function PromoShopee() {
                     <button
                       className="im-bulk-apply"
                       onClick={() => applyCardBulk(sellerSku, rows)}
-                      disabled={!bulk.harga && bulk.stok === '' && bulk.batas === ''}
+                      style={appliedSkus[sellerSku] ? { background: 'var(--gradient-success, #10b981)', color: '#fff' } : undefined}
                     >
-                      <Save size={13} /> Terapkan
+                      {appliedSkus[sellerSku] ? (
+                        <><CheckCircle2 size={13} /> Diterapkan!</>
+                      ) : (
+                        <><Save size={13} /> Terapkan</>
+                      )}
                     </button>
 
                     {/* Saran harga — di samping Terapkan, langsung ke semua variasi yg punya saran */}
