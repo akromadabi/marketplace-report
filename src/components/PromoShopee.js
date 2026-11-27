@@ -1447,8 +1447,18 @@ function PromoShopee() {
                       <button onClick={() => confirmLoadTemplate(t)} style={{ flex: 1, padding: '0.625rem 0.75rem', textAlign: 'left', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '0.8125rem', color: 'var(--text-primary)' }}>
                         {t.name}
                       </button>
-                      <button onClick={(e) => { e.stopPropagation(); setShowTemplateMenu(false); handleSaveTemplate(t.name); }} title="Timpa (Update) Preset Ini" style={{ padding: '0.625rem 0.4rem', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)', opacity: 0.8 }}
-                        onMouseOver={e => e.currentTarget.style.opacity = 1} onMouseOut={e => e.currentTarget.style.opacity = 0.8}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (window.confirm(`Perbarui preset "${t.name}" dengan data promo saat ini?`)) {
+                            setShowTemplateMenu(false);
+                            handleSaveTemplate(t.name);
+                          }
+                        }}
+                        title="Timpa (Update) Preset Ini"
+                        style={{ padding: '0.625rem 0.4rem', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)', opacity: 0.8 }}
+                        onMouseOver={e => e.currentTarget.style.opacity = 1}
+                        onMouseOut={e => e.currentTarget.style.opacity = 0.8}
                       >
                         <Save size={13} />
                       </button>
@@ -2376,4 +2386,19 @@ function PromoShopee() {
 
           <div style={{ width: '1px', height: '1.5rem', background: 'var(--border-medium)' }} />
 
-          <button onClick={() => { if (window.confirm(`Hapus ${selectedIds.size} produk?\nData akan dihapus pe
+          <button onClick={() => { if (window.confirm(`Hapus ${selectedIds.size} produk?\nData akan dihapus permanen dari database.`)) handleDelete(); }}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '2rem', padding: '0.4rem 1rem', cursor: 'pointer', fontSize: '0.8125rem', fontWeight: 600, color: '#ef4444', transition: 'all 0.2s' }}
+          >
+            {isDeleting ? <Loader2 size={14} className="spin" /> : <Trash2 size={14} />}
+            Hapus ({selectedIds.size})
+          </button>
+        </div>
+      )}
+
+
+
+    </div>
+  );
+}
+
+export default PromoShopee;
