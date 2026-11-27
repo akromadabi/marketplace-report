@@ -559,7 +559,8 @@ function InputModal() {
           <button
             className="btn-primary"
             onClick={handleSaveAll}
-            disabled={isSaving || (!isDirty && !saveSuccess)}
+            disabled={isSaving}
+            title={isDirty ? "Simpan perubahan HPP ke database" : "Semua nilai HPP sudah tersimpan (klik untuk cek status)"}
             style={{
               padding: '0.45rem 1.15rem',
               fontSize: '0.8125rem',
@@ -567,9 +568,11 @@ function InputModal() {
               display: 'flex',
               alignItems: 'center',
               gap: '0.375rem',
-              opacity: (!isDirty && !saveSuccess) ? 0.45 : 1,
+              opacity: (!isDirty && !saveSuccess) ? 0.6 : 1,
               background: saveSuccess ? 'var(--gradient-success)' : undefined,
+              boxShadow: isDirty ? '0 0 10px rgba(108, 92, 231, 0.4)' : undefined,
               transition: 'all 0.25s ease',
+              cursor: isSaving ? 'wait' : 'pointer'
             }}
           >
             {isSaving ? (
@@ -857,10 +860,13 @@ function InputModal() {
                       <button
                         className="im-bulk-apply"
                         onClick={() => applyBulkInput(sellerSku)}
-                        disabled={!bulk.value}
+                        style={appliedSkus[sellerSku] ? { background: 'var(--gradient-success, #10b981)', color: '#fff' } : undefined}
                       >
-                        <Check size={12} />
-                        Terapkan
+                        {appliedSkus[sellerSku] ? (
+                          <><CheckCircle2 size={12} /> Diterapkan!</>
+                        ) : (
+                          <><Check size={12} /> Terapkan</>
+                        )}
                       </button>
                     </div>
 
