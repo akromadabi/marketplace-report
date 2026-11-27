@@ -19,6 +19,7 @@ import {
   apiGetFeeProfiles
 } from '../api';
 import { useStore } from '../contexts/StoreContext';
+import { useNotification } from '../contexts/NotificationContext';
 
 // ─── Format helpers ────────────────────────────────────────────────
 function fmtRp(val) {
@@ -277,6 +278,7 @@ function exportCampaign(rows, withStock, filename, templateType = 'campaign') {
 
 // ─── Main Component ────────────────────────────────────────────────
 function PromoShopee() {
+  const { addNotification } = useNotification();
   const { activeStore } = useStore();
   const storeId = activeStore?.id || null;
   const fileInputRef = useRef(null);
@@ -321,6 +323,7 @@ function PromoShopee() {
   // Per-card bulk state: { [sellerSku]: { selections: [], harga: '', stok: '', batas: '' } }
   const [cardBulk, setCardBulk] = useState({});
   const [flashSku, setFlashSku] = useState(null);
+  const [appliedSkus, setAppliedSkus] = useState({});
   const [ignoreZeroStock, setIgnoreZeroStock] = useState(false);
   const [downloadConfirm, setDownloadConfirm] = useState(null); // { rows, skipped, withStock, filename }
 
@@ -588,7 +591,10 @@ function PromoShopee() {
 
   const handleSaveTemplate = async (overrideName = null) => {
     const finalName = typeof overrideName === 'string' ? overrideName : templateName;
-    if (!finalName.trim()) return;
+    if (!finalName.trim()) {
+      addNotification?.({ type: 'info', message: 'Masukkan nama preset terlebih dahulu.' });
+      return;
+    }
 
     // Ambil hanya produk yang tampil berdasar filter aktif
     const visibleIds = new Set(filteredGroups.flatMap(g => g.rows.map(r => r.id)));
@@ -624,8 +630,17 @@ function PromoShopee() {
       setSaveTemplateModal(false);
       setTemplateName('');
       loadTemplates();
+      addNotification?.({
+        type: 'success',
+        message: `✓ Preset "${finalName.trim()}" (${payload.length} produk) berhasil disimpan!`,
+        duration: 4000
+      });
     } catch (e) {
-      alert("Gagal simpan template: " + e.message);
+      addNotification?.({
+        type: 'error',
+        message: `Gagal menyimpan preset: ${e.message}`,
+        duration: 5000
+      });
     } finally {
       setIsSavingTemplate(false);
     }
@@ -711,8 +726,17 @@ function PromoShopee() {
 
       setLocalValues(newLocalValues);
       setSelectedIds(newSelectedIds);
+      addNotification?.({
+        type: 'success',
+        message: `✓ Preset "${template.name}" berhasil dimuat ke tabel!`,
+        duration: 4000
+      });
     } catch (e) {
-      alert("Gagal load template: " + e.message);
+      addNotification?.({
+        type: 'error',
+        message: "Gagal load template: " + e.message,
+        duration: 5000
+      });
     } finally {
       setLoading(false);
     }
@@ -724,8 +748,17 @@ function PromoShopee() {
     try {
       await apiDeleteCampaignTemplate(id);
       loadTemplates();
+      addNotification?.({
+        type: 'info',
+        message: 'Preset berhasil dihapus.',
+        duration: 3000
+      });
     } catch (e) {
-      alert("Gagal menghapus: " + e.message);
+      addNotification?.({
+        type: 'error',
+        message: "Gagal menghapus: " + e.message,
+        duration: 4000
+      });
     }
   };
 
@@ -752,7 +785,14 @@ function PromoShopee() {
   // ─── Per-Card Bulk apply ─────────────────────────────────────
   function applyCardBulk(sellerSku, rows) {
     const bulk = cardBulk[sellerSku] || { selections: [], harga: '', stok: '', batas: '' };
-    if (!bulk.harga && bulk.stok === '' && bulk.batas === '') return;
+    if (!bulk.harga && bulk.stok === '' && (bulk.batas === '' || bulk.batas === undefined)) {
+      addNotification?.({
+        type: 'info',
+        message: 'Silakan isi Harga Promo atau Stok terlebih dahulu pada bar Isi Masal.',
+        duration: 3500
+      });
+      return;
+    }
     const varTypes = getVariationTypes(rows);
     const selections = bulk.selections || [];
 
@@ -857,7 +897,15 @@ function PromoShopee() {
     setCardBulk(prev => ({ ...prev, [sellerSku]: { selections, harga: '', stok: '', batas: '' } }));
     setFlashSku(sellerSku);
     setTimeout(() => setFlashSku(null), 1500);
+    setAppliedSkus(prev => ({ ...prev, [sellerSku]: true }));
+    setTimeout(() => setAppliedSkus(prev => ({ ...prev, [sellerSku]: false })), 2000);
     setCardBulkStockConfirm(null);
+
+    addNotification?.({
+      type: 'success',
+      message: `✓ Nilai masal diterapkan ke ${targets.length} variasi pada "${sellerSku}". Klik "Simpan" di atas untuk menyimpan ke database.`,
+      duration: 3500
+    });
 
     if (stok !== '' && skippedCount > 0) {
       alert(`Stok promo untuk SKU "${sellerSku}" berhasil diterapkan:\n\n✓ ${filledCount} variasi diisi stok ${stok}\n✗ ${skippedCount} variasi dilewati/kosong karena stok real < ${stok}`);
@@ -1022,9 +1070,20 @@ function PromoShopee() {
 
   // Apply saran harga from failMap to a list of rows
   function applySaranHarga(rows) {
+    let appliedCount = 0;
     rows.forEach(r => {
-      if (r.saran_harga) setLocalField(r.id, 'harga_promo', fmtRp(r.saran_harga));
+      if (r.saran_harga) {
+        setLocalField(r.id, 'harga_promo', fmtRp(r.saran_harga));
+        appliedCount++;
+      }
     });
+    if (appliedCount > 0) {
+      addNotification?.({
+        type: 'success',
+        message: `✓ Saran harga diterapkan ke ${appliedCount} variasi.`,
+        duration: 3000
+      });
+    }
   }
 
   // ─── Upload ──────────────────────────────────────────────────
@@ -1093,7 +1152,16 @@ function PromoShopee() {
 
   // ─── Save ────────────────────────────────────────────────────
   async function handleSave() {
+    if (!isDirty && !isSaving) {
+      addNotification?.({
+        type: 'info',
+        message: 'Tidak ada perubahan baru untuk disimpan. Semua data sudah tersimpan di database.',
+        duration: 3500
+      });
+      return;
+    }
     setIsSaving(true);
+    let countUpdates = 0;
     try {
       const updates = Object.entries(localValues).map(([id, vals]) => ({
         id: Number(id),
@@ -1101,20 +1169,30 @@ function PromoShopee() {
         ...('stok_promo' in vals ? { stok_promo: vals.stok_promo !== '' ? toRawNum(vals.stok_promo) : null } : {}),
         ...('batas_pembelian' in vals ? { batas_pembelian: vals.batas_pembelian !== '' ? toRawNum(vals.batas_pembelian) : null } : {}),
       }));
+      countUpdates = updates.length;
       if (updates.length > 0) await apiSavePromoBatch(updates, storeId);
     } catch (err) {
-      alert('Gagal menyimpan: ' + err.message);
+      addNotification?.({
+        type: 'error',
+        message: 'Gagal menyimpan: ' + err.message,
+        duration: 5000
+      });
       setIsSaving(false);
       return;
     }
     // Save berhasil — baru clear local edits dan reload
     setLocalValues({});
     setIsDirty(false);
-      setRetainedSkus(new Set());
-      setSaveSuccess(true);
+    setRetainedSkus(new Set());
+    setSaveSuccess(true);
+    addNotification?.({
+      type: 'success',
+      message: `✓ Berhasil menyimpan ${countUpdates > 0 ? countUpdates + ' data promo' : 'perubahan'} ke database!`,
+      duration: 4500
+    });
     try { await loadProducts(); } catch { /* reload gagal tapi data sudah tersimpan */ }
     setIsSaving(false);
-    setTimeout(() => setSaveSuccess(false), 2000);
+    setTimeout(() => setSaveSuccess(false), 2500);
   }
 
   // ─── Delete ──────────────────────────────────────────────────
@@ -1180,7 +1258,8 @@ function PromoShopee() {
     const d = new Date();
     const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
     const dateStr = `${d.getDate()} ${monthNames[d.getMonth()]} ${d.getFullYear()}`;
-    const filename = `Kampanye Shopee ${dateStr}.xlsx`;
+    const stockSuffix = withStock ? 'Dengan Stok' : 'Tanpa Stok';
+    const filename = `Kampanye Shopee ${dateStr} - ${stockSuffix}.xlsx`;
 
     if (skipped > 0) {
       setDownloadConfirm({ rows, skipped, withStock, filename });
@@ -2297,19 +2376,4 @@ function PromoShopee() {
 
           <div style={{ width: '1px', height: '1.5rem', background: 'var(--border-medium)' }} />
 
-          <button onClick={() => { if (window.confirm(`Hapus ${selectedIds.size} produk?\nData akan dihapus permanen dari database.`)) handleDelete(); }}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '2rem', padding: '0.4rem 1rem', cursor: 'pointer', fontSize: '0.8125rem', fontWeight: 600, color: '#ef4444', transition: 'all 0.2s' }}
-          >
-            {isDeleting ? <Loader2 size={14} className="spin" /> : <Trash2 size={14} />}
-            Hapus ({selectedIds.size})
-          </button>
-        </div>
-      )}
-
-
-
-    </div>
-  );
-}
-
-export default PromoShopee;
+          <button onClick={() => { if (window.confirm(`Hapus ${selectedIds.size} produk?\nData akan dihapus pe

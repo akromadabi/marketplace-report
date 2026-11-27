@@ -1011,7 +1011,8 @@ function PromoTiktok() {
     const d = new Date();
     const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
     const dateStr = `${d.getDate()} ${monthNames[d.getMonth()]} ${d.getFullYear()}`;
-    const filename = `Kampanye Tiktok ${dateStr}.xlsx`;
+    const stockSuffix = withStock ? 'Dengan Stok' : 'Tanpa Stok';
+    const filename = `Kampanye Tiktok ${dateStr} - ${stockSuffix}.xlsx`;
 
     if (skipped > 0) {
       setDownloadConfirm({ rows, skipped, withStock, filename });
